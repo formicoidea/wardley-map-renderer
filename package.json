@@ -1,0 +1,40 @@
+{
+  "name": "wardleyapi",
+  "version": "0.1.0",
+  "description": "API that generates Wardley value chains from natural language",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "start": "tsx src/server.ts",
+    "build": "tsc",
+    "typecheck": "tsc --noEmit"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/formicoidea/WardleyAPI.git"
+  },
+  "keywords": [
+    "wardley",
+    "mapping",
+    "strategy",
+    "api"
+  ],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/formicoidea/WardleyAPI/issues"
+  },
+  "homepage": "https://github.com/formicoidea/WardleyAPI#readme",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.78.0",
+    "@hono/node-server": "^1.19.11",
+    "hono": "^4.12.5",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@opencode-ai/sdk": "^1.2.24",
+    "@types/node": "^25.3.5",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  }
+}
