@@ -7,7 +7,8 @@
     "dev": "tsx watch src/server.ts",
     "start": "tsx src/server.ts",
     "build": "tsc",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "batch-render": "tsx scripts/batch-render.ts"
   },
   "repository": {
     "type": "git",
@@ -28,13 +29,17 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.78.0",
     "@hono/node-server": "^1.19.11",
+    "@resvg/resvg-js": "^2.6.2",
     "hono": "^4.12.5",
+    "lit": "^3.3.2",
     "zod": "^4.3.6"
   },
   "devDependencies": {
     "@opencode-ai/sdk": "^1.2.24",
     "@types/node": "^25.3.5",
     "tsx": "^4.21.0",
-    "typescript": "^5.9.3"
-  }
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.18"
+  },
+  "packageManager": "pnpm@10.21.0+sha512.da3337267e400fdd3d479a6c68079ac6db01d8ca4f67572083e722775a796788a7a9956613749e000fac20d424b594f7a791a5f4e2e13581c5ef947f26968a40"
 }

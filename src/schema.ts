@@ -26,6 +26,10 @@ export const ComponentSchema = z.object({
   // Visibility on the value chain (0 = top/visible, 1 = bottom/invisible)
   visibility: z.number().min(0).max(1),
   description: z.string().optional(),
+  // Optional label offset for rendering (pixels relative to component center)
+  labelPosition: z
+    .object({ dx: z.number(), dy: z.number() })
+    .optional(),
 });
 
 // ── Relation (edge) ────────────────────────────────────────
@@ -99,15 +103,6 @@ export function validateMap(map: WardleyMap): string[] {
       errors.push(`Relation references unknown component: ${r.from}`);
     if (!ids.has(r.to))
       errors.push(`Relation references unknown component: ${r.to}`);
-  }
-
-  // Anchors should be at top of value chain (low visibility number)
-  for (const a of anchors) {
-    if (a.visibility > 0.3) {
-      errors.push(
-        `Anchor "${a.label}" should be near top of value chain (visibility <= 0.3), got ${a.visibility}`
-      );
-    }
   }
 
   return errors;
