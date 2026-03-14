@@ -29,9 +29,9 @@ export interface EvolutionPhase {
 
 export const EVOLUTION_PHASES: readonly EvolutionPhase[] = [
   { label: 'Genesis', startRatio: 0, endRatio: EVOLUTION_PHASE_CUSTOM },
-  { label: 'Custom-Built', startRatio: EVOLUTION_PHASE_CUSTOM, endRatio: EVOLUTION_PHASE_PRODUCT },
-  { label: 'Product (+Rental)', startRatio: EVOLUTION_PHASE_PRODUCT, endRatio: EVOLUTION_PHASE_COMMODITY },
-  { label: 'Commodity (+Utility)', startRatio: EVOLUTION_PHASE_COMMODITY, endRatio: 1.0 },
+  { label: 'Custom', startRatio: EVOLUTION_PHASE_CUSTOM, endRatio: EVOLUTION_PHASE_PRODUCT },
+  { label: 'Product (+rental)', startRatio: EVOLUTION_PHASE_PRODUCT, endRatio: EVOLUTION_PHASE_COMMODITY },
+  { label: 'Commodity (+utility)', startRatio: EVOLUTION_PHASE_COMMODITY, endRatio: 1.0 },
 ] as const;
 
 /** Boundary x-ratios (the three interior dividers) */
@@ -48,7 +48,7 @@ export const WARDLEY_MAP_FLAVOUR = 'affine:wardley-map' as const;
 export const AXIS_LABEL_FONT = '13px Inter, sans-serif';
 export const PHASE_LABEL_FONT = '11px Inter, sans-serif';
 export const BORDER_COLOR = '#c0c0c0';
-export const DIVIDER_COLOR = '#e0e0e0';
+export const DIVIDER_COLOR = '#444444';
 export const BACKGROUND_COLOR = '#ffffff';
 export const LABEL_COLOR = '#666666';
 export const AXIS_LABEL_COLOR = '#444444';
@@ -76,7 +76,7 @@ export const TITLE_FONT_SIZE = 16;
 
 // ── Default axis labels ─────────────────────────────────────────
 export const DEFAULT_X_AXIS_LABEL = 'Evolution';
-export const DEFAULT_Y_AXIS_LABEL = 'Value Chain (Visibility)';
+export const DEFAULT_Y_AXIS_LABEL = 'Value Chain';
 
 /** Zoom clamp bounds — labels never shrink below MIN or grow above MAX */
 export const ZOOM_LABEL_SCALE_MIN = 0.5;

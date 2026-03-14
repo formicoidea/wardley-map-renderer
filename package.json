@@ -37,6 +37,9 @@
   "devDependencies": {
     "@opencode-ai/sdk": "^1.2.24",
     "@types/node": "^25.3.5",
+    "@types/pngjs": "^6.0.5",
+    "pixelmatch": "^7.1.0",
+    "pngjs": "^7.0.0",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
     "vitest": "^4.0.18"

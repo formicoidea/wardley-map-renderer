@@ -33,6 +33,15 @@ importers:
       '@types/node':
         specifier: ^25.3.5
         version: 25.4.0
+      '@types/pngjs':
+        specifier: ^6.0.5
+        version: 6.0.5
+      pixelmatch:
+        specifier: ^7.1.0
+        version: 7.1.0
+      pngjs:
+        specifier: ^7.0.0
+        version: 7.0.0
       tsx:
         specifier: ^4.21.0
         version: 4.21.0
@@ -448,6 +457,9 @@ packages:
   '@types/node@25.4.0':
     resolution: {integrity: sha512-9wLpoeWuBlcbBpOY3XmzSTG3oscB6xjBEEtn+pYXTfhyXhIxC5FsBer2KTopBlvKEiW9l13po9fq+SJY/5lkhw==}
 
+  '@types/pngjs@6.0.5':
+    resolution: {integrity: sha512-0k5eKfrA83JOZPppLtS2C7OUtyNAl2wKNxfyYl9Q5g9lPkgBl/9hNyAu6HuEH2J4XmIv2znEpkDd0SaZVxW6iQ==}
+
   '@types/trusted-types@2.0.7':
     resolution: {integrity: sha512-ScaPdn1dQczgbl0QFTeTOmVHFULt394XJgOQNoyVhZ6r2vLnMLJfBPd53SB52T/3G36VI1/g2MZaX0cwDuXsfw==}
 
@@ -557,6 +569,14 @@ packages:
   picomatch@4.0.3:
     resolution: {integrity: sha512-5gTmgEY/sqK6gFXLIsQNH19lWb4ebPDLA4SdLP7dsWkIXHWlG66oPuVvXSGFPppYZz8ZDZq0dYYrbHfBCVUb1Q==}
     engines: {node: '>=12'}
+
+  pixelmatch@7.1.0:
+    resolution: {integrity: sha512-1wrVzJ2STrpmONHKBy228LM1b84msXDUoAzVEl0R8Mz4Ce6EPr+IVtxm8+yvrqLYMHswREkjYFaMxnyGnaY3Ng==}
+    hasBin: true
+
+  pngjs@7.0.0:
+    resolution: {integrity: sha512-LKWqWJRhstyYo9pGvgor/ivk2w94eSjE3RGVuzLGlr3NmD8bf7RcYGze1mNdEHRP6TRP6rMuDHk5t44hnTRyow==}
+    engines: {node: '>=14.19.0'}
 
   postcss@8.5.8:
     resolution: {integrity: sha512-OW/rX8O/jXnm82Ey1k44pObPtdblfiuWnrd8X7GJ7emImCOstunGbXUpp7HdBrFQX6rJzn3sPT397Wp5aCwCHg==}
@@ -939,6 +959,10 @@ snapshots:
     dependencies:
       undici-types: 7.18.2
 
+  '@types/pngjs@6.0.5':
+    dependencies:
+      '@types/node': 25.4.0
+
   '@types/trusted-types@2.0.7': {}
 
   '@vitest/expect@4.0.18':
@@ -1068,6 +1092,12 @@ snapshots:
   picocolors@1.1.1: {}
 
   picomatch@4.0.3: {}
+
+  pixelmatch@7.1.0:
+    dependencies:
+      pngjs: 7.0.0
+
+  pngjs@7.0.0: {}
 
   postcss@8.5.8:
     dependencies:
