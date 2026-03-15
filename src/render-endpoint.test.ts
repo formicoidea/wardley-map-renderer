@@ -6,17 +6,22 @@
 import { describe, it, expect } from "vitest";
 import { Hono } from "hono";
 import { renderRoute } from "./render.js";
+import { rfc7807ErrorHandler } from "./middleware/error-handler.js";
 
 const app = new Hono();
+
+// Install the RFC 7807 error handler (same as production server)
+app.onError(rfc7807ErrorHandler);
+
 app.post("/render", renderRoute);
 
 const VALID_MAP = {
   title: "Test Map",
   components: [
-    { id: "c1", label: "User", type: "anchor", nature: null, evolution: 0.9, visibility: 0.1 },
-    { id: "c2", label: "Web App", type: "capacity", nature: "activity", evolution: 0.6, visibility: 0.3 },
+    { id: "c1", label: "User", type: "anchor", evolution: 0.9, visibility: 0.1 },
+    { id: "c2", label: "Web App", type: "component", nature: "activity", evolution: 0.6, visibility: 0.3 },
   ],
-  relations: [{ from: "c1", to: "c2", type: "dependency" }],
+  relations: [{ source: "c1", target: "c2", type: "DependsOn" }],
 };
 
 function post(accept?: string) {
@@ -67,6 +72,51 @@ describe("POST /render content negotiation", () => {
     const res = await post("text/plain");
     expect(res.status).toBe(406);
     const body = await res.json();
-    expect(body.error).toBe("Not Acceptable");
+    // RFC 7807 Problem Details format
+    expect(body.title).toBe("Not Acceptable");
+    expect(body.status).toBe(406);
+  });
+
+  it("SVG response contains valid SVG document with Wardley Map elements", async () => {
+    const res = await post("image/svg+xml");
+    expect(res.status).toBe(200);
+    const svg = await res.text();
+    // Should contain the map title
+    expect(svg).toContain("Test Map");
+    // Should contain component labels
+    expect(svg).toContain("User");
+    expect(svg).toContain("Web App");
+  });
+
+  it("PNG response has non-zero Content-Length", async () => {
+    const res = await post("image/png");
+    expect(res.status).toBe(200);
+    const contentLength = res.headers.get("Content-Length");
+    expect(contentLength).toBeTruthy();
+    expect(parseInt(contentLength!)).toBeGreaterThan(0);
+  });
+
+  it("returns Cache-Control: no-store for SVG", async () => {
+    const res = await post("image/svg+xml");
+    expect(res.status).toBe(200);
+    expect(res.headers.get("Cache-Control")).toBe("no-store");
+  });
+
+  it("returns Cache-Control: no-store for PNG", async () => {
+    const res = await post("image/png");
+    expect(res.status).toBe(200);
+    expect(res.headers.get("Cache-Control")).toBe("no-store");
+  });
+
+  it("prefers SVG when quality factor is higher for svg", async () => {
+    const res = await post("image/png;q=0.5, image/svg+xml;q=1.0");
+    expect(res.status).toBe(200);
+    expect(res.headers.get("Content-Type")).toContain("image/svg+xml");
+  });
+
+  it("prefers PNG when quality factor is higher for png", async () => {
+    const res = await post("image/svg+xml;q=0.5, image/png;q=1.0");
+    expect(res.status).toBe(200);
+    expect(res.headers.get("Content-Type")).toBe("image/png");
   });
 });

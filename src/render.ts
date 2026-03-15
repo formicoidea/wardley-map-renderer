@@ -9,6 +9,7 @@
 
 import { Resvg } from "@resvg/resvg-js";
 import type { Context } from "hono";
+import { HttpProblem } from "./middleware/error-handler.js";
 import {
   WardleyMapSchema,
   sanitizeMap,
@@ -54,6 +55,7 @@ import {
   TITLE_FONT_SIZE,
   DEFAULT_X_AXIS_LABEL,
   DEFAULT_Y_AXIS_LABEL,
+  resolveAxisLabels,
 } from "./blocks/wardley-map/wardley-map-consts.js";
 
 // ── Dimensions ──────────────────────────────────────────────────────
@@ -80,6 +82,13 @@ const NODE_RADIUS = 5;
 const NODE_FILL = "#ffffff";
 const NODE_STROKE = "#000000";
 const EDGE_COLOR = "#999999";
+
+/** Visual style per relation type: color + default dash pattern */
+const RELATION_TYPE_STYLES: Record<string, { color: string; dashArray: string }> = {
+  DependsOn:  { color: "#999999", dashArray: "" },
+  Flow:       { color: "#2563eb", dashArray: "8,4" },
+  Constraint: { color: "#dc2626", dashArray: "3,3" },
+};
 const COMPONENT_LABEL_FONT_SIZE = 12;
 const COMPONENT_LABEL_COLOR = "#333333";
 
@@ -246,8 +255,9 @@ function boxesOverlap(a: LabelBox, b: LabelBox): boolean {
   return a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
 }
 
-/** Compute total overlap area between a box and all other boxes (excluding self by index) */
-function overlapPenalty(box: LabelBox, others: LabelBox[], selfIndex: number): number {
+/** Compute placement penalty: label-label overlap (high weight) + edge crossings (low weight) */
+function placementPenalty(box: LabelBox, others: LabelBox[], selfIndex: number, edges: EdgeSegment[]): number {
+  // Label-label overlap (weight ×1000 — dominates)
   let penalty = 0;
   for (let k = 0; k < others.length; k++) {
     if (k === selfIndex) continue;
@@ -255,37 +265,36 @@ function overlapPenalty(box: LabelBox, others: LabelBox[], selfIndex: number): n
     if (boxesOverlap(box, other)) {
       const ox = Math.min(box.right, other.right) - Math.max(box.left, other.left);
       const oy = Math.min(box.bottom, other.bottom) - Math.max(box.top, other.top);
-      penalty += ox * oy;
+      penalty += ox * oy * 1000;
     }
   }
+
+  // Edge-crossing (weight ×1 — tiebreaker for "fond blanc")
+  for (const e of edges) {
+    if (segmentIntersectsRect(e.x1, e.y1, e.x2, e.y2, box.left, box.top, box.right, box.bottom)) {
+      penalty += 1;
+    }
+  }
+
   return penalty;
 }
 
-/** Check if any edge segment intersects a label bounding box. */
-function labelCollidesWithEdges(box: LabelBox, edges: EdgeSegment[]): boolean {
-  for (const e of edges) {
-    if (segmentIntersectsRect(e.x1, e.y1, e.x2, e.y2, box.left, box.top, box.right, box.bottom)) {
-      return true;
-    }
-  }
-  return false;
-}
 
-/** Recompute a box's left/right/top/bottom from its label position. */
-function refreshBox(box: LabelBox, charWidth: number, lineHeight: number): void {
-  const fresh = labelToBox(box.label, charWidth, lineHeight);
-  box.left = fresh.left;
-  box.right = fresh.right;
-  box.top = fresh.top;
-  box.bottom = fresh.bottom;
+/** Plot area bounds for label clamping */
+export interface PlotBounds {
+  top: number;
+  bottom: number;
 }
 
 export function avoidLabelCollisions(
   labels: LabelPlacement[],
   edges: EdgeSegment[] = [],
   charWidth = 7,
-  lineHeight = 16
+  lineHeight = 16,
+  plotBounds?: PlotBounds
 ): LabelPlacement[] {
+  const clampTop = plotBounds?.top ?? PLOT_TOP;
+  const clampBottom = plotBounds?.bottom ?? PLOT_BOTTOM;
   const boxes: LabelBox[] = labels.map((l) => labelToBox(l, charWidth, lineHeight));
 
   // ── Phase 1: Alternate-placement repositioning ──────────
@@ -301,8 +310,7 @@ export function avoidLabelCollisions(
     // Skip labels without node info
     if (lbl.nodeCx == null || lbl.nodeCy == null) continue;
 
-    const currentPenalty = overlapPenalty(boxes[i], boxes, i);
-    if (currentPenalty === 0) continue; // no collision
+    const currentPenalty = placementPenalty(boxes[i], boxes, i, edges);
 
     let bestPenalty = currentPenalty;
     let bestCandidate: LabelPlacement | null = null;
@@ -318,7 +326,7 @@ export function avoidLabelCollisions(
       // Temporarily replace for penalty calculation
       const saved = boxes[i];
       boxes[i] = trialBox;
-      const penalty = overlapPenalty(trialBox, boxes, i);
+      const penalty = placementPenalty(trialBox, boxes, i, edges);
       boxes[i] = saved;
 
       if (penalty < bestPenalty) {
@@ -354,36 +362,10 @@ export function avoidLabelCollisions(
     }
   }
 
-  // ── Pass 2: label-edge collision avoidance ───────────────
-  // For each label that overlaps an edge, nudge it vertically
-  if (edges.length > 0) {
-    const EDGE_NUDGE = lineHeight + 2; // px to shift away from edge
-    for (let pass = 0; pass < 3; pass++) {
-      for (const box of boxes) {
-        if (labelCollidesWithEdges(box, edges)) {
-          // Save original position
-          const savedY = box.label.y;
-          const savedTop = box.top;
-          const savedBottom = box.bottom;
-
-          // Try shifting down first
-          box.label.y += EDGE_NUDGE;
-          refreshBox(box, charWidth, lineHeight);
-
-          if (labelCollidesWithEdges(box, edges)) {
-            // Shifting down still collides — revert and shift up instead
-            box.label.y = savedY - EDGE_NUDGE;
-            refreshBox(box, charWidth, lineHeight);
-          }
-        }
-      }
-    }
-  }
-
   // Clamp labels inside plot area
   for (const b of boxes) {
-    if (b.label.y < PLOT_TOP + lineHeight) b.label.y = PLOT_TOP + lineHeight;
-    if (b.label.y > PLOT_BOTTOM) b.label.y = PLOT_BOTTOM;
+    if (b.label.y < clampTop + lineHeight) b.label.y = clampTop + lineHeight;
+    if (b.label.y > clampBottom) b.label.y = clampBottom;
   }
 
   return boxes.map((b) => b.label);
@@ -424,6 +406,8 @@ export interface RelationSegment {
   readonly y2: number;
   /** Optional flow style (solid, dashed, bold) */
   readonly style?: "solid" | "dashed" | "bold";
+  /** Relation type — determines base visual style (color + dash pattern) */
+  readonly relationType?: "DependsOn" | "Flow" | "Constraint";
 }
 
 /** Pre-computed evolution arrow geometry */
@@ -432,7 +416,7 @@ export interface EvolveArrowGeometry {
   readonly fromY: number;
   readonly toX: number;
   readonly toY: number;
-  readonly evolveType: "natural" | "ecosystem" | "forced";
+  readonly evolveType: "natural" | "ecosystem" | "forced" | "late";
 }
 
 /**
@@ -545,6 +529,7 @@ export function computeGeometry(inputMap: WardleyMap): RenderGeometry {
     edgeSegments.push({
       ...seg,
       style: rel.flow?.style ?? "solid",
+      relationType: rel.type ?? "DependsOn",
     });
     edgeSegmentsForCollision.push(seg);
   }
@@ -596,6 +581,24 @@ export function computeGeometry(inputMap: WardleyMap): RenderGeometry {
         evolveType: a.evolveType,
       });
     }
+  }
+
+  // Add evolve arrows as collision segments
+  for (const a of evolveArrows) {
+    edgeSegmentsForCollision.push({ x1: a.fromX, y1: a.fromY, x2: a.toX, y2: a.toY });
+  }
+
+  // Add pipeline borders as collision segments (4 sides per pipeline)
+  for (const p of pipelineRects) {
+    const pad = PIPELINE_PADDING;
+    const left = p.x - pad, top = p.y - pad;
+    const right = p.x + p.width + pad, bottom = p.y + p.height + pad;
+    edgeSegmentsForCollision.push(
+      { x1: left, y1: top, x2: right, y2: top },       // top
+      { x1: left, y1: bottom, x2: right, y2: bottom },  // bottom
+      { x1: left, y1: top, x2: left, y2: bottom },      // left
+      { x1: right, y1: top, x2: right, y2: bottom },    // right
+    );
   }
 
   return {
@@ -756,13 +759,23 @@ export function renderSvg(
 
   // ── Layer 5: Relations (edges) ──────────────────────────
   for (const edge of geometry.edges) {
-    const dashAttr = edge.style === "dashed"
-      ? ` stroke-dasharray="6,3"`
-      : "";
-    const strokeWidth = edge.style === "bold" ? "2.5" : "1.5";
+    // Resolve base visual style from relation type
+    const typeStyle = RELATION_TYPE_STYLES[edge.relationType ?? "DependsOn"] ?? RELATION_TYPE_STYLES.DependsOn;
+    let strokeColor = typeStyle.color;
+    let strokeWidth = 1.5;
+    let dashArray = typeStyle.dashArray;
+
+    // Flow metadata can override line style
+    if (edge.style === "dashed") {
+      dashArray = "6,4";
+    } else if (edge.style === "bold") {
+      strokeWidth = 3;
+    }
+
+    const dashAttr = dashArray ? ` stroke-dasharray="${dashArray}"` : "";
     parts.push(
       `<line x1="${edge.x1}" y1="${edge.y1}" x2="${edge.x2}" y2="${edge.y2}" ` +
-        `stroke="${EDGE_COLOR}" stroke-width="${strokeWidth}"${dashAttr} />`
+        `stroke="${strokeColor}" stroke-width="${strokeWidth}"${dashAttr} />`
     );
   }
 
@@ -818,7 +831,9 @@ export function renderSvg(
   // ── Layer 8: Labels (with collision avoidance) ──────────
   const adjusted = avoidLabelCollisions(
     [...geometry.initialLabels],
-    [...geometry.edgeSegmentsForCollision]
+    [...geometry.edgeSegmentsForCollision],
+    7, 16,
+    { top: ctx.plotTop, bottom: ctx.plotBottom }
   );
   for (const lbl of adjusted) {
     parts.push(
@@ -892,14 +907,19 @@ export function renderMapToSVG(inputMap: WardleyMap): string {
     );
   }
 
+  // ── Resolve i18n axis labels ────────────────────────────
+  const axisLabels = resolveAxisLabels(map.axes.labels);
+
   // ── Phase labels (below x-axis) ────────────────────────
-  for (const phase of EVOLUTION_PHASES) {
+  for (let i = 0; i < EVOLUTION_PHASES.length; i++) {
+    const phase = EVOLUTION_PHASES[i];
+    const phaseLabel = axisLabels.phases[i] ?? phase.label;
     const cx = evoToX((phase.startRatio + phase.endRatio) / 2);
     const cy = PLOT_BOTTOM + AXIS_MARGIN_BOTTOM / 2 + 4;
     parts.push(
       `<text x="${cx}" y="${cy}" text-anchor="middle" ` +
         `font-family="Inter, sans-serif" font-size="${PHASE_LABEL_FONT_SIZE}" ` +
-        `fill="${LABEL_COLOR}">${esc(phase.label)}</text>`
+        `fill="${LABEL_COLOR}">${esc(phaseLabel)}</text>`
     );
   }
 
@@ -908,7 +928,7 @@ export function renderMapToSVG(inputMap: WardleyMap): string {
   parts.push(
     `<text x="${PLOT_LEFT + PLOT_W / 2}" y="${H - 4}" text-anchor="middle" ` +
       `font-family="Inter, sans-serif" font-size="${AXIS_LABEL_FONT_SIZE}" ` +
-      `fill="${AXIS_LABEL_COLOR}">${esc(DEFAULT_X_AXIS_LABEL)}</text>`
+      `fill="${AXIS_LABEL_COLOR}">${esc(axisLabels.xAxis)}</text>`
   );
 
   // Y-axis label (rotated)
@@ -916,17 +936,17 @@ export function renderMapToSVG(inputMap: WardleyMap): string {
     `<text x="14" y="${PLOT_TOP + PLOT_H / 2}" text-anchor="middle" ` +
       `font-family="Inter, sans-serif" font-size="${AXIS_LABEL_FONT_SIZE}" ` +
       `fill="${AXIS_LABEL_COLOR}" ` +
-      `transform="rotate(-90, 14, ${PLOT_TOP + PLOT_H / 2})">${esc(DEFAULT_Y_AXIS_LABEL)}</text>`
+      `transform="rotate(-90, 14, ${PLOT_TOP + PLOT_H / 2})">${esc(axisLabels.yAxis)}</text>`
   );
 
   // ── Visibility direction indicators ─────────────────────
   parts.push(
     `<text x="${PLOT_LEFT + 4}" y="${PLOT_TOP + 14}" ` +
-      `font-family="Inter, sans-serif" font-size="${DIRECTION_LABEL_FONT_SIZE}" fill="${LABEL_COLOR}">Visible</text>`
+      `font-family="Inter, sans-serif" font-size="${DIRECTION_LABEL_FONT_SIZE}" fill="${LABEL_COLOR}">${esc(axisLabels.visibilityHigh)}</text>`
   );
   parts.push(
     `<text x="${PLOT_LEFT + 4}" y="${PLOT_BOTTOM - 4}" ` +
-      `font-family="Inter, sans-serif" font-size="${DIRECTION_LABEL_FONT_SIZE}" fill="${LABEL_COLOR}">Invisible</text>`
+      `font-family="Inter, sans-serif" font-size="${DIRECTION_LABEL_FONT_SIZE}" fill="${LABEL_COLOR}">${esc(axisLabels.visibilityLow)}</text>`
   );
 
   // ── Build component lookup ──────────────────────────────
@@ -980,9 +1000,25 @@ export function renderMapToSVG(inputMap: WardleyMap): string {
     const y2 = visToY(tgt.visibility);
 
     edgeSegments.push({ x1, y1, x2, y2 });
+
+    // Resolve visual style from relation type
+    const typeStyle = RELATION_TYPE_STYLES[rel.type ?? "DependsOn"] ?? RELATION_TYPE_STYLES.DependsOn;
+    let strokeColor = typeStyle.color;
+    let strokeWidth = 1.5;
+    let dashArray = typeStyle.dashArray;
+
+    // Flow metadata can override line style
+    const flowStyle = rel.flow?.style ?? "solid";
+    if (flowStyle === "dashed") {
+      dashArray = "6,4";
+    } else if (flowStyle === "bold") {
+      strokeWidth = 3;
+    }
+
+    const dashAttr = dashArray ? ` stroke-dasharray="${dashArray}"` : "";
     parts.push(
       `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" ` +
-        `stroke="${EDGE_COLOR}" stroke-width="1.5" />`
+        `stroke="${strokeColor}" stroke-width="${strokeWidth}"${dashAttr} />`
     );
   }
 
@@ -1016,6 +1052,21 @@ export function renderMapToSVG(inputMap: WardleyMap): string {
       nodeCy: cy,
       pinned: hasCustomPos,
     });
+  }
+
+  // Add pipeline borders as collision segments (4 sides per pipeline)
+  for (const rp of resolvedPipelines) {
+    const pg = rp.geometry;
+    const left = evoToX(pg.evoStart) - PIPELINE_PADDING;
+    const top = visToY(pg.visStart) - PIPELINE_PADDING;
+    const right = evoToX(pg.evoEnd) + PIPELINE_PADDING;
+    const bottom = visToY(pg.visEnd) + PIPELINE_PADDING;
+    edgeSegments.push(
+      { x1: left, y1: top, x2: right, y2: top },
+      { x1: left, y1: bottom, x2: right, y2: bottom },
+      { x1: left, y1: top, x2: left, y2: bottom },
+      { x1: right, y1: top, x2: right, y2: bottom },
+    );
   }
 
   // ── Apply label collision avoidance and render labels ───
@@ -1193,13 +1244,9 @@ export async function renderRoute(c: Context): Promise<Response> {
   // ── Validate Content-Type ──────────────────────────────
   const contentType = c.req.header("Content-Type") ?? "";
   if (!contentType.includes("application/json") && !contentType.includes("text/json")) {
-    return c.json(
-      {
-        error: "Unsupported Media Type",
-        message: "Content-Type must be application/json",
-      },
-      415
-    );
+    throw new HttpProblem(415, "Unsupported Media Type", {
+      detail: "Content-Type must be application/json",
+    });
   }
 
   // ── Parse body ──────────────────────────────────────────
@@ -1207,25 +1254,21 @@ export async function renderRoute(c: Context): Promise<Response> {
   try {
     body = await c.req.json();
   } catch {
-    return c.json(
-      { error: "Invalid JSON body", message: "Request body must be valid JSON" },
-      400
-    );
+    throw new HttpProblem(400, "Bad Request", {
+      detail: "Request body must be valid JSON",
+    });
   }
 
   // ── Validate against WardleyMap schema ──────────────────
   const parsed = WardleyMapSchema.safeParse(body);
   if (!parsed.success) {
-    return c.json(
-      {
-        error: "Invalid WardleyMap JSON",
-        details: parsed.error.issues.map((issue) => ({
-          path: issue.path.join("."),
-          message: issue.message,
-        })),
-      },
-      400
-    );
+    throw new HttpProblem(422, "Validation Error", {
+      detail: "Invalid WardleyMap JSON",
+      errors: parsed.error.issues.map((issue) => ({
+        path: issue.path.join("."),
+        message: issue.message,
+      })),
+    });
   }
 
   const map = sanitizeMap(parsed.data);
@@ -1235,13 +1278,9 @@ export async function renderRoute(c: Context): Promise<Response> {
   const format = negotiateFormat(accept);
 
   if (format === null) {
-    return c.json(
-      {
-        error: "Not Acceptable",
-        message: "Supported formats: image/svg+xml, image/png",
-      },
-      406
-    );
+    throw new HttpProblem(406, "Not Acceptable", {
+      detail: "Supported formats: image/svg+xml, image/png. Set Accept header accordingly.",
+    });
   }
 
   // ── Render ──────────────────────────────────────────────
@@ -1267,11 +1306,10 @@ export async function renderRoute(c: Context): Promise<Response> {
       });
     }
   } catch (err) {
+    // Re-throw HttpProblem errors (handled by global error handler)
+    if (err instanceof HttpProblem) throw err;
     const detail = err instanceof Error ? err.message : "Rendering failed";
     console.error("[render] Error:", detail);
-    return c.json(
-      { error: "Internal Server Error", message: detail },
-      500
-    );
+    throw new HttpProblem(500, "Internal Server Error", { detail });
   }
 }

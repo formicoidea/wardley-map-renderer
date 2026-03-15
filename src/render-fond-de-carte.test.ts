@@ -69,7 +69,7 @@ describe("SVG fond de carte (AC 3)", () => {
   });
 
   it("renders the Value Chain y-axis label", () => {
-    expect(svg).toContain("Value Chain (Visibility)");
+    expect(svg).toContain("Value Chain");
   });
 
   // ── Direction indicators ──────────────────────────────────

@@ -40,6 +40,7 @@ import { renderEvolvesToLayer } from "./render/evolvesto-layer.js";
 import { renderNodesLayer } from "./render/nodes-layer.js";
 import { renderLabelsLayer } from "./render/labels-layer.js";
 import { renderNotesLayer } from "./render/notes-layer.js";
+import { renderLegendLayer } from "./render/legend-layer.js";
 
 // ── Build explicit layer list (no global registry mutation) ──────────
 
@@ -52,6 +53,7 @@ const LAYERS: readonly LayerRegistration[] = [
   { name: "nodes", order: LAYER_ORDER.nodes, render: renderNodesLayer },
   { name: "labels", order: LAYER_ORDER.labels, render: renderLabelsLayer },
   { name: "notes", order: LAYER_ORDER.notes, render: renderNotesLayer },
+  { name: "legend", order: LAYER_ORDER.legend, render: renderLegendLayer },
 ];
 
 // ── Public types ────────────────────────────────────────────────────

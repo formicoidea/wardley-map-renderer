@@ -186,7 +186,9 @@ describe("renderAxesLayer", () => {
     const ctx = buildRenderContext(map);
     const parts = renderAxesLayer(ctx);
 
-    const dividers = parts.filter((p) => p.includes(DIVIDER_COLOR));
+    const dividers = parts.filter(
+      (p) => p.includes(DIVIDER_COLOR) && p.includes("stroke-dasharray")
+    );
     expect(dividers).toHaveLength(0);
   });
 

@@ -67,20 +67,21 @@ export const renderLabelsLayer: LayerRenderer = (
     const cx = node.cx;
     const cy = node.cy;
 
-    // Label offset: pipelines centered above handle, others to the right of node
+    // Label offset: to the right of node (pipelines: above handle center)
     const hasCustomPos = comp.labelPosition != null;
     let dx: number;
     let dy: number;
-    let anchor: string;
+    let anchor: "start" | "middle" | "end" = "middle";
 
     if (comp.type === "pipeline") {
-      dx = comp.labelPosition?.dx ?? 0;
-      dy = comp.labelPosition?.dy ?? -(NODE_RADIUS + 4);
+      dx = comp.labelPosition?.dx ?? (NODE_RADIUS + 4);
+      dy = comp.labelPosition?.dy ?? 4;
       anchor = "middle";
     } else {
       dx = comp.labelPosition?.dx ?? NODE_RADIUS + 4;
       dy = comp.labelPosition?.dy ?? 4;
-      anchor = dx < 0 ? "end" : "start";
+      anchor = dx < 0 ? "end" : anchor;
+      anchor = dx > 0 ? "start" : anchor;
     }
 
     labelPlacements.push({
@@ -96,16 +97,35 @@ export const renderLabelsLayer: LayerRenderer = (
 
   if (labelPlacements.length === 0) return [];
 
-  // Convert edge geometry to EdgeSegment format for collision avoidance
+  // Build collision segments: relation edges + evolve arrows + pipeline borders
   const edgeSegments: EdgeSegment[] = ctx.edges.map((e) => ({
-    x1: e.x1,
-    y1: e.y1,
-    x2: e.x2,
-    y2: e.y2,
+    x1: e.x1, y1: e.y1, x2: e.x2, y2: e.y2,
   }));
 
-  // Apply collision avoidance algorithm
-  const adjusted = avoidLabelCollisions(labelPlacements, edgeSegments);
+  // Evolve arrows
+  for (const a of ctx.evolves) {
+    edgeSegments.push({ x1: a.fromX, y1: a.fromY, x2: a.toX, y2: a.toY });
+  }
+
+  // Pipeline borders (4 sides each)
+  const PIPELINE_PADDING = 4;
+  for (const p of ctx.pipelines) {
+    const left = p.x - PIPELINE_PADDING, top = p.y - PIPELINE_PADDING;
+    const right = p.x + p.width + PIPELINE_PADDING, bottom = p.y + p.height + PIPELINE_PADDING;
+    edgeSegments.push(
+      { x1: left, y1: top, x2: right, y2: top },
+      { x1: left, y1: bottom, x2: right, y2: bottom },
+      { x1: left, y1: top, x2: left, y2: bottom },
+      { x1: right, y1: top, x2: right, y2: bottom },
+    );
+  }
+
+  // Apply label collision avoidance (label-label + edge-crossing scoring)
+  const adjusted = avoidLabelCollisions(
+    labelPlacements, edgeSegments,
+    7, 16,
+    { top: ctx.plot.top, bottom: ctx.plot.bottom }
+  );
 
   // Generate SVG text elements
   const parts: string[] = [];

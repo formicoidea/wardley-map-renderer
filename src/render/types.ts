@@ -60,7 +60,7 @@ export interface EvolveGeometry {
   readonly fromY: number;
   readonly toX: number;
   readonly toY: number;
-  readonly evolveType: "natural" | "ecosystem" | "forced";
+  readonly evolveType: "natural" | "ecosystem" | "forced"| "late";
   readonly component: Component;
 }
 
@@ -270,7 +270,8 @@ export type LayerName =
   | "evolvesTo"
   | "nodes"
   | "labels"
-  | "notes";
+  | "notes"
+  | "legend";
 
 /** A registered layer with its renderer and execution order */
 export interface LayerRegistration {

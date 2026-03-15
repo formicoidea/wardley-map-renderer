@@ -111,12 +111,14 @@ describe("evoToX", () => {
 describe("visToY", () => {
   const ctx = createRenderContext(makeMap());
 
-  it("maps 0 to plotTop", () => {
-    expect(visToY(0, ctx)).toBe(ctx.plotTop);
+  it("maps 0 (invisible/bottom) to plotBottom", () => {
+    // MapKeep convention: visibility 0 = invisible = bottom of map
+    expect(visToY(0, ctx)).toBe(ctx.plotTop + ctx.plotHeight);
   });
 
-  it("maps 1 to plotBottom", () => {
-    expect(visToY(1, ctx)).toBe(ctx.plotTop + ctx.plotHeight);
+  it("maps 1 (visible/top) to plotTop", () => {
+    // MapKeep convention: visibility 1 = visible = top of map
+    expect(visToY(1, ctx)).toBe(ctx.plotTop);
   });
 });
 
@@ -150,12 +152,15 @@ describe("computePipelineRect", () => {
     expect(rect.x2).toBeCloseTo(expectedX2);
     expect(rect.width).toBeCloseTo(expectedX2 - expectedX1);
 
-    // y: visToY(0.3) and visToY(0.7)
-    const expectedY1 = visToY(0.3, ctx);
-    const expectedY2 = visToY(0.7, ctx);
-    expect(rect.y).toBeCloseTo(expectedY1);
-    expect(rect.y2).toBeCloseTo(expectedY2);
-    expect(rect.height).toBeCloseTo(expectedY2 - expectedY1);
+    // y: visToY uses MapKeep convention (higher vis → lower pixel y)
+    // computePipelineRect normalises with Math.min/max
+    const vy1 = visToY(0.3, ctx);
+    const vy2 = visToY(0.7, ctx);
+    const expectedYTop = Math.min(vy1, vy2);
+    const expectedYBot = Math.max(vy1, vy2);
+    expect(rect.y).toBeCloseTo(expectedYTop);
+    expect(rect.y2).toBeCloseTo(expectedYBot);
+    expect(rect.height).toBeCloseTo(expectedYBot - expectedYTop);
   });
 
   it("defaults handle to midpoint of evo range when not specified", () => {
@@ -200,8 +205,12 @@ describe("computePipelineRect", () => {
 
     expect(rect.x).toBeCloseTo(evoToX(0.196, ctx));
     expect(rect.x2).toBeCloseTo(evoToX(0.735, ctx));
-    expect(rect.y).toBeCloseTo(visToY(0.664, ctx));
-    expect(rect.y2).toBeCloseTo(visToY(0.704, ctx));
+    // visToY uses MapKeep convention: higher vis → lower pixel y
+    // computePipelineRect normalises with Math.min/max
+    const vy664 = visToY(0.664, ctx);
+    const vy704 = visToY(0.704, ctx);
+    expect(rect.y).toBeCloseTo(Math.min(vy664, vy704));
+    expect(rect.y2).toBeCloseTo(Math.max(vy664, vy704));
     expect(rect.handleX).toBeCloseTo(evoToX(0.245, ctx));
   });
 });

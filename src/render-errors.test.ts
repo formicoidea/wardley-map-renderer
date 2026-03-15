@@ -1,52 +1,40 @@
 /**
- * Tests for AC 12: Errors returned as JSON with 4xx/5xx status codes
+ * Tests for error handling on the POST /render endpoint.
  *
- * Verifies that the POST /render endpoint returns proper JSON error responses
- * for all error conditions.
+ * Verifies that the POST /render endpoint returns proper RFC 7807
+ * Problem Details JSON error responses for all error conditions.
  */
 
 import { describe, it, expect } from "vitest";
 import { Hono } from "hono";
 import { renderRoute, negotiateFormat } from "./render.js";
+import { rfc7807ErrorHandler, rfc7807NotFound } from "./middleware/error-handler.js";
 
 // ── Test app setup ──────────────────────────────────────────────────
 
 function createTestApp() {
   const app = new Hono();
 
-  // Global error handler (mirrors server.ts)
-  app.onError((err, c) => {
-    const status =
-      "status" in err && typeof err.status === "number" ? err.status : 500;
-    return c.json(
-      {
-        error: status >= 500 ? "Internal Server Error" : "Request Error",
-        message: err.message || "An unexpected error occurred",
-      },
-      status as any
-    );
-  });
+  // Use the production RFC 7807 error handler
+  app.onError(rfc7807ErrorHandler);
 
   app.post("/render", renderRoute);
 
   // Method not allowed
   app.all("/render", (c) =>
     c.json(
-      { error: "Method Not Allowed", message: "Use POST for /render" },
+      {
+        type: "about:blank",
+        title: "Method Not Allowed",
+        status: 405,
+        detail: "Use POST for /render",
+      },
       405
     )
   );
 
   // 404 catch-all
-  app.notFound((c) =>
-    c.json(
-      {
-        error: "Not Found",
-        message: `No route for ${c.req.method} ${c.req.path}`,
-      },
-      404
-    )
-  );
+  app.notFound(rfc7807NotFound);
 
   return app;
 }
@@ -60,20 +48,19 @@ const VALID_MAP = {
       id: "user",
       label: "User",
       type: "anchor",
-      nature: null,
       evolution: 0.5,
       visibility: 0.1,
     },
     {
       id: "svc",
       label: "Service",
-      type: "capacity",
+      type: "component",
       nature: "activity",
       evolution: 0.6,
       visibility: 0.5,
     },
   ],
-  relations: [{ from: "user", to: "svc" }],
+  relations: [{ source: "user", target: "svc" }],
 };
 
 // ── Helper ──────────────────────────────────────────────────────────
@@ -104,35 +91,35 @@ describe("POST /render error handling", () => {
   it("returns 400 JSON for invalid JSON body", async () => {
     const res = await postRender(app, "not valid json {{{");
     expect(res.status).toBe(400);
-    expect(res.headers.get("content-type")).toContain("application/json");
+    expect(res.headers.get("content-type")).toContain("json");
     const json = await res.json();
-    expect(json).toHaveProperty("error");
-    expect(json.error).toMatch(/invalid/i);
+    expect(json).toHaveProperty("title");
+    expect(json.title).toBe("Bad Request");
   });
 
-  it("returns 400 JSON when required fields are missing", async () => {
+  it("returns 422 JSON when required fields are missing", async () => {
     const res = await postRender(app, { title: "Missing components" });
-    expect(res.status).toBe(400);
-    expect(res.headers.get("content-type")).toContain("application/json");
+    expect(res.status).toBe(422);
+    expect(res.headers.get("content-type")).toContain("json");
     const json = await res.json();
-    expect(json).toHaveProperty("error");
-    expect(json).toHaveProperty("details");
-    expect(Array.isArray(json.details)).toBe(true);
+    expect(json).toHaveProperty("title");
+    expect(json).toHaveProperty("errors");
+    expect(Array.isArray(json.errors)).toBe(true);
   });
 
-  it("returns 400 JSON when components array is empty", async () => {
+  it("returns 422 JSON when components array is empty", async () => {
     const res = await postRender(app, {
       title: "Empty",
       components: [],
       relations: [],
     });
-    expect(res.status).toBe(400);
-    expect(res.headers.get("content-type")).toContain("application/json");
+    expect(res.status).toBe(422);
+    expect(res.headers.get("content-type")).toContain("json");
     const json = await res.json();
-    expect(json).toHaveProperty("error");
+    expect(json).toHaveProperty("title");
   });
 
-  it("returns 400 JSON when evolution is out of range", async () => {
+  it("returns 422 JSON when evolution is out of range", async () => {
     const res = await postRender(app, {
       title: "Bad evolution",
       components: [
@@ -140,34 +127,33 @@ describe("POST /render error handling", () => {
           id: "x",
           label: "X",
           type: "anchor",
-          nature: null,
           evolution: 2.0,
           visibility: 0.1,
         },
       ],
       relations: [],
     });
-    expect(res.status).toBe(400);
-    expect(res.headers.get("content-type")).toContain("application/json");
+    expect(res.status).toBe(422);
+    expect(res.headers.get("content-type")).toContain("json");
     const json = await res.json();
-    expect(json).toHaveProperty("error");
+    expect(json).toHaveProperty("title");
   });
 
-  it("returns 400 with details array for schema validation errors", async () => {
+  it("returns 422 with errors array for schema validation errors", async () => {
     const res = await postRender(app, {
       title: 123, // wrong type
       components: "not an array",
       relations: [],
     });
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(422);
     const json = await res.json();
-    expect(json.error).toBe("Invalid WardleyMap JSON");
-    expect(json.details).toBeDefined();
-    expect(json.details.length).toBeGreaterThan(0);
-    // Each detail should have path and message
-    for (const detail of json.details) {
-      expect(detail).toHaveProperty("path");
-      expect(detail).toHaveProperty("message");
+    expect(json.detail).toBe("Invalid WardleyMap JSON");
+    expect(json.errors).toBeDefined();
+    expect(json.errors.length).toBeGreaterThan(0);
+    // Each error should have path and message
+    for (const err of json.errors) {
+      expect(err).toHaveProperty("path");
+      expect(err).toHaveProperty("message");
     }
   });
 
@@ -178,11 +164,11 @@ describe("POST /render error handling", () => {
       Accept: "application/pdf",
     });
     expect(res.status).toBe(406);
-    expect(res.headers.get("content-type")).toContain("application/json");
+    expect(res.headers.get("content-type")).toContain("json");
     const json = await res.json();
-    expect(json.error).toBe("Not Acceptable");
-    expect(json.message).toContain("image/svg+xml");
-    expect(json.message).toContain("image/png");
+    expect(json.title).toBe("Not Acceptable");
+    expect(json.detail).toContain("image/svg+xml");
+    expect(json.detail).toContain("image/png");
   });
 
   it("returns 406 JSON for text/html Accept", async () => {
@@ -191,7 +177,7 @@ describe("POST /render error handling", () => {
     });
     expect(res.status).toBe(406);
     const json = await res.json();
-    expect(json).toHaveProperty("error");
+    expect(json).toHaveProperty("title");
   });
 
   // ── 415 Unsupported Media Type ──────────────────────────
@@ -203,10 +189,10 @@ describe("POST /render error handling", () => {
       body: JSON.stringify(VALID_MAP),
     });
     expect(res.status).toBe(415);
-    expect(res.headers.get("content-type")).toContain("application/json");
+    expect(res.headers.get("content-type")).toContain("json");
     const json = await res.json();
-    expect(json.error).toBe("Unsupported Media Type");
-    expect(json.message).toContain("application/json");
+    expect(json.title).toBe("Unsupported Media Type");
+    expect(json.detail).toContain("json");
   });
 
   it("returns 415 JSON when Content-Type is multipart/form-data", async () => {
@@ -217,7 +203,7 @@ describe("POST /render error handling", () => {
     });
     expect(res.status).toBe(415);
     const json = await res.json();
-    expect(json.error).toBe("Unsupported Media Type");
+    expect(json.title).toBe("Unsupported Media Type");
   });
 
   // ── 405 Method Not Allowed ──────────────────────────────
@@ -225,9 +211,9 @@ describe("POST /render error handling", () => {
   it("returns 405 JSON for GET /render", async () => {
     const res = await app.request("/render", { method: "GET" });
     expect(res.status).toBe(405);
-    expect(res.headers.get("content-type")).toContain("application/json");
+    expect(res.headers.get("content-type")).toContain("json");
     const json = await res.json();
-    expect(json.error).toBe("Method Not Allowed");
+    expect(json.title).toBe("Method Not Allowed");
   });
 
   // ── 404 Not Found ───────────────────────────────────────
@@ -235,9 +221,9 @@ describe("POST /render error handling", () => {
   it("returns 404 JSON for unknown routes", async () => {
     const res = await app.request("/nonexistent", { method: "GET" });
     expect(res.status).toBe(404);
-    expect(res.headers.get("content-type")).toContain("application/json");
+    expect(res.headers.get("content-type")).toContain("json");
     const json = await res.json();
-    expect(json.error).toBe("Not Found");
+    expect(json.title).toBe("Not Found");
   });
 
   // ── Success baseline (confirms non-error paths work) ───

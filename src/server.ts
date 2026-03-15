@@ -1,107 +1,80 @@
 import { Hono } from "hono";
 import { serve } from "@hono/node-server";
 import { cors } from "hono/cors";
-import { generateMap } from "./llm.js";
-import { validateMap, toOWM } from "./schema.js";
-import { renderRoute } from "./render.js";
+import { apiKeyAuth } from "./middleware/api-key.js";
+import { rateLimiter } from "./middleware/rate-limiter.js";
+import { v1 } from "./routes/v1.js";
+import { rfc7807ErrorHandler, rfc7807NotFound } from "./middleware/error-handler.js";
 
 const app = new Hono();
 
 app.use("*", cors());
 
-// ── Global error handler — all unhandled errors return JSON ──
-app.onError((err, c) => {
-  console.error("[server] Unhandled error:", err.message);
-  const status = "status" in err && typeof err.status === "number" ? err.status : 500;
-  return c.json(
-    {
-      error: status >= 500 ? "Internal Server Error" : "Request Error",
-      message: err.message || "An unexpected error occurred",
-    },
-    status as any
-  );
+// ── API key authentication on /v1/* routes (except /v1/docs/*) ──
+app.use("/v1/*", async (c, next) => {
+  // Skip auth for documentation endpoints
+  if (c.req.path.startsWith("/v1/docs/")) {
+    return next();
+  }
+  return apiKeyAuth()(c, next);
 });
 
-// ── Health check ───────────────────────────────────────────
+// ── Rate limiting on /v1/* routes (except /v1/docs/*) ───────────
+app.use("/v1/*", async (c, next) => {
+  // Skip rate limiting for documentation endpoints
+  if (c.req.path.startsWith("/v1/docs/")) {
+    return next();
+  }
+  return rateLimiter()(c, next);
+});
+
+// ── Global error handler — RFC 7807 Problem Details ─────────
+app.onError(rfc7807ErrorHandler);
+
+// ── Health check (root — not versioned) ──────────────────────
+app.get("/health", (c) =>
+  c.json({
+    name: "WardleyAPI",
+    version: "0.1.0",
+    status: "ok",
+  })
+);
+
 app.get("/", (c) =>
   c.json({
     name: "WardleyAPI",
     version: "0.1.0",
     status: "ok",
     endpoints: {
-      "POST /generate": "Generate a Wardley Map from a prompt",
-      "POST /render": "Render a Wardley Map to PNG (default) or SVG (Accept: image/svg+xml)",
+      "GET  /health": "Health check",
+      "POST /v1/render": "Render a Wardley Map to PNG (default) or SVG (Accept: image/svg+xml)",
+      "POST /v1/generate": "Generate a Wardley Map from a prompt",
+      "GET  /v1/docs/openapi.json": "OpenAPI 3.1 specification (no auth required)",
     },
   })
 );
 
-// ── Main endpoint ──────────────────────────────────────────
-app.post("/generate", async (c) => {
-  const body = await c.req.json<{ prompt: string; format?: string }>();
+// ── v1 API routes ────────────────────────────────────────────
+app.route("/v1", v1);
 
-  if (!body.prompt || typeof body.prompt !== "string") {
-    return c.json({ error: "Missing 'prompt' field (string)" }, 400);
-  }
+// ── 404 catch-all — RFC 7807 Problem Details ────────────────
+app.notFound(rfc7807NotFound);
 
-  const format = body.format || "json"; // "json" | "owm" | "both"
+// ── Start (only when run directly, not when imported by tests) ──
+const isTestEnv =
+  process.env.NODE_ENV === "test" ||
+  process.env.VITEST === "true" ||
+  typeof (globalThis as any).__vitest_worker__ !== "undefined";
 
-  try {
-    const startTime = Date.now();
-    const map = await generateMap(body.prompt);
-    const elapsed = Date.now() - startTime;
+if (!isTestEnv) {
+  const port = parseInt(process.env.PORT || "3000", 10);
 
-    // Run validation (Engine 3)
-    const warnings = validateMap(map);
+  serve({ fetch: app.fetch, port }, (info) => {
+    console.log(`WardleyAPI running at http://localhost:${info.port}`);
+    console.log(`  GET  /health        Health check`);
+    console.log(`  POST /v1/render     WardleyMap JSON body, Accept: image/png (default)|image/svg+xml`);
+    console.log(`  POST /v1/generate   { "prompt": "...", "format": "json|owm|both" }`);
+  });
+}
 
-    // Build response based on requested format
-    const response: Record<string, unknown> = {
-      meta: {
-        elapsed_ms: elapsed,
-        warnings,
-        engine: "llm-only-v1", // honest about current architecture
-      },
-    };
-
-    if (format === "json" || format === "both") {
-      response.map = map;
-    }
-    if (format === "owm" || format === "both") {
-      response.owm = toOWM(map);
-    }
-
-    return c.json(response);
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown error";
-    console.error("Generation failed:", message);
-    return c.json({ error: message }, 500);
-  }
-});
-
-// ── Render endpoint ─────────────────────────────────────────
-// Content negotiation via Accept header:
-//   image/svg+xml → SVG
-//   image/png     → PNG (1600×900, default when no/ambiguous Accept header)
-//   unsupported   → 406 Not Acceptable
-app.post("/render", renderRoute);
-
-// ── Method Not Allowed for /render ──────────────────────────
-app.all("/render", (c) =>
-  c.json(
-    { error: "Method Not Allowed", message: "Use POST for /render" },
-    405
-  )
-);
-
-// ── 404 catch-all — unknown routes return JSON ──────────────
-app.notFound((c) =>
-  c.json({ error: "Not Found", message: `No route for ${c.req.method} ${c.req.path}` }, 404)
-);
-
-// ── Start ──────────────────────────────────────────────────
-const port = parseInt(process.env.PORT || "3000", 10);
-
-serve({ fetch: app.fetch, port }, (info) => {
-  console.log(`WardleyAPI running at http://localhost:${info.port}`);
-  console.log(`  POST /generate  { "prompt": "...", "format": "json|owm|both" }`);
-  console.log(`  POST /render    WardleyMap JSON body, Accept: image/png (default)|image/svg+xml`);
-});
+export { app };

@@ -67,3 +67,4 @@ export { renderEvolvesToLayer } from "./evolvesto-layer.js";
 export { renderNodesLayer } from "./nodes-layer.js";
 export { renderLabelsLayer } from "./labels-layer.js";
 export { renderNotesLayer } from "./notes-layer.js";
+export { renderLegendLayer } from "./legend-layer.js";

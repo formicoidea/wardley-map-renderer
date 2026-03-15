@@ -4,6 +4,15 @@ import { z } from "zod";
 // Phase 1: single float. Phase 2+: swap to distribution array.
 export const EvolutionSchema = z.number().min(0).max(1);
 
+// ── Evolution range (optional min-max span) ─────────────────
+// Represents a component's evolution uncertainty or span as [min, max].
+// Both values are normalized [0, 1] and min must be ≤ max.
+export const EvolutionRangeSchema = z
+  .tuple([EvolutionSchema, EvolutionSchema])
+  .refine(([min, max]) => min <= max, {
+    message: "evolutionRange[0] (min) must be ≤ evolutionRange[1] (max)",
+  });
+
 // ── Component types (aligned with MapKeep) ──────────────────
 // 5 types: component (generic capacity), user-need, pipeline, note, anchor
 export const ComponentTypeEnum = z.enum([
@@ -31,7 +40,7 @@ export const NatureEnum = z
 export const EvolvesToSchema = z.object({
   evolution: EvolutionSchema,
   visibility: z.number().min(0).max(1),
-  evolveType: z.enum(["natural", "ecosystem", "forced"]).default("natural"),
+  evolveType: z.enum(["natural", "ecosystem", "forced", "late"]).default("natural"),
 });
 
 // ── Pipeline geometry ───────────────────────────────────────
@@ -59,6 +68,8 @@ export const ComponentSchema = z.object({
   labelPosition: z
     .object({ dx: z.number(), dy: z.number() })
     .optional(),
+  // Optional evolution range: [min, max] span for evolution uncertainty or breadth
+  evolutionRange: EvolutionRangeSchema.optional(),
   // Evolution movement targets
   evolvesTo: z.array(EvolvesToSchema).optional(),
   // Pipeline geometry (only for type === "pipeline")
@@ -70,7 +81,11 @@ export const ComponentSchema = z.object({
 // ── Relation (edge) ────────────────────────────────────────
 // Breaking change: source/target replaces from/to, DependsOn type
 // flow: optional semantic annotation for the nature of the dependency
-export const RelationTypeEnum = z.enum(["DependsOn"]);
+// Relation types:
+//   - DependsOn: standard dependency (A depends on B)
+//   - Flow: data/value/information flow between components
+//   - Constraint: regulatory, policy, or structural constraint
+export const RelationTypeEnum = z.enum(["DependsOn", "Flow", "Constraint"]);
 
 export const FlowSchema = z.object({
   /** Semantic label describing what flows along the edge (e.g. "data", "money", "risk", "information") */
@@ -93,26 +108,136 @@ export const GridSizeSchema = z.object({
   height: z.number().positive(),
 });
 
+// ── Supported locales for axis labels ─────────────────────
+export const LocaleEnum = z.enum(["en", "fr"]);
+
+// ── Axis labels (i18n) ────────────────────────────────────
+// All fields optional — locale provides defaults, individual fields override.
+export const AxisLabelsSchema = z.object({
+  /** Locale preset: selects built-in label set (default: "en") */
+  locale: LocaleEnum.default("en"),
+  /** X-axis main label (e.g. "Evolution") */
+  xAxis: z.string().optional(),
+  /** Y-axis main label (e.g. "Value Chain" / "Chaîne de valeur") */
+  yAxis: z.string().optional(),
+  /** Evolution phase labels — exactly 4 strings: [Genesis, Custom, Product, Commodity] */
+  phases: z.tuple([z.string(), z.string(), z.string(), z.string()]).optional(),
+  /** Direction indicator at left/start of evolution axis (e.g. "Uncharted") */
+  evolutionStart: z.string().optional(),
+  /** Direction indicator at right/end of evolution axis (e.g. "Industrialized") */
+  evolutionEnd: z.string().optional(),
+  /** Direction indicator at top of value chain axis (e.g. "Visible") */
+  visibilityHigh: z.string().optional(),
+  /** Direction indicator at bottom of value chain axis (e.g. "Invisible") */
+  visibilityLow: z.string().optional(),
+});
+
+/**
+ * AxisLabelsOverrideSchema — variant for renderConfig.axisLabels.
+ * Unlike AxisLabelsSchema, locale is optional WITHOUT a default,
+ * so unset locale doesn't override axes.labels locale.
+ */
+export const AxisLabelsOverrideSchema = z.object({
+  locale: LocaleEnum.optional(),
+  xAxis: z.string().optional(),
+  yAxis: z.string().optional(),
+  phases: z.tuple([z.string(), z.string(), z.string(), z.string()]).optional(),
+  evolutionStart: z.string().optional(),
+  evolutionEnd: z.string().optional(),
+  visibilityHigh: z.string().optional(),
+  visibilityLow: z.string().optional(),
+});
+
 // ── Axes visibility ────────────────────────────────────────
 export const AxesSchema = z.object({
   valueChain: z.boolean().default(true),
   evolution: z.boolean().default(true),
+  /** i18n axis labels — locale-aware with per-field overrides */
+  labels: AxisLabelsSchema.optional(),
+});
+
+// ── Legend config ──────────────────────────────────────────
+export const LegendPositionEnum = z.enum([
+  "top-left", "top-right", "bottom-left", "bottom-right", "auto"
+]);
+
+export const LegendSchema = z.object({
+  show: z.boolean().default(true),
+  position: LegendPositionEnum.default("auto"),
+});
+
+// ── Render config (optional visual overrides embedded in map JSON) ──
+// Mirrors RenderOptions from render/types.ts but as a Zod schema,
+// allowing render hints to travel with the map payload.
+
+/** Evolve arrow style per evolve type */
+export const EvolveStyleSchema = z.object({
+  stroke: z.string().optional(),
+  strokeDasharray: z.string().optional(),
+});
+
+export const RenderConfigSchema = z.object({
+  /** Override canvas width (defaults to gridSize.width) */
+  width: z.number().positive().optional(),
+  /** Override canvas height (defaults to gridSize.height) */
+  height: z.number().positive().optional(),
+  /** Background color hex string (defaults to "#ffffff") */
+  backgroundColor: z.string().regex(/^#[0-9a-fA-F]{3,8}$/, "Must be a valid hex color").optional(),
+  /** Whether to render axes */
+  showAxes: z.boolean().optional(),
+  /** Whether to render the value chain (y-axis) label */
+  showValueChain: z.boolean().optional(),
+  /** Whether to render evolution phase labels */
+  showPhaseLabels: z.boolean().optional(),
+  /** Font family for all text */
+  fontFamily: z.string().optional(),
+  /** Scale factor for component label font size (1.0 = default 12px) */
+  labelScale: z.number().positive().max(5).optional(),
+  /** Node circle radius in pixels */
+  nodeRadius: z.number().positive().max(50).optional(),
+  /** Enable/disable label collision avoidance */
+  avoidCollisions: z.boolean().optional(),
+  /** Component types to exclude from rendering */
+  excludeTypes: z.array(ComponentTypeEnum).optional(),
+  /** Custom color overrides by component type (hex values) */
+  typeColors: z.object({
+    "component": z.string().optional(),
+    "user-need": z.string().optional(),
+    "pipeline": z.string().optional(),
+    "note": z.string().optional(),
+    "anchor": z.string().optional(),
+  }).partial().optional(),
+  /** evolveType → stroke style mapping for evolution arrows */
+  evolveStyles: z.object({
+    natural: EvolveStyleSchema.optional(),
+    ecosystem: EvolveStyleSchema.optional(),
+    forced: EvolveStyleSchema.optional(),
+  }).strict().optional(),
+  /** Axis label overrides — applied on top of map.axes.labels (highest priority).
+   *  Uses AxisLabelsOverrideSchema (locale has no default) so unset fields
+   *  fall through to map.axes.labels or locale preset. */
+  axisLabels: AxisLabelsOverrideSchema.optional(),
 });
 
 // ── Wardley Map ────────────────────────────────────────────
 export const WardleyMapSchema = z.object({
   title: z.string(),
-  components: z.array(ComponentSchema).min(1),
+  components: z.array(ComponentSchema),
   relations: z.array(RelationSchema),
   context: z.string().optional(),
   // Grid dimensions for coordinate mapping (default 1600×800)
   gridSize: GridSizeSchema.default({ width: 1600, height: 800 }),
   // Axes visibility toggles
   axes: AxesSchema.default({ valueChain: true, evolution: true }),
+  // Legend visibility and position
+  legend: LegendSchema.default({ show: true, position: "auto" }),
+  // Optional render config — visual overrides that travel with the map payload
+  renderConfig: RenderConfigSchema.optional(),
 });
 
 // ── TypeScript types derived from Zod ──────────────────────
 export type Component = z.infer<typeof ComponentSchema>;
+export type EvolutionRange = z.infer<typeof EvolutionRangeSchema>;
 export type EvolvesTo = z.infer<typeof EvolvesToSchema>;
 export type PipelineGeometry = z.infer<typeof PipelineGeometrySchema>;
 export type Relation = z.infer<typeof RelationSchema>;
@@ -120,6 +245,12 @@ export type Flow = z.infer<typeof FlowSchema>;
 export type RelationType = z.infer<typeof RelationTypeEnum>;
 export type GridSize = z.infer<typeof GridSizeSchema>;
 export type Axes = z.infer<typeof AxesSchema>;
+export type AxisLabels = z.infer<typeof AxisLabelsSchema>;
+export type Locale = z.infer<typeof LocaleEnum>;
+export type Legend = z.infer<typeof LegendSchema>;
+export type LegendPosition = z.infer<typeof LegendPositionEnum>;
+export type RenderConfig = z.infer<typeof RenderConfigSchema>;
+export type EvolveStyle = z.infer<typeof EvolveStyleSchema>;
 export type WardleyMap = z.infer<typeof WardleyMapSchema>;
 
 // ── Color mapping ──────────────────────────────────────────
@@ -158,6 +289,16 @@ export function validateComponent(c: Component): string[] {
     errors.push(
       `Non-pipeline "${c.label}" should not have pipelineGeometry`
     );
+  }
+
+  // Validate evolutionRange consistency with evolution point
+  if (c.evolutionRange) {
+    const [min, max] = c.evolutionRange;
+    if (c.evolution < min || c.evolution > max) {
+      errors.push(
+        `Component "${c.label}" evolution (${c.evolution}) is outside its evolutionRange [${min}, ${max}]`
+      );
+    }
   }
 
   // Validate evolvesTo targets
@@ -222,6 +363,12 @@ const LEGACY_RELATION_TYPE_MAP: Record<string, string> = {
   depends_on: "DependsOn",
   dependson: "DependsOn",
   DependsOn: "DependsOn",
+  flow: "Flow",
+  Flow: "Flow",
+  data_flow: "Flow",
+  constraint: "Constraint",
+  Constraint: "Constraint",
+  regulation: "Constraint",
 };
 
 /** Clamp a numeric value to [0, 1] */
@@ -258,6 +405,11 @@ export function sanitizeMap(raw: WardleyMap): WardleyMap {
     (map as any).axes = { valueChain: true, evolution: true };
   }
 
+  // Ensure legend defaults
+  if (!map.legend) {
+    (map as any).legend = { show: true, position: "auto" };
+  }
+
   for (const c of map.components) {
     // Migrate legacy type names (LLM might still produce old types)
     const rawType = (c as any).type as string;
@@ -272,6 +424,15 @@ export function sanitizeMap(raw: WardleyMap): WardleyMap {
     // Clamp evolution and visibility to [0,1]
     c.evolution = clamp01(c.evolution);
     c.visibility = clamp01(c.visibility);
+
+    // Sanitize evolutionRange: clamp and ensure min ≤ max
+    if (c.evolutionRange) {
+      c.evolutionRange[0] = clamp01(c.evolutionRange[0]);
+      c.evolutionRange[1] = clamp01(c.evolutionRange[1]);
+      if (c.evolutionRange[0] > c.evolutionRange[1]) {
+        [c.evolutionRange[0], c.evolutionRange[1]] = [c.evolutionRange[1], c.evolutionRange[0]];
+      }
+    }
 
     // Sanitize evolvesTo entries
     if (c.evolvesTo) {
@@ -437,15 +598,35 @@ export function fromMapKeep(raw: any): WardleyMap {
     return base;
   });
 
-  const relations = (raw.edges ?? []).map((e: any) => {
-    const rel: any = {
-      source: e.source ?? e.from, // support legacy from/to field names
-      target: e.target ?? e.to,
-      type: e.type ?? "DependsOn",
-    };
-    if (e.flow) rel.flow = e.flow;
-    return rel;
-  });
+  // Convert EvolveTo edges into evolvesTo on source components
+  const compMap = new Map<string, any>(components.map((c: any) => [c.id, c]));
+  const rawEdges = raw.edges ?? [];
+  for (const e of rawEdges) {
+    if (e.type !== "EvolveTo") continue;
+    const sourceId = e.source ?? e.from;
+    const targetId = e.target ?? e.to;
+    const src = compMap.get(sourceId);
+    const tgt = compMap.get(targetId);
+    if (!src || !tgt) continue;
+    if (!src.evolvesTo) src.evolvesTo = [];
+    src.evolvesTo.push({
+      evolution: tgt.evolution,
+      visibility: tgt.visibility,
+      evolveType: "natural",
+    });
+  }
+
+  const relations = rawEdges
+    .filter((e: any) => (e.type ?? "DependsOn") !== "EvolveTo")
+    .map((e: any) => {
+      const rel: any = {
+        source: e.source ?? e.from,
+        target: e.target ?? e.to,
+        type: e.type ?? "DependsOn",
+      };
+      if (e.flow) rel.flow = e.flow;
+      return rel;
+    });
 
   return WardleyMapSchema.parse({
     title: raw.title ?? "Untitled",

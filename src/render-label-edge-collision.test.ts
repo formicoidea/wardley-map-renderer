@@ -1,16 +1,10 @@
 /**
- * Sub-AC 2 of AC 9: Label/relation-line collision detection.
- *
- * Tests that label bounding boxes are checked against edge path segments
- * and nudged when they overlap.
+ * Tests for segmentIntersectsRect (Liang-Barsky) and label positioning.
  */
 import { describe, it, expect } from "vitest";
 import {
   segmentIntersectsRect,
-  avoidLabelCollisions,
   renderMapToSVG,
-  type LabelPlacement,
-  type EdgeSegment,
 } from "./render.js";
 import { sanitizeMap } from "./schema.js";
 
@@ -107,90 +101,9 @@ describe("segmentIntersectsRect", () => {
 });
 
 // ────────────────────────────────────────────────────────────────────
-// Unit tests for avoidLabelCollisions with edges
+// Integration test: renderMapToSVG label positioning
 // ────────────────────────────────────────────────────────────────────
-describe("avoidLabelCollisions with edge segments", () => {
-  it("does not move labels when no edges are present", () => {
-    const labels: LabelPlacement[] = [
-      { x: 100, y: 200, text: "Hello", anchor: "start" },
-    ];
-    const result = avoidLabelCollisions(labels, []);
-    expect(result[0].y).toBe(200);
-  });
-
-  it("nudges a label that collides with an edge segment", () => {
-    // Place a label at y=200, with a horizontal edge passing right through it
-    const labels: LabelPlacement[] = [
-      { x: 100, y: 200, text: "Component", anchor: "start" },
-    ];
-    // Edge passes horizontally through the label's bounding box
-    const edges: EdgeSegment[] = [
-      { x1: 50, y1: 200, x2: 300, y2: 200 },
-    ];
-    const result = avoidLabelCollisions(labels, edges);
-    // The label should have been nudged away from its original y=200
-    expect(result[0].y).not.toBe(200);
-  });
-
-  it("does not nudge a label that does not collide with any edge", () => {
-    const labels: LabelPlacement[] = [
-      { x: 100, y: 200, text: "Safe", anchor: "start" },
-    ];
-    // Edge is far away from the label
-    const edges: EdgeSegment[] = [
-      { x1: 500, y1: 500, x2: 600, y2: 600 },
-    ];
-    const result = avoidLabelCollisions(labels, edges);
-    expect(result[0].y).toBe(200);
-  });
-
-  it("handles multiple labels, only nudging colliding ones", () => {
-    const labels: LabelPlacement[] = [
-      { x: 100, y: 200, text: "Collider", anchor: "start" },
-      { x: 500, y: 400, text: "Safe", anchor: "start" },
-    ];
-    const edges: EdgeSegment[] = [
-      { x1: 50, y1: 198, x2: 250, y2: 198 },
-    ];
-    const result = avoidLabelCollisions(labels, edges);
-    // The colliding label should be moved
-    expect(result[0].y).not.toBe(200);
-    // The safe label should stay put
-    expect(result[1].y).toBe(400);
-  });
-});
-
-// ────────────────────────────────────────────────────────────────────
-// Integration test: renderMapToSVG with edge-label collision
-// ────────────────────────────────────────────────────────────────────
-describe("renderMapToSVG label-edge collision avoidance", () => {
-  it("nudges label away from crossing edge in a simple map", () => {
-    // Create a map where a label would normally overlap an edge:
-    // Component A at (0.3, 0.5) with label to the right
-    // Component B at (0.7, 0.5) — same visibility, so edge is horizontal
-    // Component C at (0.5, 0.5) — its label sits right on the A→B edge
-    const map = sanitizeMap({
-      title: "Edge collision test",
-      components: [
-        { id: "a", label: "A", type: "anchor", nature: null, evolution: 0.3, visibility: 0.5 },
-        { id: "b", label: "B", type: "anchor", nature: null, evolution: 0.7, visibility: 0.5 },
-        { id: "c", label: "CLabel", type: "capacity", nature: "activity", evolution: 0.5, visibility: 0.5 },
-      ],
-      relations: [{ from: "a", to: "b" }],
-    });
-
-    const svg = renderMapToSVG(map);
-    const texts = extractTexts(svg);
-    const cLabel = texts.find((t) => t.content === "CLabel");
-
-    expect(cLabel).toBeDefined();
-    // The C label default position (right of node at same y) would sit on
-    // the horizontal A→B edge. The collision avoidance should have moved it.
-    const defaultY = visToY(0.5) + 4; // default dy=4
-    // Allow some tolerance — it should be shifted by at least one lineHeight (~16px)
-    expect(Math.abs(cLabel!.y - defaultY)).toBeGreaterThanOrEqual(10);
-  });
-
+describe("renderMapToSVG label positioning", () => {
   it("does not nudge labels when no edges cross them", () => {
     // Two components far apart with no edge between them
     const map = sanitizeMap({

@@ -31,7 +31,7 @@ const FONT_PATH = join(import.meta.dirname ?? ".", "..", "assets", "fonts", "Int
 const MAX_DIFF_PERCENT = 1;
 
 /** pixelmatch threshold — 0.57 accounts for font rendering + antialiasing differences between resvg-js and Chrome */
-const PIXEL_THRESHOLD = 0.57;
+const PIXEL_THRESHOLD = 0.1;
 
 // ── Helpers ─────────────────────────────────────────────────────────
 

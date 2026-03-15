@@ -6,20 +6,20 @@
  */
 import { describe, it, expect } from "vitest";
 import { renderMapToSVG, renderMapToPNG } from "./render.js";
-import type { WardleyMap } from "./schema.js";
+import { WardleyMapSchema, sanitizeMap, type WardleyMap } from "./schema.js";
 import {
   WARDLEY_MAP_DEFAULT_WIDTH,
   WARDLEY_MAP_DEFAULT_HEIGHT,
   BACKGROUND_COLOR,
 } from "./blocks/wardley-map/wardley-map-consts.js";
 
-const MINIMAL_MAP: WardleyMap = {
+const MINIMAL_MAP: WardleyMap = sanitizeMap(WardleyMapSchema.parse({
   title: "Background Test",
   components: [
-    { id: "a", label: "A", evolution: 0.5, visibility: 0.5 },
+    { id: "a", label: "A", type: "component", evolution: 0.5, visibility: 0.5 },
   ],
   relations: [],
-};
+}));
 
 describe("White opaque background", () => {
   const svg = renderMapToSVG(MINIMAL_MAP);

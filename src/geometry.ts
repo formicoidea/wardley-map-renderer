@@ -257,7 +257,7 @@ export interface EvolveArrow {
   readonly fromY: number;
   readonly toX: number;
   readonly toY: number;
-  readonly evolveType: "natural" | "ecosystem" | "forced";
+  readonly evolveType: "natural" | "ecosystem" | "forced" | "late";
 }
 
 /**
