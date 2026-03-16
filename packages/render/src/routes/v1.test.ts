@@ -17,17 +17,15 @@ const VALID_MAP = {
   components: [
     {
       id: "user",
-      label: "User",
+      label: { name: "User" },
       type: "anchor",
-      evolution: 0.95,
-      visibility: 0.95,
+      position: { evolution: { scalar: 0.95 }, visibility: { scalar: 0.95 } },
     },
     {
       id: "web-app",
-      label: "Web App",
+      label: { name: "Web App" },
       type: "component",
-      evolution: 0.65,
-      visibility: 0.8,
+      position: { evolution: { scalar: 0.65 }, visibility: { scalar: 0.8 } },
     },
   ],
   relations: [{ source: "user", target: "web-app" }],
@@ -150,7 +148,7 @@ describe("POST /v1/render — route handler", () => {
     }
   });
 
-  it("returns 422 when components array is empty", async () => {
+  it("returns 200 for empty components (renders fond de carte)", async () => {
     const res = await app.request("/v1/render", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -160,9 +158,7 @@ describe("POST /v1/render — route handler", () => {
         relations: [],
       }),
     });
-    expect(res.status).toBe(422);
-    const body = await res.json();
-    expect(body.errors).toBeDefined();
+    expect(res.status).toBe(200);
   });
 
   // ── Successful PNG rendering (default) ─────────────────────
@@ -242,17 +238,15 @@ describe("POST /v1/render — route handler", () => {
       components: [
         {
           id: "a",
-          label: "Anchor",
+          label: { name: "Anchor" },
           type: "anchor",
-          evolution: 0.9,
-          visibility: 0.9,
+          position: { evolution: { scalar: 0.9 }, visibility: { scalar: 0.9 } },
         },
         {
           id: "b",
-          label: "Legacy Capacity",
+          label: { name: "Legacy Capacity" },
           type: "component", // modern type
-          evolution: 0.5,
-          visibility: 0.5,
+          position: { evolution: { scalar: 0.5 }, visibility: { scalar: 0.5 } },
         },
       ],
       relations: [{ source: "a", target: "b" }],

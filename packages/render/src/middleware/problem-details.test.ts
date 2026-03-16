@@ -4,6 +4,7 @@ import {
   ValidationProblemDetailSchema,
   ProblemTypes,
   PROBLEM_CONTENT_TYPE,
+  PROBLEM_HINTS,
   createProblemDetail,
   createValidationProblem,
 } from "./problem-details.js";
@@ -26,18 +27,20 @@ describe("ProblemDetailSchema (RFC 7807)", () => {
     }
   });
 
-  it("parses a full problem detail with all fields", () => {
+  it("parses a full problem detail with all fields including hint", () => {
     const input = {
-      type: "https://api.wardleyapi.com/problems/validation-error",
+      type: ProblemTypes.VALIDATION_ERROR,
       title: "Validation Error",
       status: 422,
       detail: "The field 'evolution' must be between 0 and 1.",
       instance: "/v1/render/abc-123",
+      hint: "Check evolution values",
     };
     const result = ProblemDetailSchema.safeParse(input);
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data).toMatchObject(input);
+      expect(result.data.hint).toBe("Check evolution values");
     }
   });
 
@@ -112,15 +115,15 @@ describe("ValidationProblemDetailSchema", () => {
       status: 422,
       detail: "Request body failed validation.",
       errors: [
-        { field: "components[0].evolution", message: "Must be between 0 and 1" },
-        { field: "title", message: "Required", code: "invalid_type" },
+        { path: "components.0.evolution", message: "Must be between 0 and 1" },
+        { path: "title", message: "Required", code: "invalid_type" },
       ],
     };
     const result = ValidationProblemDetailSchema.safeParse(input);
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data.errors).toHaveLength(2);
-      expect(result.data.errors[0].field).toBe("components[0].evolution");
+      expect(result.data.errors[0].path).toBe("components.0.evolution");
     }
   });
 
@@ -161,6 +164,16 @@ describe("ProblemTypes constants", () => {
   });
 });
 
+describe("PROBLEM_HINTS", () => {
+  it("has a hint for every ProblemType", () => {
+    for (const uri of Object.values(ProblemTypes)) {
+      expect(PROBLEM_HINTS[uri]).toBeDefined();
+      expect(typeof PROBLEM_HINTS[uri]).toBe("string");
+      expect(PROBLEM_HINTS[uri].length).toBeGreaterThan(10);
+    }
+  });
+});
+
 describe("PROBLEM_CONTENT_TYPE", () => {
   it("is application/problem+json", () => {
     expect(PROBLEM_CONTENT_TYPE).toBe("application/problem+json");
@@ -168,27 +181,34 @@ describe("PROBLEM_CONTENT_TYPE", () => {
 });
 
 describe("createProblemDetail", () => {
-  it("creates a problem detail with defaults", () => {
+  it("creates a problem detail with defaults and auto-hint", () => {
     const problem = createProblemDetail({
+      type: ProblemTypes.NOT_FOUND,
       title: "Not Found",
       status: 404,
     });
-    expect(problem.type).toBe("about:blank");
+    expect(problem.type).toBe(ProblemTypes.NOT_FOUND);
     expect(problem.title).toBe("Not Found");
     expect(problem.status).toBe(404);
+    expect(problem.hint).toBe(PROBLEM_HINTS[ProblemTypes.NOT_FOUND]);
   });
 
-  it("creates a problem detail with all fields", () => {
+  it("uses about:blank when no type provided", () => {
+    const problem = createProblemDetail({
+      title: "Error",
+      status: 500,
+    });
+    expect(problem.type).toBe("about:blank");
+  });
+
+  it("allows custom hint override", () => {
     const problem = createProblemDetail({
       type: ProblemTypes.INTERNAL_ERROR,
-      title: "Internal Server Error",
+      title: "Error",
       status: 500,
-      detail: "Render pipeline failed unexpectedly.",
-      instance: "/v1/render/req-456",
+      hint: "Custom LLM hint",
     });
-    expect(problem.type).toBe(ProblemTypes.INTERNAL_ERROR);
-    expect(problem.detail).toBe("Render pipeline failed unexpectedly.");
-    expect(problem.instance).toBe("/v1/render/req-456");
+    expect(problem.hint).toBe("Custom LLM hint");
   });
 
   it("supports extension members", () => {
@@ -203,20 +223,21 @@ describe("createProblemDetail", () => {
 });
 
 describe("createValidationProblem", () => {
-  it("creates a validation problem with field errors", () => {
+  it("creates a validation problem with field errors and hint", () => {
     const problem = createValidationProblem([
-      { field: "evolution", message: "Must be a number" },
+      { path: "evolution", message: "Must be a number" },
     ]);
     expect(problem.type).toBe(ProblemTypes.VALIDATION_ERROR);
     expect(problem.title).toBe("Validation Error");
     expect(problem.status).toBe(422);
     expect(problem.errors).toHaveLength(1);
     expect(problem.detail).toBe("The request body failed schema validation.");
+    expect(problem.hint).toBe(PROBLEM_HINTS[ProblemTypes.VALIDATION_ERROR]);
   });
 
   it("allows custom detail and instance", () => {
     const problem = createValidationProblem(
-      [{ field: "title", message: "Required" }],
+      [{ path: "title", message: "Required" }],
       "Custom detail",
       "/v1/render/req-789"
     );
@@ -226,22 +247,23 @@ describe("createValidationProblem", () => {
 
   it("validates against the schema", () => {
     const problem = createValidationProblem([
-      { field: "x", message: "bad", code: "custom" },
+      { path: "x", message: "bad", code: "custom" },
     ]);
     const result = ValidationProblemDetailSchema.safeParse(problem);
     expect(result.success).toBe(true);
   });
 });
 
-// Type-level checks (compile-time only, no runtime assertions)
+// Type-level checks (compile-time only)
 describe("TypeScript type compatibility", () => {
-  it("ProblemDetail type has all RFC 7807 fields", () => {
+  it("ProblemDetail type has all RFC 7807 fields plus hint", () => {
     const pd: ProblemDetail = {
       type: "https://example.com/test",
       title: "Test",
       status: 200,
       detail: "ok",
       instance: "/test",
+      hint: "actionable suggestion",
     };
     expect(pd).toBeDefined();
   });
@@ -253,7 +275,6 @@ describe("TypeScript type compatibility", () => {
       status: 422,
       errors: [],
     };
-    // A ValidationProblemDetail should be assignable to ProblemDetail
     const pd: ProblemDetail = vpd;
     expect(pd).toBeDefined();
   });

@@ -12,10 +12,9 @@ const baseMap = {
   components: [
     {
       id: "user",
-      label: "User",
+      label: { name: "User" },
       type: "user-need" as const,
-      evolution: 0.9,
-      visibility: 0.95,
+      position: { evolution: { scalar: 0.9 }, visibility: { scalar: 0.95 } },
     },
   ],
   relations: [],
@@ -284,9 +283,102 @@ describe("WardleyMapSchema with renderConfig", () => {
       expect(result.data.context).toBe("Test context");
       expect(result.data.components).toHaveLength(1);
       expect(result.data.renderConfig!.backgroundColor).toBe("#aabbcc");
-      // Defaults still applied
-      expect(result.data.gridSize).toEqual({ width: 1600, height: 800 });
-      expect(result.data.axes.valueChain).toBe(true);
+      // renderConfig is optional — no gridSize anymore
+    }
+  });
+});
+
+// ── renderConfig consolidation tests ───────────────────────
+
+describe("renderConfig consolidation (legend + axes toggles)", () => {
+  it("accepts renderConfig.legend", () => {
+    const result = RenderConfigSchema.safeParse({
+      legend: { show: false, position: "top-left" },
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.legend!.show).toBe(false);
+      expect(result.data.legend!.position).toBe("top-left");
+    }
+  });
+
+  it("accepts renderConfig.legend with defaults", () => {
+    const result = RenderConfigSchema.safeParse({
+      legend: {},
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.legend!.show).toBe(true);
+      expect(result.data.legend!.position).toBe("bottom-right");
+    }
+  });
+
+  it("accepts legend with {x, y} position", () => {
+    const result = RenderConfigSchema.safeParse({
+      legend: { position: { x: 100, y: 600 } },
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.legend!.position).toEqual({ x: 100, y: 600 });
+    }
+  });
+
+  it("rejects legend with invalid position string", () => {
+    const result = RenderConfigSchema.safeParse({
+      legend: { position: "invalid" },
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("showValueChain=false is accepted", () => {
+    const result = RenderConfigSchema.safeParse({ showValueChain: false });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.showValueChain).toBe(false);
+    }
+  });
+
+  it("showAxes=false is accepted", () => {
+    const result = RenderConfigSchema.safeParse({ showAxes: false });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.showAxes).toBe(false);
+    }
+  });
+
+  it("showPhaseLabels=false is accepted", () => {
+    const result = RenderConfigSchema.safeParse({ showPhaseLabels: false });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.showPhaseLabels).toBe(false);
+    }
+  });
+
+  it("defaults: all visible when renderConfig is absent", () => {
+    const result = WardleyMapSchema.safeParse(baseMap);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      // renderConfig is undefined — renderer defaults to all-visible
+      expect(result.data.renderConfig).toBeUndefined();
+    }
+  });
+
+  it("WardleyMap no longer has top-level axes or legend fields", () => {
+    const result = WardleyMapSchema.safeParse(baseMap);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect((result.data as any).axes).toBeUndefined();
+      expect((result.data as any).legend).toBeUndefined();
+    }
+  });
+
+  it("axisLabels with locale in renderConfig", () => {
+    const result = RenderConfigSchema.safeParse({
+      axisLabels: { locale: "fr" },
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.axisLabels!.locale).toBe("fr");
     }
   });
 });

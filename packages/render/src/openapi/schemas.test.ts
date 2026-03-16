@@ -48,14 +48,17 @@ describe("OpenAPI schema registrations", () => {
     "RelationType",
     "LegendPosition",
     "Locale",
+    "LabelPosition",
+    "Label",
+    "EvolutionField",
+    "VisibilityField",
+    "Position",
     "EvolvesTo",
     "PipelineGeometry",
     "Component",
     "Flow",
     "Relation",
-    "GridSize",
     "AxisLabels",
-    "Axes",
     "Legend",
     "EvolveStyle",
     "RenderConfig",
@@ -76,7 +79,7 @@ describe("OpenAPI schema registrations", () => {
   it("registers at least 21 schemas", () => {
     const schemas = (doc().components as any)?.schemas;
     const schemaNames = Object.keys(schemas || {});
-    expect(schemaNames.length).toBeGreaterThanOrEqual(21);
+    expect(schemaNames.length).toBeGreaterThanOrEqual(24);
   });
 
   // ── WardleyMap schema structure ──────────────────────────
@@ -109,15 +112,14 @@ describe("OpenAPI schema registrations", () => {
 
   // ── Component schema ─────────────────────────────────────
 
-  it("Component schema has id, label, type, evolution, visibility", () => {
+  it("Component schema has id, label, type, position", () => {
     const schemas = (doc().components as any)?.schemas;
     const comp = schemas?.Component;
     expect(comp).toBeDefined();
     expect(comp.properties.id).toBeDefined();
     expect(comp.properties.label).toBeDefined();
     expect(comp.properties.type).toBeDefined();
-    expect(comp.properties.evolution).toBeDefined();
-    expect(comp.properties.visibility).toBeDefined();
+    expect(comp.properties.position).toBeDefined();
   });
 
   // ── ProblemDetail schema (RFC 7807) ──────────────────────

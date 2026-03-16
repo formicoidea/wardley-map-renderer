@@ -5,12 +5,7 @@
     "moduleResolution": "bundler",
     "esModuleInterop": true,
     "strict": true,
-    "outDir": "dist",
-    "rootDir": "src",
     "skipLibCheck": true,
-    "resolveJsonModule": true,
-    "experimentalDecorators": true,
-    "useDefineForClassFields": false
-  },
-  "include": ["src"]
+    "resolveJsonModule": true
+  }
 }

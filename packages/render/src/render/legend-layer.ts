@@ -353,8 +353,8 @@ function cornerToPosition(
 export const renderLegendLayer: LayerRenderer = (
   ctx: RenderContext
 ): string[] => {
-  // Check if legend is disabled
-  const legend = ctx.map.legend;
+  // Check if legend is disabled (now sourced from renderConfig)
+  const legend = ctx.map.renderConfig?.legend;
   if (legend && !legend.show) return [];
 
   // Collect data-driven items
@@ -369,19 +369,23 @@ export const renderLegendLayer: LayerRenderer = (
   const legendH = LEGEND_PADDING * 2 + TITLE_HEIGHT + items.length * LINE_HEIGHT;
 
   // Determine position
-  let corner: Corner;
-  const position = legend?.position ?? "auto";
-  if (position === "auto") {
-    corner = findBestCorner(ctx, legendW, legendH);
+  const position = legend?.position ?? "bottom-right";
+  let legendX: number;
+  let legendY: number;
+
+  if (typeof position === "object" && "x" in position) {
+    legendX = position.x;
+    legendY = position.y;
+  } else if (position === "auto") {
+    const corner = findBestCorner(ctx, legendW, legendH);
+    ({ x: legendX, y: legendY } = cornerToPosition(corner, ctx, legendW, legendH));
   } else {
-    corner = position as Corner;
+    ({ x: legendX, y: legendY } = cornerToPosition(position as Corner, ctx, legendW, legendH));
   }
 
-  const { x, y } = cornerToPosition(corner, ctx, legendW, legendH);
-
   // Clamp within canvas bounds
-  const cx = Math.max(0, Math.min(x, ctx.canvasWidth - legendW));
-  const cy = Math.max(0, Math.min(y, ctx.canvasHeight - legendH));
+  const cx = Math.max(0, Math.min(legendX, ctx.canvasWidth - legendW));
+  const cy = Math.max(0, Math.min(legendY, ctx.canvasHeight - legendH));
 
   // Build SVG
   const parts: string[] = [];

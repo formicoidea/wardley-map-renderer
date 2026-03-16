@@ -18,6 +18,7 @@
  */
 
 import type { Context, MiddlewareHandler, Next } from "hono";
+import { ProblemTypes, PROBLEM_CONTENT_TYPE, PROBLEM_HINTS } from "./problem-details.js";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -159,14 +160,15 @@ export function rateLimiter(opts?: RateLimiterOptions): MiddlewareHandler {
 
       return c.json(
         {
-          type: "https://wardleyapi.dev/problems/rate-limit-exceeded",
+          type: ProblemTypes.RATE_LIMIT_EXCEEDED,
           title: "Too Many Requests",
           status: 429,
           detail: `Rate limit exceeded. Try again in ${retryAfter} seconds.`,
+          hint: PROBLEM_HINTS[ProblemTypes.RATE_LIMIT_EXCEEDED],
           retryAfter,
         },
         429,
-        { "Content-Type": "application/problem+json" }
+        { "Content-Type": PROBLEM_CONTENT_TYPE }
       );
     }
 

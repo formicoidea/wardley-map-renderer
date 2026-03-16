@@ -60,7 +60,6 @@ describe("OpenAPI document generation", () => {
     expect(schemas.ProblemDetail).toBeDefined();
     expect(schemas.RenderConfig).toBeDefined();
     expect(schemas.Legend).toBeDefined();
-    expect(schemas.Axes).toBeDefined();
   });
 
   it("defines POST /v1/render with content negotiation responses", () => {

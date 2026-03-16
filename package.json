@@ -9,8 +9,8 @@
     "typecheck": "turbo typecheck",
     "test": "turbo test",
     "lint": "turbo lint",
-    "start": "tsx src/server.ts",
-    "batch-render": "tsx scripts/batch-render.ts"
+    "start": "pnpm --filter @wardleyapi/render start",
+    "batch-render": "tsx scripts/batch-render-test.ts"
   },
   "repository": {
     "type": "git",
@@ -28,17 +28,7 @@
     "url": "https://github.com/formicoidea/WardleyAPI/issues"
   },
   "homepage": "https://github.com/formicoidea/WardleyAPI#readme",
-  "dependencies": {
-    "@anthropic-ai/sdk": "^0.78.0",
-    "@asteasolutions/zod-to-openapi": "^8.4.3",
-    "@hono/node-server": "^1.19.11",
-    "@resvg/resvg-js": "^2.6.2",
-    "hono": "^4.12.5",
-    "lit": "^3.3.2",
-    "zod": "^4.3.6"
-  },
   "devDependencies": {
-    "@opencode-ai/sdk": "^1.2.24",
     "@types/node": "^25.3.5",
     "@types/pngjs": "^6.0.5",
     "pixelmatch": "^7.1.0",

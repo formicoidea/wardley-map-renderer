@@ -17,7 +17,7 @@ type ComponentType = Component["type"];
 
 // ── Layout dimensions ────────────────────────────────────────────
 
-/** Fixed margins in pixels — identical regardless of gridSize or axes state */
+/** Fixed margins in pixels — identical regardless of canvas size or axes state */
 export interface Margins {
   readonly top: number;
   readonly right: number;
@@ -151,16 +151,16 @@ export interface RenderGeometry {
  * sensible defaults.
  */
 export interface RenderOptions {
-  /** Override canvas width (defaults to map.gridSize.width) */
+  /** Override canvas width (defaults to map.renderConfig.width or 1600) */
   readonly width?: number;
 
-  /** Override canvas height (defaults to map.gridSize.height) */
+  /** Override canvas height (defaults to map.renderConfig.height or 800) */
   readonly height?: number;
 
   /** Background color (defaults to "#ffffff") */
   readonly backgroundColor?: string;
 
-  /** Whether to render axes (border, grid, phase labels). Defaults to map.axes values. */
+  /** Whether to render axes (border, grid, phase labels). Defaults to true. */
   readonly showAxes?: boolean;
 
   /** Whether to render the value chain (y-axis) label and direction indicators */
@@ -207,7 +207,7 @@ export interface RenderContext {
   /** Original validated map data */
   readonly map: WardleyMap;
 
-  /** SVG canvas dimensions (from gridSize + margins) */
+  /** SVG canvas dimensions (from renderConfig + margins) */
   readonly canvasWidth: number;
   readonly canvasHeight: number;
 

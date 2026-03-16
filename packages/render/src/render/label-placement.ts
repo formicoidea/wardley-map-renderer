@@ -185,15 +185,24 @@ export function avoidLabelCollisions(
   }
 
   // Phase 2: Vertical push-apart for remaining overlaps
+  // Respects pinned labels: if one label is pinned, only the other moves.
+  // If both are pinned, neither moves.
   for (let pass = 0; pass < 5; pass++) {
     for (let i = 0; i < boxes.length; i++) {
       for (let j = i + 1; j < boxes.length; j++) {
         const a = boxes[i];
         const b = boxes[j];
         if (boxesOverlap(a, b)) {
+          const aPinned = a.label.pinned;
+          const bPinned = b.label.pinned;
+          if (aPinned && bPinned) continue;
           const overlapY = Math.min(a.bottom - b.top, b.bottom - a.top);
           const shift = overlapY / 2 + 2;
-          if (a.label.y <= b.label.y) {
+          if (aPinned) {
+            b.label.y += shift; b.top += shift; b.bottom += shift;
+          } else if (bPinned) {
+            a.label.y -= shift; a.top -= shift; a.bottom -= shift;
+          } else if (a.label.y <= b.label.y) {
             a.label.y -= shift; a.top -= shift; a.bottom -= shift;
             b.label.y += shift; b.top += shift; b.bottom += shift;
           } else {
@@ -205,8 +214,9 @@ export function avoidLabelCollisions(
     }
   }
 
-  // Clamp labels inside plot area
+  // Clamp labels inside plot area (skip pinned labels)
   for (const b of boxes) {
+    if (b.label.pinned) continue;
     if (b.label.y < clampTop + lineHeight) b.label.y = clampTop + lineHeight;
     if (b.label.y > clampBottom) b.label.y = clampBottom;
   }

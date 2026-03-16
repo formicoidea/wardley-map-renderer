@@ -67,7 +67,7 @@ describe("API key authentication middleware", () => {
   it("returns RFC 7807 problem detail on missing auth", async () => {
     const res = await app.request("/v1/ping");
     const body = await res.json();
-    expect(body.type).toBe("https://wardleyapi.dev/problems/unauthorized");
+    expect(body.type).toBe("https://api.wardleyapi.com/problems/authentication-error");
     expect(body.title).toBe("Unauthorized");
     expect(body.status).toBe(401);
     expect(body.detail).toContain("Missing API key");

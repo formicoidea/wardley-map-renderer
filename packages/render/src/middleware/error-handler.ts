@@ -2,8 +2,8 @@
  * RFC 7807 Problem Details error-handling middleware for Hono.
  *
  * Catches all thrown errors (including HTTPException from Hono),
- * maps them to RFC 7807 format, and sets Content-Type to
- * application/problem+json.
+ * maps them to RFC 7807 format with LLM-actionable `hint` fields,
+ * and sets Content-Type to application/problem+json.
  *
  * @see https://datatracker.ietf.org/doc/html/rfc7807
  * @module middleware/error-handler
@@ -12,23 +12,16 @@
 import type { Context, ErrorHandler } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { ZodError } from "zod";
+import {
+  ProblemTypes,
+  PROBLEM_CONTENT_TYPE,
+  PROBLEM_HINTS,
+  type ProblemDetail,
+} from "./problem-details.js";
 
-// ── RFC 7807 Problem Details type ────────────────────────────────────
+// ── Re-export ProblemDetail type for backward compat ────────────────
 
-export interface ProblemDetail {
-  /** URI reference identifying the problem type (default: "about:blank") */
-  type: string;
-  /** Short human-readable summary of the problem */
-  title: string;
-  /** HTTP status code */
-  status: number;
-  /** Human-readable explanation specific to this occurrence */
-  detail?: string;
-  /** URI reference identifying the specific occurrence */
-  instance?: string;
-  /** Validation errors (extension member for 400s) */
-  errors?: Array<{ path: string; message: string }>;
-}
+export type { ProblemDetail } from "./problem-details.js";
 
 // ── Custom HttpProblem error class ───────────────────────────────────
 
@@ -42,7 +35,8 @@ export class HttpProblem extends Error {
   public readonly title: string;
   public readonly detail?: string;
   public readonly instance?: string;
-  public readonly errors?: Array<{ path: string; message: string }>;
+  public readonly hint?: string;
+  public readonly errors?: Array<{ path: string; message: string; code?: string }>;
 
   constructor(
     status: number,
@@ -51,7 +45,8 @@ export class HttpProblem extends Error {
       detail?: string;
       type?: string;
       instance?: string;
-      errors?: Array<{ path: string; message: string }>;
+      hint?: string;
+      errors?: Array<{ path: string; message: string; code?: string }>;
     }
   ) {
     super(opts?.detail ?? title);
@@ -61,6 +56,7 @@ export class HttpProblem extends Error {
     this.detail = opts?.detail;
     this.problemType = opts?.type ?? "about:blank";
     this.instance = opts?.instance;
+    this.hint = opts?.hint ?? PROBLEM_HINTS[this.problemType];
     this.errors = opts?.errors;
   }
 
@@ -72,7 +68,8 @@ export class HttpProblem extends Error {
     };
     if (this.detail !== undefined) problem.detail = this.detail;
     if (this.instance !== undefined) problem.instance = this.instance;
-    if (this.errors !== undefined) problem.errors = this.errors;
+    if (this.hint !== undefined) problem.hint = this.hint;
+    if (this.errors !== undefined) (problem as any).errors = this.errors;
     return problem;
   }
 }
@@ -103,7 +100,7 @@ function defaultTitle(status: number): string {
 
 function problemResponse(c: Context, problem: ProblemDetail): Response {
   return c.json(problem, problem.status as any, {
-    "Content-Type": "application/problem+json",
+    "Content-Type": PROBLEM_CONTENT_TYPE,
   });
 }
 
@@ -111,13 +108,13 @@ function problemResponse(c: Context, problem: ProblemDetail): Response {
 
 /**
  * Hono onError hook that maps all thrown errors to RFC 7807 Problem
- * Details JSON responses.
+ * Details JSON responses with LLM-actionable hints.
  *
  * Supports:
- * - HttpProblem (custom class) → serialized directly
+ * - HttpProblem (custom class) → serialized directly with hint
  * - Hono HTTPException → mapped to problem with status + message
- * - ZodError → mapped to 400 with validation errors array
- * - Generic Error → mapped to 500
+ * - ZodError → mapped to 400 with validation errors array + hint
+ * - Generic Error → mapped to 500 with hint
  */
 export const rfc7807ErrorHandler: ErrorHandler = (err, c) => {
   // ── HttpProblem (our custom class) ──
@@ -152,15 +149,17 @@ export const rfc7807ErrorHandler: ErrorHandler = (err, c) => {
   // ── ZodError (schema validation) ──
   if (err instanceof ZodError) {
     const problem: ProblemDetail = {
-      type: "about:blank",
+      type: ProblemTypes.VALIDATION_ERROR,
       title: "Bad Request",
       status: 400,
       detail: "Request validation failed",
-      errors: err.issues.map((issue) => ({
-        path: issue.path.join("."),
-        message: issue.message,
-      })),
+      hint: PROBLEM_HINTS[ProblemTypes.VALIDATION_ERROR],
     };
+    (problem as any).errors = err.issues.map((issue) => ({
+      path: issue.path.join("."),
+      message: issue.message,
+      code: issue.code,
+    }));
     return problemResponse(c, problem);
   }
 
@@ -169,11 +168,12 @@ export const rfc7807ErrorHandler: ErrorHandler = (err, c) => {
   console.error("[error] 500 Internal Server Error:", message);
 
   const problem: ProblemDetail = {
-    type: "about:blank",
+    type: ProblemTypes.INTERNAL_ERROR,
     title: "Internal Server Error",
     status: 500,
     // Don't leak internal details in production
     detail: process.env.NODE_ENV === "production" ? undefined : message,
+    hint: PROBLEM_HINTS[ProblemTypes.INTERNAL_ERROR],
   };
   return problemResponse(c, problem);
 };
@@ -185,10 +185,11 @@ export const rfc7807ErrorHandler: ErrorHandler = (err, c) => {
  */
 export function rfc7807NotFound(c: Context): Response {
   const problem: ProblemDetail = {
-    type: "about:blank",
+    type: ProblemTypes.NOT_FOUND,
     title: "Not Found",
     status: 404,
     detail: `No route for ${c.req.method} ${c.req.path}`,
+    hint: PROBLEM_HINTS[ProblemTypes.NOT_FOUND],
   };
   return problemResponse(c, problem);
 }

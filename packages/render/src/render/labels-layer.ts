@@ -67,18 +67,18 @@ export const renderLabelsLayer: LayerRenderer = (
     const cy = node.cy;
 
     // Label offset: to the right of node (pipelines: above handle center)
-    const hasCustomPos = comp.labelPosition != null;
+    const hasCustomPos = comp.label.position != null;
     let dx: number;
     let dy: number;
     let anchor: "start" | "middle" | "end" = "middle";
 
     if (comp.type === "pipeline") {
-      dx = comp.labelPosition?.dx ?? (NODE_RADIUS + 4);
-      dy = comp.labelPosition?.dy ?? 4;
+      dx = comp.label.position?.dx ?? (NODE_RADIUS + 4);
+      dy = comp.label.position?.dy ?? 4;
       anchor = "middle";
     } else {
-      dx = comp.labelPosition?.dx ?? NODE_RADIUS + 4;
-      dy = comp.labelPosition?.dy ?? 4;
+      dx = comp.label.position?.dx ?? NODE_RADIUS + 4;
+      dy = comp.label.position?.dy ?? 4;
       anchor = dx < 0 ? "end" : anchor;
       anchor = dx > 0 ? "start" : anchor;
     }
@@ -86,7 +86,7 @@ export const renderLabelsLayer: LayerRenderer = (
     labelPlacements.push({
       x: cx + dx,
       y: cy + dy,
-      text: comp.label,
+      text: comp.label.name,
       anchor,
       nodeCx: cx,
       nodeCy: cy,

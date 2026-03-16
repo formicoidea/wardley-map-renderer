@@ -22,7 +22,7 @@ import { renderToSVG } from "./render-orchestrator.js";
 
 // ── Test data ───────────────────────────────────────────────────────
 
-const DATA_DIR = join(import.meta.dirname ?? ".", "..", "data");
+const DATA_DIR = join(import.meta.dirname ?? ".", "..", "..", "..", "data");
 const MAPKEEP_JSON = join(DATA_DIR, "mapkeep", "mapkeep-extracted-maps.json");
 const VERIFIED_DIR = join(DATA_DIR, "verified-exemples");
 const FONT_PATH = join(import.meta.dirname ?? ".", "..", "assets", "fonts", "Inter-Regular.ttf");

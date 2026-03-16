@@ -46,35 +46,43 @@ describe("EvolutionRangeSchema", () => {
 describe("ComponentSchema with evolutionRange", () => {
   const baseComponent = {
     id: "comp-1",
-    label: "Test Component",
+    label: { name: "Test Component" },
     type: "component" as const,
-    evolution: 0.5,
-    visibility: 0.8,
+    position: {
+      evolution: { scalar: 0.5 },
+      visibility: { scalar: 0.8 },
+    },
   };
 
   it("accepts component without evolutionRange (optional)", () => {
     const result = ComponentSchema.safeParse(baseComponent);
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.evolutionRange).toBeUndefined();
+      expect(result.data.position.evolution.range).toBeUndefined();
     }
   });
 
   it("accepts component with valid evolutionRange", () => {
     const result = ComponentSchema.safeParse({
       ...baseComponent,
-      evolutionRange: [0.3, 0.7],
+      position: {
+        evolution: { scalar: 0.5, range: [0.3, 0.7] },
+        visibility: { scalar: 0.8 },
+      },
     });
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.evolutionRange).toEqual([0.3, 0.7]);
+      expect(result.data.position.evolution.range).toEqual([0.3, 0.7]);
     }
   });
 
   it("rejects component with invalid evolutionRange (min > max)", () => {
     const result = ComponentSchema.safeParse({
       ...baseComponent,
-      evolutionRange: [0.9, 0.1],
+      position: {
+        evolution: { scalar: 0.5, range: [0.9, 0.1] },
+        visibility: { scalar: 0.8 },
+      },
     });
     expect(result.success).toBe(false);
   });
@@ -87,18 +95,21 @@ describe("WardleyMapSchema with evolutionRange", () => {
       components: [
         {
           id: "user",
-          label: "User",
+          label: { name: "User" },
           type: "user-need",
-          evolution: 0.9,
-          visibility: 0.95,
+          position: {
+            evolution: { scalar: 0.9 },
+            visibility: { scalar: 0.95 },
+          },
         },
         {
           id: "platform",
-          label: "Platform",
+          label: { name: "Platform" },
           type: "component",
-          evolution: 0.5,
-          visibility: 0.6,
-          evolutionRange: [0.3, 0.7],
+          position: {
+            evolution: { scalar: 0.5, range: [0.3, 0.7] },
+            visibility: { scalar: 0.6 },
+          },
         },
       ],
       relations: [{ source: "user", target: "platform" }],
@@ -106,7 +117,7 @@ describe("WardleyMapSchema with evolutionRange", () => {
     const result = WardleyMapSchema.safeParse(map);
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.components[1].evolutionRange).toEqual([0.3, 0.7]);
+      expect(result.data.components[1].position.evolution.range).toEqual([0.3, 0.7]);
     }
   });
 });
@@ -115,11 +126,12 @@ describe("validateComponent with evolutionRange", () => {
   it("returns no errors when evolution is within range", () => {
     const errors = validateComponent({
       id: "c1",
-      label: "Comp",
+      label: { name: "Comp" },
       type: "component",
-      evolution: 0.5,
-      visibility: 0.5,
-      evolutionRange: [0.3, 0.7],
+      position: {
+        evolution: { scalar: 0.5, range: [0.3, 0.7] },
+        visibility: { scalar: 0.5 },
+      },
     });
     expect(errors).toEqual([]);
   });
@@ -127,11 +139,12 @@ describe("validateComponent with evolutionRange", () => {
   it("returns error when evolution is below range min", () => {
     const errors = validateComponent({
       id: "c1",
-      label: "Comp",
+      label: { name: "Comp" },
       type: "component",
-      evolution: 0.1,
-      visibility: 0.5,
-      evolutionRange: [0.3, 0.7],
+      position: {
+        evolution: { scalar: 0.1, range: [0.3, 0.7] },
+        visibility: { scalar: 0.5 },
+      },
     });
     expect(errors).toHaveLength(1);
     expect(errors[0]).toContain("outside its evolutionRange");
@@ -140,11 +153,12 @@ describe("validateComponent with evolutionRange", () => {
   it("returns error when evolution is above range max", () => {
     const errors = validateComponent({
       id: "c1",
-      label: "Comp",
+      label: { name: "Comp" },
       type: "component",
-      evolution: 0.9,
-      visibility: 0.5,
-      evolutionRange: [0.3, 0.7],
+      position: {
+        evolution: { scalar: 0.9, range: [0.3, 0.7] },
+        visibility: { scalar: 0.5 },
+      },
     });
     expect(errors).toHaveLength(1);
     expect(errors[0]).toContain("outside its evolutionRange");
@@ -154,22 +168,24 @@ describe("validateComponent with evolutionRange", () => {
     expect(
       validateComponent({
         id: "c1",
-        label: "Comp",
+        label: { name: "Comp" },
         type: "component",
-        evolution: 0.3,
-        visibility: 0.5,
-        evolutionRange: [0.3, 0.7],
+        position: {
+          evolution: { scalar: 0.3, range: [0.3, 0.7] },
+          visibility: { scalar: 0.5 },
+        },
       })
     ).toEqual([]);
 
     expect(
       validateComponent({
         id: "c1",
-        label: "Comp",
+        label: { name: "Comp" },
         type: "component",
-        evolution: 0.7,
-        visibility: 0.5,
-        evolutionRange: [0.3, 0.7],
+        position: {
+          evolution: { scalar: 0.7, range: [0.3, 0.7] },
+          visibility: { scalar: 0.5 },
+        },
       })
     ).toEqual([]);
   });
@@ -181,79 +197,83 @@ describe("sanitizeMap with evolutionRange", () => {
     components: [
       {
         id: "user",
-        label: "User",
+        label: { name: "User" },
         type: "user-need",
-        evolution: 0.9,
-        visibility: 0.95,
+        position: {
+          evolution: { scalar: 0.9 },
+          visibility: { scalar: 0.95 },
+        },
       },
       ...components,
     ],
     relations: [],
-    gridSize: { width: 1600, height: 800 },
-    axes: { valueChain: true, evolution: true },
-    legend: { show: true, position: "auto" as const },
   });
 
   it("clamps evolutionRange values to [0, 1]", () => {
     const map = makeMap([
       {
         id: "c1",
-        label: "Comp",
+        label: { name: "Comp" },
         type: "component",
-        evolution: 0.5,
-        visibility: 0.5,
-        evolutionRange: [-0.2, 1.5],
+        position: {
+          evolution: { scalar: 0.5, range: [-0.2, 1.5] },
+          visibility: { scalar: 0.5 },
+        },
       },
     ]);
     const sanitized = sanitizeMap(map as any);
     const comp = sanitized.components.find((c) => c.id === "c1")!;
-    expect(comp.evolutionRange).toEqual([0, 1]);
+    expect(comp.position.evolution.range).toEqual([0, 1]);
   });
 
   it("swaps inverted evolutionRange", () => {
     const map = makeMap([
       {
         id: "c1",
-        label: "Comp",
+        label: { name: "Comp" },
         type: "component",
-        evolution: 0.5,
-        visibility: 0.5,
-        evolutionRange: [0.8, 0.2],
+        position: {
+          evolution: { scalar: 0.5, range: [0.8, 0.2] },
+          visibility: { scalar: 0.5 },
+        },
       },
     ]);
     const sanitized = sanitizeMap(map as any);
     const comp = sanitized.components.find((c) => c.id === "c1")!;
-    expect(comp.evolutionRange).toEqual([0.2, 0.8]);
+    expect(comp.position.evolution.range).toEqual([0.2, 0.8]);
   });
 
   it("preserves valid evolutionRange unchanged", () => {
     const map = makeMap([
       {
         id: "c1",
-        label: "Comp",
+        label: { name: "Comp" },
         type: "component",
-        evolution: 0.5,
-        visibility: 0.5,
-        evolutionRange: [0.3, 0.7],
+        position: {
+          evolution: { scalar: 0.5, range: [0.3, 0.7] },
+          visibility: { scalar: 0.5 },
+        },
       },
     ]);
     const sanitized = sanitizeMap(map as any);
     const comp = sanitized.components.find((c) => c.id === "c1")!;
-    expect(comp.evolutionRange).toEqual([0.3, 0.7]);
+    expect(comp.position.evolution.range).toEqual([0.3, 0.7]);
   });
 
   it("leaves components without evolutionRange untouched", () => {
     const map = makeMap([
       {
         id: "c1",
-        label: "Comp",
+        label: { name: "Comp" },
         type: "component",
-        evolution: 0.5,
-        visibility: 0.5,
+        position: {
+          evolution: { scalar: 0.5 },
+          visibility: { scalar: 0.5 },
+        },
       },
     ]);
     const sanitized = sanitizeMap(map as any);
     const comp = sanitized.components.find((c) => c.id === "c1")!;
-    expect(comp.evolutionRange).toBeUndefined();
+    expect(comp.position.evolution.range).toBeUndefined();
   });
 });

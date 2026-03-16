@@ -9,7 +9,7 @@ import {
   DEFAULT_PALETTE,
   DEFAULT_FONT,
   DEFAULT_LAYER_TOGGLES,
-} from "./render-config.js";
+} from "./render-config-v2.js";
 
 describe("RenderConfigSchema", () => {
   it("parses an empty object with defaults", () => {

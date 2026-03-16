@@ -23,17 +23,15 @@ const VALID_MAP = {
   components: [
     {
       id: "user",
-      label: "User",
+      label: { name: "User" },
       type: "anchor",
-      evolution: 0.9,
-      visibility: 0.95,
+      position: { evolution: { scalar: 0.9 }, visibility: { scalar: 0.95 } },
     },
     {
       id: "webapp",
-      label: "Web App",
+      label: { name: "Web App" },
       type: "component",
-      evolution: 0.65,
-      visibility: 0.7,
+      position: { evolution: { scalar: 0.65 }, visibility: { scalar: 0.7 } },
     },
   ],
   relations: [
@@ -142,7 +140,7 @@ describe("POST /v1/render — error responses", () => {
   it("returns validation error when title is missing", async () => {
     const res = await postRender({
       components: [
-        { id: "c1", label: "X", type: "component", evolution: 0.5, visibility: 0.5 },
+        { id: "c1", label: { name: "X" }, type: "component", position: { evolution: { scalar: 0.5 }, visibility: { scalar: 0.5 } } },
       ],
       relations: [],
     });
@@ -154,22 +152,20 @@ describe("POST /v1/render — error responses", () => {
     expect(body.detail).toContain("Invalid WardleyMap");
   });
 
-  it("returns validation error when components array is empty", async () => {
+  it("returns 200 for empty components (renders fond de carte)", async () => {
     const res = await postRender({
       title: "Empty",
       components: [],
       relations: [],
     });
-    const body = await res.json();
-    expect(body.status).toBeGreaterThanOrEqual(400);
-    expect(body.status).toBeLessThan(500);
+    expect(res.status).toBe(200);
   });
 
   it("returns validation error when evolution is out of range", async () => {
     const res = await postRender({
       title: "Bad Evolution",
       components: [
-        { id: "c1", label: "X", type: "component", evolution: 1.5, visibility: 0.5 },
+        { id: "c1", label: { name: "X" }, type: "component", position: { evolution: { scalar: 1.5 }, visibility: { scalar: 0.5 } } },
       ],
       relations: [],
     });

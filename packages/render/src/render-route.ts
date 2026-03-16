@@ -11,6 +11,7 @@ import type { Context } from "hono";
 import { WardleyMapSchema, sanitizeMap } from "./schema.js";
 import { renderToSVG, renderToPNG } from "./render-orchestrator.js";
 import { HttpProblem } from "./middleware/error-handler.js";
+import { ProblemTypes } from "./middleware/problem-details.js";
 
 // ── Content Negotiation ──────────────────────────────────────────────
 
@@ -63,6 +64,7 @@ export async function renderRoute(c: Context): Promise<Response> {
   const contentType = c.req.header("Content-Type") ?? "";
   if (!contentType.includes("application/json") && !contentType.includes("text/json")) {
     throw new HttpProblem(415, "Unsupported Media Type", {
+      type: ProblemTypes.UNSUPPORTED_MEDIA_TYPE,
       detail: "Content-Type must be application/json",
     });
   }
@@ -73,6 +75,7 @@ export async function renderRoute(c: Context): Promise<Response> {
     body = await c.req.json();
   } catch {
     throw new HttpProblem(400, "Bad Request", {
+      type: ProblemTypes.BAD_REQUEST,
       detail: "Request body must be valid JSON",
     });
   }
@@ -81,10 +84,12 @@ export async function renderRoute(c: Context): Promise<Response> {
   const parsed = WardleyMapSchema.safeParse(body);
   if (!parsed.success) {
     throw new HttpProblem(422, "Validation Error", {
+      type: ProblemTypes.VALIDATION_ERROR,
       detail: "Invalid WardleyMap JSON",
       errors: parsed.error.issues.map((issue) => ({
         path: issue.path.join("."),
         message: issue.message,
+        code: issue.code,
       })),
     });
   }
@@ -97,14 +102,30 @@ export async function renderRoute(c: Context): Promise<Response> {
 
   if (format === null) {
     throw new HttpProblem(406, "Not Acceptable", {
+      type: ProblemTypes.NOT_ACCEPTABLE,
       detail: "Supported formats: image/svg+xml, image/png. Set Accept header accordingly.",
     });
   }
 
+  // ── Extract renderConfig → renderOptions ────────────────
+  const rc = map.renderConfig;
+  const renderOptions = rc ? {
+    width: rc.width,
+    height: rc.height,
+    backgroundColor: rc.backgroundColor,
+    fontFamily: rc.fontFamily,
+    labelScale: rc.labelScale,
+    nodeRadius: rc.nodeRadius,
+    avoidCollisions: rc.avoidCollisions,
+    excludeTypes: rc.excludeTypes,
+    typeColors: rc.typeColors,
+    evolveStyles: rc.evolveStyles,
+  } : undefined;
+
   // ── Render via modular pipeline ─────────────────────────
   try {
     if (format === "svg") {
-      const svg = renderToSVG(map);
+      const svg = renderToSVG(map, renderOptions);
       return new Response(svg, {
         status: 200,
         headers: {
@@ -113,7 +134,7 @@ export async function renderRoute(c: Context): Promise<Response> {
         },
       });
     } else {
-      const png = await renderToPNG(map);
+      const png = await renderToPNG(map, renderOptions);
       return new Response(new Uint8Array(png), {
         status: 200,
         headers: {
@@ -127,6 +148,9 @@ export async function renderRoute(c: Context): Promise<Response> {
     if (err instanceof HttpProblem) throw err;
     const detail = err instanceof Error ? err.message : "Rendering failed";
     console.error("[render] Error:", detail);
-    throw new HttpProblem(500, "Internal Server Error", { detail });
+    throw new HttpProblem(500, "Internal Server Error", {
+      type: ProblemTypes.INTERNAL_ERROR,
+      detail,
+    });
   }
 }

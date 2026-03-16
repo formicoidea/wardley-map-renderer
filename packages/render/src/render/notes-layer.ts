@@ -56,7 +56,7 @@ export const renderNotesLayer: LayerRenderer = (
     if (comp.type !== "note") continue;
 
     // Use description if available, otherwise fall back to label
-    const text = comp.description?.trim() || comp.label;
+    const text = comp.description?.trim() || comp.label.name;
     const lines = text.split("\n");
 
     if (lines.length === 1) {

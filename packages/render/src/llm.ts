@@ -21,7 +21,7 @@ RULES:
 6. Assign visibility values (0-1 scale): 0 = most visible to user (top), 1 = least visible (bottom infrastructure)
 7. Generate 6-15 components for a useful map
 8. Each component needs a unique id (short kebab-case, e.g. "web-platform", "user-data")
-9. Always include gridSize and axes in your output
+9. Canvas dimensions go in renderConfig (width/height default to 1600/800)
 10. If a component is evolving, add evolvesTo with target evolution position
 
 EVOLUTION HEURISTICS:
@@ -34,18 +34,19 @@ Respond with ONLY valid JSON matching this schema. No markdown, no explanation, 
 {
   "title": "string - map title",
   "context": "string - brief context note",
-  "gridSize": { "width": 1600, "height": 800 },
-  "axes": { "valueChain": true, "evolution": true },
+  "renderConfig": { "width": 1600, "height": 800 },
   "components": [
     {
       "id": "string",
-      "label": "string",
+      "label": { "name": "string", "position": { "dx": 0, "dy": 0 } (optional) },
       "type": "anchor" | "user-need" | "component" | "pipeline" | "note",
       "nature": "natural_need" | "technical_system_need" | "activity" | "practice" | "data" | "knowledge" (optional),
-      "evolution": 0-1,
-      "visibility": 0-1,
+      "position": {
+        "evolution": { "scalar": 0-1, "range": [min, max] (optional) },
+        "visibility": { "scalar": 0-1 }
+      },
       "description": "string (optional)",
-      "evolvesTo": [{ "evolution": 0-1, "visibility": 0-1, "evolveType": "natural" | "ecosystem" | "forced" }] (optional),
+      "evolvesTo": [{ "position": { "evolution": { "scalar": 0-1 }, "visibility": { "scalar": 0-1 } }, "evolveType": "natural" | "ecosystem" | "forced" }] (optional),
       "pipelineGeometry": { "evoStart": 0-1, "evoEnd": 0-1, "visStart": 0-1, "visEnd": 0-1 } (only for type "pipeline")
     }
   ],

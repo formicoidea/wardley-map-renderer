@@ -14,6 +14,7 @@
  */
 
 import type { Component, PipelineGeometry, WardleyMap } from "./schema.js";
+import { evo, vis } from "./schema.js";
 
 // ── Types ──────────────────────────────────────────────────────────
 
@@ -72,10 +73,10 @@ export function isInsidePipeline(
   epsilon = 0.015
 ): boolean {
   return (
-    comp.evolution >= geo.evoStart - epsilon &&
-    comp.evolution <= geo.evoEnd + epsilon &&
-    comp.visibility >= geo.visStart - epsilon &&
-    comp.visibility <= geo.visEnd + epsilon
+    evo(comp) >= geo.evoStart - epsilon &&
+    evo(comp) <= geo.evoEnd + epsilon &&
+    vis(comp) >= geo.visStart - epsilon &&
+    vis(comp) <= geo.visEnd + epsilon
   );
 }
 
@@ -281,8 +282,15 @@ export function applyPipelineContainment(map: WardleyMap): WardleyMap {
 
     return {
       ...comp,
-      evolution: clampEvolutionToPipeline(comp.evolution, geo),
-      visibility: clampVisibilityToPipeline(comp.visibility, geo),
+      position: {
+        evolution: {
+          scalar: clampEvolutionToPipeline(evo(comp), geo),
+          range: comp.position.evolution.range,
+        },
+        visibility: {
+          scalar: clampVisibilityToPipeline(vis(comp), geo),
+        },
+      },
     };
   });
 

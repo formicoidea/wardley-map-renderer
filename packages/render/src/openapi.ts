@@ -36,9 +36,35 @@ const NatureEnum = z.enum([
   "natural_need", "technical_system_need",
 ]).optional().openapi("Nature");
 
+const LabelPositionSchema = z.object({
+  dx: z.number(),
+  dy: z.number(),
+}).openapi("LabelPosition");
+
+const LabelSchema = z.object({
+  name: z.string(),
+  position: LabelPositionSchema.optional(),
+}).openapi("Label");
+
+const EvolutionFieldSchema = z.object({
+  scalar: z.number().min(0).max(1),
+  range: EvolutionRangeSchema.optional(),
+}).openapi("EvolutionField");
+
+const VisibilityFieldSchema = z.object({
+  scalar: z.number().min(0).max(1),
+}).openapi("VisibilityField");
+
+const PositionSchema = z.object({
+  evolution: EvolutionFieldSchema,
+  visibility: VisibilityFieldSchema,
+}).openapi("Position");
+
 const EvolvesToSchema = z.object({
-  evolution: z.number().min(0).max(1),
-  visibility: z.number().min(0).max(1),
+  position: z.object({
+    evolution: z.object({ scalar: z.number().min(0).max(1) }),
+    visibility: z.object({ scalar: z.number().min(0).max(1) }),
+  }),
   evolveType: z.enum(["natural", "ecosystem", "forced", "late"]).default("natural"),
 }).openapi("EvolvesTo");
 
@@ -52,14 +78,11 @@ const PipelineGeometrySchema = z.object({
 
 const ComponentSchema = z.object({
   id: z.string(),
-  label: z.string(),
+  label: LabelSchema,
   type: ComponentTypeEnum,
   nature: NatureEnum,
-  evolution: z.number().min(0).max(1),
-  visibility: z.number().min(0).max(1),
+  position: PositionSchema,
   description: z.string().optional(),
-  labelPosition: z.object({ dx: z.number(), dy: z.number() }).optional(),
-  evolutionRange: EvolutionRangeSchema.optional(),
   evolvesTo: z.array(EvolvesToSchema).optional(),
   pipelineGeometry: PipelineGeometrySchema.optional(),
   color: z.string().optional(),
@@ -79,11 +102,6 @@ const RelationSchema = z.object({
   flow: FlowSchema.optional(),
 }).openapi("Relation");
 
-const GridSizeSchema = z.object({
-  width: z.number().positive(),
-  height: z.number().positive(),
-}).openapi("GridSize");
-
 const LocaleEnum = z.enum(["en", "fr"]).openapi("Locale");
 
 const AxisLabelsSchema = z.object({
@@ -97,15 +115,12 @@ const AxisLabelsSchema = z.object({
   visibilityLow: z.string().optional(),
 }).openapi("AxisLabels");
 
-const AxesSchema = z.object({
-  valueChain: z.boolean().default(true),
-  evolution: z.boolean().default(true),
-  labels: AxisLabelsSchema.optional(),
-}).openapi("Axes");
-
 const LegendSchema = z.object({
   show: z.boolean().default(true),
-  position: z.enum(["top-left", "top-right", "bottom-left", "bottom-right", "auto"]).default("auto"),
+  position: z.union([
+    z.enum(["top-left", "top-right", "bottom-left", "bottom-right", "auto"]),
+    z.object({ x: z.number(), y: z.number() }),
+  ]).default("bottom-right"),
 }).openapi("Legend");
 
 const EvolveStyleSchema = z.object({
@@ -137,6 +152,8 @@ const RenderConfigSchema = z.object({
     ecosystem: EvolveStyleSchema.optional(),
     forced: EvolveStyleSchema.optional(),
   }).optional(),
+  axisLabels: AxisLabelsSchema.optional(),
+  legend: LegendSchema.optional(),
 }).openapi("RenderConfig");
 
 const WardleyMapSchema = z.object({
@@ -144,9 +161,6 @@ const WardleyMapSchema = z.object({
   components: z.array(ComponentSchema),
   relations: z.array(RelationSchema),
   context: z.string().optional(),
-  gridSize: GridSizeSchema.default({ width: 1600, height: 800 }),
-  axes: AxesSchema.default({ valueChain: true, evolution: true }),
-  legend: LegendSchema.default({ show: true, position: "auto" }),
   renderConfig: RenderConfigSchema.optional(),
 }).openapi("WardleyMap");
 

@@ -45,22 +45,13 @@ export const renderAxesLayer: LayerRenderer = (
 ): string[] => {
   const parts: string[] = [];
   const { plot, map } = ctx;
-  const axes = map.axes;
+  const rc = map.renderConfig;
 
-  // Merge axis labels: locale preset → map.axes.labels → renderConfig.axisLabels
-  const mapLabels = axes.labels;
-  const rcLabels = map.renderConfig?.axisLabels;
-  const mergedLabels = (mapLabels || rcLabels) ? {
-    locale: rcLabels?.locale ?? mapLabels?.locale,
-    xAxis: rcLabels?.xAxis ?? mapLabels?.xAxis,
-    yAxis: rcLabels?.yAxis ?? mapLabels?.yAxis,
-    phases: rcLabels?.phases ?? mapLabels?.phases,
-    evolutionStart: rcLabels?.evolutionStart ?? mapLabels?.evolutionStart,
-    evolutionEnd: rcLabels?.evolutionEnd ?? mapLabels?.evolutionEnd,
-    visibilityHigh: rcLabels?.visibilityHigh ?? mapLabels?.visibilityHigh,
-    visibilityLow: rcLabels?.visibilityLow ?? mapLabels?.visibilityLow,
-  } : undefined;
-  const labels = resolveAxisLabels(mergedLabels);
+  // renderConfig is now the single source of truth for all visual config
+  const showEvolution = rc?.showAxes ?? true;
+  const showValueChain = rc?.showValueChain ?? true;
+  const showPhaseLabels = rc?.showPhaseLabels ?? true;
+  const labels = resolveAxisLabels(rc?.axisLabels);
 
   // Horizontal grid lines removed — cleaner visual per Wardley convention
 
@@ -71,7 +62,7 @@ export const renderAxesLayer: LayerRenderer = (
   );
 
   // ── X-axis: horizontal arrow at bottom of plot area ──────
-  if (axes.evolution) {
+  if (showEvolution) {
     parts.push(
       `<line x1="${plot.left}" y1="${plot.bottom}" x2="${plot.right}" y2="${plot.bottom}" ` +
         `stroke="${AXIS_LABEL_COLOR}" stroke-width="1.5" marker-end="url(#axis-arrow)" />`
@@ -79,7 +70,7 @@ export const renderAxesLayer: LayerRenderer = (
   }
 
   // ── Y-axis: vertical arrow at left of plot area ──────────
-  if (axes.valueChain) {
+  if (showValueChain) {
     parts.push(
       `<line x1="${plot.left}" y1="${plot.bottom}" x2="${plot.left}" y2="${plot.top}" ` +
         `stroke="${AXIS_LABEL_COLOR}" stroke-width="1.5" marker-end="url(#axis-arrow)" />`
@@ -87,7 +78,7 @@ export const renderAxesLayer: LayerRenderer = (
   }
 
   // ── Evolution phase dividers (vertical dashed lines) ───
-  if (axes.evolution) {
+  if (showEvolution) {
     for (const ratio of EVOLUTION_BOUNDARIES) {
       const x = ctx.evoToX(ratio);
       parts.push(
@@ -98,7 +89,7 @@ export const renderAxesLayer: LayerRenderer = (
   }
 
   // ── Phase labels (left-aligned, close to x-axis) ───
-  if (axes.evolution) {
+  if (showEvolution && showPhaseLabels) {
     for (let i = 0; i < EVOLUTION_PHASES.length; i++) {
       const phase = EVOLUTION_PHASES[i];
       const phaseLabel = labels.phases[i] ?? phase.label;
@@ -113,7 +104,7 @@ export const renderAxesLayer: LayerRenderer = (
   }
 
   // ── X-axis label (close to arrowhead end) ───────
-  if (axes.evolution) {
+  if (showEvolution) {
     parts.push(
       `<text x="${plot.right-16}" y="${plot.bottom + 16}" text-anchor="end" ` +
         `font-family="Inter, sans-serif" font-size="${AXIS_LABEL_FONT_SIZE}" ` +
@@ -122,7 +113,7 @@ export const renderAxesLayer: LayerRenderer = (
   }
 
   // ── Y-axis label (rotated, close to axis) ─
-  if (axes.valueChain) {
+  if (showValueChain) {
     const yCenter = plot.top + plot.height / 2;
     const labelX = plot.left - 14;
     parts.push(
@@ -134,7 +125,7 @@ export const renderAxesLayer: LayerRenderer = (
   }
 
   // ── Evolution direction indicators (inside plot area, top corners) ────
-  if (axes.evolution) {
+  if (showEvolution) {
     parts.push(
       `<text x="${plot.left + 12}" y="${plot.top + 14}" ` +
         `font-family="Inter, sans-serif" font-size="${DIRECTION_LABEL_FONT_SIZE}" fill="${LABEL_COLOR}">${esc(labels.evolutionStart)}</text>`
@@ -146,7 +137,7 @@ export const renderAxesLayer: LayerRenderer = (
   }
 
   // ── Visibility direction indicators (rotated like Value Chain label) ─
-  if (axes.valueChain) {
+  if (showValueChain) {
     // "Visible" near top of Y-axis, rotated -90°
     const visX = plot.left - 6;
     const visTopY = plot.top + 40;

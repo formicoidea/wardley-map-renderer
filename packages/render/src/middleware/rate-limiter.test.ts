@@ -142,7 +142,7 @@ describe("Rate limiting middleware", () => {
 
     const body = await res.json();
     expect(body.type).toBe(
-      "https://wardleyapi.dev/problems/rate-limit-exceeded"
+      "https://api.wardleyapi.com/problems/rate-limit-exceeded"
     );
     expect(body.title).toBe("Too Many Requests");
     expect(body.status).toBe(429);

@@ -20,14 +20,12 @@ import type { WardleyMap, Component } from "./schema.js";
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
-/** Minimal valid WardleyMap for testing with default gridSize 1600×800 */
+/** Minimal valid WardleyMap for testing (default 1600×800) */
 function makeMap(overrides: Partial<WardleyMap> = {}): WardleyMap {
   return {
     title: "Test",
     components: [],
     relations: [],
-    gridSize: { width: 1600, height: 800 },
-    axes: { valueChain: true, evolution: true },
     ...overrides,
   };
 }
@@ -43,10 +41,12 @@ function makePipeline(
 ): Component {
   return {
     id,
-    label: `Pipeline ${id}`,
+    label: { name: `Pipeline ${id}` },
     type: "pipeline",
-    evolution: evoStart,
-    visibility: visEnd,
+    position: {
+      evolution: { scalar: evoStart },
+      visibility: { scalar: visEnd },
+    },
     pipelineGeometry: {
       evoStart,
       evoEnd,
@@ -73,9 +73,9 @@ describe("createRenderContext", () => {
     expect(ctx.plotHeight).toBe(728); // 752 - 24
   });
 
-  it("adapts to different gridSize while keeping fixed margins", () => {
+  it("adapts to different renderConfig while keeping fixed margins", () => {
     const ctx = createRenderContext(
-      makeMap({ gridSize: { width: 800, height: 600 } })
+      makeMap({ renderConfig: { width: 800, height: 600 } })
     );
 
     expect(ctx.width).toBe(800);
@@ -130,10 +130,12 @@ describe("computePipelineRect", () => {
   it("returns null for non-pipeline component without geometry", () => {
     const comp: Component = {
       id: "c1",
-      label: "Test",
+      label: { name: "Test" },
       type: "component",
-      evolution: 0.5,
-      visibility: 0.5,
+      position: {
+        evolution: { scalar: 0.5 },
+        visibility: { scalar: 0.5 },
+      },
     };
     expect(computePipelineRect(comp, ctx)).toBeNull();
   });
@@ -224,10 +226,12 @@ describe("allPipelineRects", () => {
         makePipeline("p1", 0.1, 0.5, 0.2, 0.4),
         {
           id: "c1",
-          label: "Regular",
+          label: { name: "Regular" },
           type: "component",
-          evolution: 0.5,
-          visibility: 0.5,
+          position: {
+            evolution: { scalar: 0.5 },
+            visibility: { scalar: 0.5 },
+          },
         },
         makePipeline("p2", 0.3, 0.9, 0.1, 0.6),
       ],
@@ -253,10 +257,12 @@ describe("componentPosition", () => {
   it("converts normalized coords to pixel center", () => {
     const comp: Component = {
       id: "c1",
-      label: "Test",
+      label: { name: "Test" },
       type: "component",
-      evolution: 0.5,
-      visibility: 0.3,
+      position: {
+        evolution: { scalar: 0.5 },
+        visibility: { scalar: 0.3 },
+      },
     };
     const pos = componentPosition(comp, ctx);
 
@@ -270,8 +276,24 @@ describe("allComponentPositions", () => {
   it("creates a Map of all component positions", () => {
     const map = makeMap({
       components: [
-        { id: "a", label: "A", type: "component", evolution: 0.1, visibility: 0.2 },
-        { id: "b", label: "B", type: "user-need", evolution: 0.9, visibility: 0.8 },
+        {
+          id: "a",
+          label: { name: "A" },
+          type: "component",
+          position: {
+            evolution: { scalar: 0.1 },
+            visibility: { scalar: 0.2 },
+          },
+        },
+        {
+          id: "b",
+          label: { name: "B" },
+          type: "user-need",
+          position: {
+            evolution: { scalar: 0.9 },
+            visibility: { scalar: 0.8 },
+          },
+        },
       ],
     });
     const ctx = createRenderContext(map);
@@ -289,8 +311,24 @@ describe("allEdgeSegments", () => {
   it("computes edge segments from relations", () => {
     const map = makeMap({
       components: [
-        { id: "a", label: "A", type: "component", evolution: 0.2, visibility: 0.3 },
-        { id: "b", label: "B", type: "component", evolution: 0.8, visibility: 0.7 },
+        {
+          id: "a",
+          label: { name: "A" },
+          type: "component",
+          position: {
+            evolution: { scalar: 0.2 },
+            visibility: { scalar: 0.3 },
+          },
+        },
+        {
+          id: "b",
+          label: { name: "B" },
+          type: "component",
+          position: {
+            evolution: { scalar: 0.8 },
+            visibility: { scalar: 0.7 },
+          },
+        },
       ],
       relations: [{ source: "a", target: "b", type: "DependsOn" }],
     });
@@ -308,7 +346,15 @@ describe("allEdgeSegments", () => {
   it("skips relations with missing component IDs", () => {
     const map = makeMap({
       components: [
-        { id: "a", label: "A", type: "component", evolution: 0.5, visibility: 0.5 },
+        {
+          id: "a",
+          label: { name: "A" },
+          type: "component",
+          position: {
+            evolution: { scalar: 0.5 },
+            visibility: { scalar: 0.5 },
+          },
+        },
       ],
       relations: [{ source: "a", target: "missing", type: "DependsOn" }],
     });
@@ -328,10 +374,12 @@ describe("componentEvolveArrows", () => {
   it("returns empty array when no evolvesTo", () => {
     const comp: Component = {
       id: "c1",
-      label: "Test",
+      label: { name: "Test" },
       type: "component",
-      evolution: 0.3,
-      visibility: 0.5,
+      position: {
+        evolution: { scalar: 0.3 },
+        visibility: { scalar: 0.5 },
+      },
     };
     expect(componentEvolveArrows(comp, ctx)).toHaveLength(0);
   });
@@ -339,11 +387,21 @@ describe("componentEvolveArrows", () => {
   it("computes arrow from component to evolved position", () => {
     const comp: Component = {
       id: "c1",
-      label: "Test",
+      label: { name: "Test" },
       type: "component",
-      evolution: 0.3,
-      visibility: 0.5,
-      evolvesTo: [{ evolution: 0.7, visibility: 0.5, evolveType: "natural" }],
+      position: {
+        evolution: { scalar: 0.3 },
+        visibility: { scalar: 0.5 },
+      },
+      evolvesTo: [
+        {
+          position: {
+            evolution: { scalar: 0.7 },
+            visibility: { scalar: 0.5 },
+          },
+          evolveType: "natural",
+        },
+      ],
     };
     const arrows = componentEvolveArrows(comp, ctx);
 

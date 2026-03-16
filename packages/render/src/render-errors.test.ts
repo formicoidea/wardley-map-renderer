@@ -46,18 +46,16 @@ const VALID_MAP = {
   components: [
     {
       id: "user",
-      label: "User",
+      label: { name: "User" },
       type: "anchor",
-      evolution: 0.5,
-      visibility: 0.1,
+      position: { evolution: { scalar: 0.5 }, visibility: { scalar: 0.1 } },
     },
     {
       id: "svc",
-      label: "Service",
+      label: { name: "Service" },
       type: "component",
       nature: "activity",
-      evolution: 0.6,
-      visibility: 0.5,
+      position: { evolution: { scalar: 0.6 }, visibility: { scalar: 0.5 } },
     },
   ],
   relations: [{ source: "user", target: "svc" }],
@@ -123,10 +121,9 @@ describe("POST /render error handling", () => {
       components: [
         {
           id: "x",
-          label: "X",
+          label: { name: "X" },
           type: "anchor",
-          evolution: 2.0,
-          visibility: 0.1,
+          position: { evolution: { scalar: 2.0 }, visibility: { scalar: 0.1 } },
         },
       ],
       relations: [],

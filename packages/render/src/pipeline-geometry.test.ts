@@ -23,7 +23,7 @@ import {
   type ResolvedPipeline,
   type CoordConverters,
 } from "./pipeline-geometry.js";
-import type { Component, PipelineGeometry, WardleyMap } from "./schema.js";
+import { evo, vis, type Component, type PipelineGeometry, type WardleyMap } from "./schema.js";
 
 // ── Test fixtures ──────────────────────────────────────────────────
 
@@ -42,12 +42,17 @@ const PIPE_GEO_NO_HANDLE: PipelineGeometry = {
   visEnd: 0.7,
 };
 
-function makeComp(overrides: Partial<Component> & { id: string; label: string }): Component {
+function makeComp(overrides: { id: string; label: string; evolution?: number; visibility?: number; type?: Component["type"]; pipelineGeometry?: PipelineGeometry }): Component {
+  const { id, label, evolution = 0.5, visibility = 0.5, type = "component", ...rest } = overrides;
   return {
-    type: "component",
-    evolution: 0.5,
-    visibility: 0.5,
-    ...overrides,
+    id,
+    label: { name: label },
+    type,
+    position: {
+      evolution: { scalar: evolution },
+      visibility: { scalar: visibility },
+    },
+    ...rest,
   } as Component;
 }
 
@@ -58,10 +63,12 @@ function makePipeline(
 ): Component {
   return {
     id,
-    label,
+    label: { name: label },
     type: "pipeline",
-    evolution: geo.evoStart,
-    visibility: geo.visEnd,
+    position: {
+      evolution: { scalar: geo.evoStart },
+      visibility: { scalar: geo.visEnd },
+    },
     pipelineGeometry: geo,
   } as Component;
 }
@@ -122,8 +129,6 @@ describe("resolvePipelines", () => {
       title: "No pipes",
       components: [makeComp({ id: "a", label: "A" })],
       relations: [],
-      gridSize: { width: 1600, height: 800 },
-      axes: { valueChain: true, evolution: true },
     };
     expect(resolvePipelines(map)).toEqual([]);
   });
@@ -136,8 +141,6 @@ describe("resolvePipelines", () => {
       title: "With pipe",
       components: [pipe, inside, outside],
       relations: [],
-      gridSize: { width: 1600, height: 800 },
-      axes: { valueChain: true, evolution: true },
     };
 
     const resolved = resolvePipelines(map);
@@ -150,17 +153,17 @@ describe("resolvePipelines", () => {
   it("ignores pipeline without pipelineGeometry", () => {
     const badPipe: Component = {
       id: "pipe-bad",
-      label: "Bad Pipeline",
+      label: { name: "Bad Pipeline" },
       type: "pipeline",
-      evolution: 0.5,
-      visibility: 0.5,
+      position: {
+        evolution: { scalar: 0.5 },
+        visibility: { scalar: 0.5 },
+      },
     } as Component;
     const map: WardleyMap = {
       title: "Bad pipe",
       components: [badPipe, makeComp({ id: "c1", label: "C1" })],
       relations: [],
-      gridSize: { width: 1600, height: 800 },
-      axes: { valueChain: true, evolution: true },
     };
     expect(resolvePipelines(map)).toEqual([]);
   });
@@ -169,17 +172,17 @@ describe("resolvePipelines", () => {
     const pipe = makePipeline("pipe1", "Pipeline", PIPE_GEO);
     const note: Component = {
       id: "note1",
-      label: "A note",
+      label: { name: "A note" },
       type: "note",
-      evolution: 0.4,
-      visibility: 0.5,
+      position: {
+        evolution: { scalar: 0.4 },
+        visibility: { scalar: 0.5 },
+      },
     } as Component;
     const map: WardleyMap = {
       title: "Pipe with note",
       components: [pipe, note],
       relations: [],
-      gridSize: { width: 1600, height: 800 },
-      axes: { valueChain: true, evolution: true },
     };
     const resolved = resolvePipelines(map);
     expect(resolved[0].childIds).not.toContain("note1");
@@ -360,8 +363,6 @@ describe("applyPipelineContainment", () => {
       title: "No pipes",
       components: [makeComp({ id: "c1", label: "C1" })],
       relations: [],
-      gridSize: { width: 1600, height: 800 },
-      axes: { valueChain: true, evolution: true },
     };
     const result = applyPipelineContainment(map);
     expect(result).toBe(map); // Same reference — no mutation needed
@@ -379,15 +380,13 @@ describe("applyPipelineContainment", () => {
       title: "Containment test",
       components: [pipe, inside],
       relations: [],
-      gridSize: { width: 1600, height: 800 },
-      axes: { valueChain: true, evolution: true },
     };
 
     const result = applyPipelineContainment(map);
     const c1 = result.components.find((c) => c.id === "c1")!;
     // Should remain at 0.4 (already inside bounds)
-    expect(c1.evolution).toBe(0.4);
-    expect(c1.visibility).toBe(0.5);
+    expect(evo(c1)).toBe(0.4);
+    expect(vis(c1)).toBe(0.5);
   });
 
   it("does not mutate the input map", () => {
@@ -401,14 +400,12 @@ describe("applyPipelineContainment", () => {
       title: "Immutability test",
       components: [pipe, inside],
       relations: [],
-      gridSize: { width: 1600, height: 800 },
-      axes: { valueChain: true, evolution: true },
     };
 
     const result = applyPipelineContainment(map);
     expect(result).not.toBe(map);
     // Original unchanged
-    expect(map.components[1].evolution).toBe(0.4);
+    expect(evo(map.components[1])).toBe(0.4);
   });
 
   it("leaves components outside pipelines unchanged", () => {
@@ -422,14 +419,12 @@ describe("applyPipelineContainment", () => {
       title: "Outside test",
       components: [pipe, outside],
       relations: [],
-      gridSize: { width: 1600, height: 800 },
-      axes: { valueChain: true, evolution: true },
     };
 
     const result = applyPipelineContainment(map);
     const c2 = result.components.find((c) => c.id === "c2")!;
-    expect(c2.evolution).toBe(0.9);
-    expect(c2.visibility).toBe(0.1);
+    expect(evo(c2)).toBe(0.9);
+    expect(vis(c2)).toBe(0.1);
   });
 });
 
@@ -469,8 +464,6 @@ describe("integration: MapKeep pipeline data", () => {
       title: "MapKeep Integration",
       components: [pipe, saas, adaptive, outsider],
       relations: [],
-      gridSize: { width: 1600, height: 800 },
-      axes: { valueChain: true, evolution: true },
     };
 
     const pipelines = resolvePipelines(map);
@@ -516,8 +509,6 @@ describe("integration: MapKeep pipeline data", () => {
       title: "Feedback Pipeline",
       components: [pipe, rlhf, usersFb, distil],
       relations: [],
-      gridSize: { width: 1600, height: 800 },
-      axes: { valueChain: true, evolution: true },
     };
 
     const pipelines = resolvePipelines(map);
@@ -534,10 +525,10 @@ describe("integration: MapKeep pipeline data", () => {
     const result = applyPipelineContainment(map);
     for (const comp of result.components.filter((c) => c.type !== "pipeline")) {
       if (pipelines[0].childIds.includes(comp.id)) {
-        expect(comp.evolution).toBeGreaterThanOrEqual(pipeGeo.evoStart);
-        expect(comp.evolution).toBeLessThanOrEqual(pipeGeo.evoEnd);
-        expect(comp.visibility).toBeGreaterThanOrEqual(pipeGeo.visStart);
-        expect(comp.visibility).toBeLessThanOrEqual(pipeGeo.visEnd);
+        expect(evo(comp)).toBeGreaterThanOrEqual(pipeGeo.evoStart);
+        expect(evo(comp)).toBeLessThanOrEqual(pipeGeo.evoEnd);
+        expect(vis(comp)).toBeGreaterThanOrEqual(pipeGeo.visStart);
+        expect(vis(comp)).toBeLessThanOrEqual(pipeGeo.visEnd);
       }
     }
   });

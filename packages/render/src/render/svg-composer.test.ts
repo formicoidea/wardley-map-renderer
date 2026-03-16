@@ -26,17 +26,15 @@ const MINIMAL_MAP: WardleyMap = WardleyMapSchema.parse({
   components: [
     {
       id: "c1",
-      label: "User",
+      label: { name: "User" },
       type: "anchor",
-      evolution: 0.5,
-      visibility: 0.1,
+      position: { evolution: { scalar: 0.5 }, visibility: { scalar: 0.1 } },
     },
     {
       id: "c2",
-      label: "Platform",
+      label: { name: "Platform" },
       type: "component",
-      evolution: 0.7,
-      visibility: 0.6,
+      position: { evolution: { scalar: 0.7 }, visibility: { scalar: 0.6 } },
     },
   ],
   relations: [{ source: "c1", target: "c2" }],
@@ -71,7 +69,7 @@ describe("composeSVG()", () => {
     expect(svg).toContain("</svg>");
   });
 
-  it("sets viewBox from gridSize dimensions", () => {
+  it("sets viewBox from canvas dimensions", () => {
     const svg = composeSVG(ctx, []);
     expect(svg).toContain(`viewBox="0 0 ${ctx.canvasWidth} ${ctx.canvasHeight}"`);
   });
@@ -234,7 +232,7 @@ describe("renderMapToSVGPartial()", () => {
 // ── RenderContext validation ─────────────────────────────────────────
 
 describe("buildRenderContext()", () => {
-  it("computes canvas dimensions from gridSize", () => {
+  it("computes canvas dimensions from defaults", () => {
     const ctx = buildRenderContext(MINIMAL_MAP);
     expect(ctx.canvasWidth).toBe(1600);
     expect(ctx.canvasHeight).toBe(800);
@@ -281,14 +279,14 @@ describe("buildRenderContext()", () => {
     expect(ctx.map.title).toBe("Composer Test");
   });
 
-  it("works with custom gridSize", () => {
+  it("works with custom renderConfig dimensions", () => {
     const customMap = WardleyMapSchema.parse({
       title: "Custom Grid",
       components: [
-        { id: "a", label: "A", type: "component", evolution: 0.5, visibility: 0.5 },
+        { id: "a", label: { name: "A" }, type: "component", position: { evolution: { scalar: 0.5 }, visibility: { scalar: 0.5 } } },
       ],
       relations: [],
-      gridSize: { width: 800, height: 400 },
+      renderConfig: { width: 800, height: 400 },
     });
 
     const ctx = buildRenderContext(customMap);
@@ -301,8 +299,8 @@ describe("buildRenderContext()", () => {
 
   it("includes componentById lookup", () => {
     const ctx = buildRenderContext(MINIMAL_MAP);
-    expect(ctx.componentById.get("c1")?.label).toBe("User");
-    expect(ctx.componentById.get("c2")?.label).toBe("Platform");
+    expect(ctx.componentById.get("c1")?.label.name).toBe("User");
+    expect(ctx.componentById.get("c2")?.label.name).toBe("Platform");
     expect(ctx.componentById.get("nonexistent")).toBeUndefined();
   });
 });

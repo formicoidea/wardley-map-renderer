@@ -10,6 +10,7 @@
  */
 
 import type { WardleyMap, Component } from "../schema.js";
+import { evo, vis, evoTarget, visTarget } from "../schema.js";
 import type {
   RenderContext,
   RenderGeometry,
@@ -31,7 +32,7 @@ import {
 } from "../blocks/wardley-map/wardley-map-consts.js";
 import { applyPipelineContainment, resolvePipelines, pipelineToRect } from "../pipeline-geometry.js";
 
-// ── Fixed margins (pixels, identical regardless of gridSize or axes) ──
+// ── Fixed margins (pixels, identical regardless of canvas size or axes) ──
 
 const FIXED_MARGINS: Margins = {
   top: AXIS_MARGIN_TOP,     // 24
@@ -61,9 +62,9 @@ export function buildRenderContext(map: WardleyMap, options: RenderOptions = DEF
   // Apply pipeline containment (clamps sub-component positions)
   const adjustedMap = applyPipelineContainment(map);
 
-  // Canvas dimensions from gridSize (or options overrides)
-  const canvasWidth = options.width ?? adjustedMap.gridSize.width;
-  const canvasHeight = options.height ?? adjustedMap.gridSize.height;
+  // Canvas dimensions from renderConfig (or options overrides)
+  const canvasWidth = options.width ?? adjustedMap.renderConfig?.width ?? 1600;
+  const canvasHeight = options.height ?? adjustedMap.renderConfig?.height ?? 800;
 
   // Compute plot area (drawable region inside margins)
   const plot: PlotArea = {
@@ -115,8 +116,8 @@ export function buildRenderContext(map: WardleyMap, options: RenderOptions = DEF
     }
     return {
       id: comp.id,
-      cx: evoToX(comp.evolution),
-      cy: visToY(comp.visibility),
+      cx: evoToX(evo(comp)),
+      cy: visToY(vis(comp)),
       component: comp,
     };
   });
@@ -143,14 +144,14 @@ export function buildRenderContext(map: WardleyMap, options: RenderOptions = DEF
   const evolves: EvolveGeometry[] = [];
   for (const comp of adjustedMap.components) {
     if (!comp.evolvesTo || comp.evolvesTo.length === 0) continue;
-    const fromX = evoToX(comp.evolution);
-    const fromY = visToY(comp.visibility);
+    const fromX = evoToX(evo(comp));
+    const fromY = visToY(vis(comp));
     for (const e of comp.evolvesTo) {
       evolves.push({
         fromX,
         fromY,
-        toX: evoToX(e.evolution),
-        toY: visToY(e.visibility),
+        toX: evoToX(evoTarget(e)),
+        toY: visToY(visTarget(e)),
         evolveType: e.evolveType ?? "natural",
         component: comp,
       });

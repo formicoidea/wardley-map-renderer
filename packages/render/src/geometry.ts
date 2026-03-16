@@ -2,7 +2,7 @@
  * Geometry layer — Phase 1 of the 2-phase rendering pipeline.
  *
  * Computes all pixel positions from normalized [0-1] coordinates
- * using a RenderContext derived from variable gridSize + fixed margins.
+ * using a RenderContext derived from renderConfig dimensions + fixed margins.
  *
  * Pure functions only — no SVG generation here.
  *
@@ -10,6 +10,7 @@
  */
 
 import type { Component, PipelineGeometry, WardleyMap } from "./schema.js";
+import { evo, vis, evoTarget, visTarget } from "./schema.js";
 import {
   AXIS_MARGIN_LEFT,
   AXIS_MARGIN_BOTTOM,
@@ -23,13 +24,13 @@ const MARGIN_RIGHT = 20;
 // ── RenderContext ─────────────────────────────────────────────────────
 
 /**
- * Immutable geometric context computed once from a WardleyMap's gridSize.
+ * Immutable geometric context computed once from a WardleyMap's renderConfig.
  * Passed as parameter to all geometry/rendering functions (functional style).
  */
 export interface RenderContext {
-  /** Total canvas width in px (gridSize.width) */
+  /** Total canvas width in px (renderConfig.width or 1600) */
   readonly width: number;
-  /** Total canvas height in px (gridSize.height) */
+  /** Total canvas height in px (renderConfig.height or 800) */
   readonly height: number;
 
   /** Plot area boundaries (inside fixed margins) */
@@ -43,12 +44,12 @@ export interface RenderContext {
 }
 
 /**
- * Build a RenderContext from a WardleyMap (uses gridSize for canvas dimensions).
- * Margins are fixed in pixels regardless of gridSize.
+ * Build a RenderContext from a WardleyMap (uses renderConfig for canvas dimensions).
+ * Margins are fixed in pixels regardless of canvas size.
  */
 export function createRenderContext(map: WardleyMap): RenderContext {
-  const width = map.gridSize.width;
-  const height = map.gridSize.height;
+  const width = map.renderConfig?.width ?? 1600;
+  const height = map.renderConfig?.height ?? 800;
 
   const plotLeft = AXIS_MARGIN_LEFT;
   const plotTop = AXIS_MARGIN_TOP;
@@ -97,8 +98,8 @@ export function componentPosition(
 ): ComponentPosition {
   return {
     id: comp.id,
-    cx: evoToX(comp.evolution, ctx),
-    cy: visToY(comp.visibility, ctx),
+    cx: evoToX(evo(comp), ctx),
+    cy: visToY(vis(comp), ctx),
   };
 }
 
@@ -269,14 +270,14 @@ export function componentEvolveArrows(
 ): EvolveArrow[] {
   if (!comp.evolvesTo || comp.evolvesTo.length === 0) return [];
 
-  const fromX = evoToX(comp.evolution, ctx);
-  const fromY = visToY(comp.visibility, ctx);
+  const fromX = evoToX(evo(comp), ctx);
+  const fromY = visToY(vis(comp), ctx);
 
   return comp.evolvesTo.map((e) => ({
     fromX,
     fromY,
-    toX: evoToX(e.evolution, ctx),
-    toY: visToY(e.visibility, ctx),
+    toX: evoToX(evoTarget(e), ctx),
+    toY: visToY(visTarget(e), ctx),
     evolveType: e.evolveType ?? "natural",
   }));
 }

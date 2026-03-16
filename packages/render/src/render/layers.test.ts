@@ -34,8 +34,8 @@ function makeSimpleMap(overrides: Record<string, unknown> = {}): WardleyMap {
   return sanitizeMap(WardleyMapSchema.parse({
     title: "Test Map",
     components: [
-      { id: "a", label: "User", type: "anchor", evolution: 0.5, visibility: 0.1 },
-      { id: "b", label: "Service", type: "component", evolution: 0.6, visibility: 0.5 },
+      { id: "a", label: { name: "User" }, type: "anchor", position: { evolution: { scalar: 0.5 }, visibility: { scalar: 0.1 } } },
+      { id: "b", label: { name: "Service" }, type: "component", position: { evolution: { scalar: 0.6 }, visibility: { scalar: 0.5 } } },
     ],
     relations: [{ source: "a", target: "b" }],
     ...overrides,
@@ -46,13 +46,12 @@ function makeMapWithPipeline(): WardleyMap {
   return sanitizeMap(WardleyMapSchema.parse({
     title: "Pipeline Map",
     components: [
-      { id: "u", label: "User", type: "anchor", evolution: 0.5, visibility: 0.1 },
+      { id: "u", label: { name: "User" }, type: "anchor", position: { evolution: { scalar: 0.5 }, visibility: { scalar: 0.1 } } },
       {
         id: "p1",
-        label: "Platform",
+        label: { name: "Platform" },
         type: "pipeline",
-        evolution: 0.5,
-        visibility: 0.5,
+        position: { evolution: { scalar: 0.5 }, visibility: { scalar: 0.5 } },
         pipelineGeometry: {
           evoStart: 0.2,
           evoEnd: 0.8,
@@ -69,9 +68,9 @@ function makeMapWithFlowEdges(): WardleyMap {
   return sanitizeMap(WardleyMapSchema.parse({
     title: "Flow Map",
     components: [
-      { id: "a", label: "A", type: "component", evolution: 0.2, visibility: 0.2 },
-      { id: "b", label: "B", type: "component", evolution: 0.6, visibility: 0.5 },
-      { id: "c", label: "C", type: "component", evolution: 0.9, visibility: 0.8 },
+      { id: "a", label: { name: "A" }, type: "component", position: { evolution: { scalar: 0.2 }, visibility: { scalar: 0.2 } } },
+      { id: "b", label: { name: "B" }, type: "component", position: { evolution: { scalar: 0.6 }, visibility: { scalar: 0.5 } } },
+      { id: "c", label: { name: "C" }, type: "component", position: { evolution: { scalar: 0.9 }, visibility: { scalar: 0.8 } } },
     ],
     relations: [
       { source: "a", target: "b", type: "DependsOn" },
@@ -128,7 +127,7 @@ describe("renderTitleLayer", () => {
   });
 
   it("centers title at half canvas width", () => {
-    const map = makeSimpleMap({ gridSize: { width: 1600, height: 800 } });
+    const map = makeSimpleMap({ renderConfig: { width: 1600, height: 800 } });
     const ctx = buildRenderContext(map);
     const parts = renderTitleLayer(ctx);
 
@@ -141,18 +140,19 @@ describe("renderTitleLayer", () => {
 // ═══════════════════════════════════════════════════════════════════
 
 describe("renderAxesLayer", () => {
-  it("always renders the plot border rectangle", () => {
-    const map = makeSimpleMap({ axes: { valueChain: false, evolution: false } });
+  it("returns only arrowhead defs when both axes are disabled", () => {
+    const map = makeSimpleMap({ renderConfig: { showAxes: false, showValueChain: false } });
     const ctx = buildRenderContext(map);
     const parts = renderAxesLayer(ctx);
 
-    const borderPart = parts.find((p) => p.includes(BORDER_COLOR));
-    expect(borderPart).toBeDefined();
-    expect(borderPart).toContain("<rect");
+    // Only the arrowhead marker definition should be rendered
+    expect(parts).toHaveLength(1);
+    expect(parts[0]).toContain("<defs>");
+    expect(parts[0]).toContain("axis-arrow");
   });
 
   it("does not render horizontal grid lines (removed for cleaner visual)", () => {
-    const map = makeSimpleMap({ axes: { valueChain: true, evolution: false } });
+    const map = makeSimpleMap({ renderConfig: { showValueChain: true, showAxes: false } });
     const ctx = buildRenderContext(map);
     const parts = renderAxesLayer(ctx);
 
@@ -161,8 +161,8 @@ describe("renderAxesLayer", () => {
     expect(gridLines).toHaveLength(0);
   });
 
-  it("renders 3 evolution phase dividers when evolution is true", () => {
-    const map = makeSimpleMap({ axes: { valueChain: false, evolution: true } });
+  it("renders 3 evolution phase dividers when showAxes is true", () => {
+    const map = makeSimpleMap({ renderConfig: { showAxes: true, showValueChain: false } });
     const ctx = buildRenderContext(map);
     const parts = renderAxesLayer(ctx);
 
@@ -172,8 +172,8 @@ describe("renderAxesLayer", () => {
     expect(dividers).toHaveLength(3);
   });
 
-  it("omits phase dividers when evolution is false", () => {
-    const map = makeSimpleMap({ axes: { valueChain: false, evolution: false } });
+  it("omits phase dividers when showAxes is false", () => {
+    const map = makeSimpleMap({ renderConfig: { showAxes: false, showValueChain: false } });
     const ctx = buildRenderContext(map);
     const parts = renderAxesLayer(ctx);
 
@@ -183,8 +183,8 @@ describe("renderAxesLayer", () => {
     expect(dividers).toHaveLength(0);
   });
 
-  it("renders 4 phase labels when evolution is true", () => {
-    const map = makeSimpleMap({ axes: { valueChain: false, evolution: true } });
+  it("renders 4 phase labels when showAxes is true (default)", () => {
+    const map = makeSimpleMap();
     const ctx = buildRenderContext(map);
     const parts = renderAxesLayer(ctx);
 
@@ -192,6 +192,23 @@ describe("renderAxesLayer", () => {
     expect(parts.some((p) => p.includes("Custom-Built"))).toBe(true);
     expect(parts.some((p) => p.includes("Product (+Rental)"))).toBe(true);
     expect(parts.some((p) => p.includes("Commodity (+Utility)"))).toBe(true);
+  });
+
+  it("showPhaseLabels=false hides phase labels but keeps evolution axis", () => {
+    const map = makeSimpleMap({ renderConfig: { showPhaseLabels: false } });
+    const ctx = buildRenderContext(map);
+    const parts = renderAxesLayer(ctx);
+
+    // Phase labels should be absent
+    expect(parts.some((p) => p.includes("Genesis"))).toBe(false);
+    expect(parts.some((p) => p.includes("Custom-Built"))).toBe(false);
+
+    // But evolution axis arrow and dividers should still be present
+    const dividers = parts.filter(
+      (p) => p.includes(DIVIDER_COLOR) && p.includes("stroke-dasharray")
+    );
+    expect(dividers).toHaveLength(3);
+    expect(parts.some((p) => p.includes("Evolution"))).toBe(true);
   });
 
   it("renders 'Evolution' x-axis label", () => {
@@ -220,6 +237,18 @@ describe("renderAxesLayer", () => {
     expect(parts.some((p) => p.includes("Visible"))).toBe(true);
     expect(parts.some((p) => p.includes("Invisible"))).toBe(true);
   });
+
+  it("legend controlled via renderConfig.legend", () => {
+    const map = makeSimpleMap({ renderConfig: { legend: { show: false } } });
+    const ctx = buildRenderContext(map);
+    expect(ctx.map.renderConfig?.legend?.show).toBe(false);
+  });
+
+  it("legend with {x, y} position is accessible in context", () => {
+    const map = makeSimpleMap({ renderConfig: { legend: { position: { x: 50, y: 50 } } } });
+    const ctx = buildRenderContext(map);
+    expect(ctx.map.renderConfig?.legend?.position).toEqual({ x: 50, y: 50 });
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════
@@ -246,7 +275,7 @@ describe("renderPipelinesLayer", () => {
     expect(rect).toContain("rx=");
     expect(rect).toContain("ry=");
     expect(rect).toContain("rgba(255, 255, 255, 0.35)");
-    expect(rect).toContain("#bbbbbb");
+    expect(rect).toContain("#999999");
   });
 
   it("pipeline rect has positive dimensions", () => {

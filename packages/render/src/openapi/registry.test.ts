@@ -124,10 +124,9 @@ describe("registerV1Routes", () => {
       components: [
         {
           id: "a",
-          label: "A",
+          label: { name: "A" },
           type: "component",
-          evolution: 0.5,
-          visibility: 0.5,
+          position: { evolution: { scalar: 0.5 }, visibility: { scalar: 0.5 } },
         },
       ],
       relations: [],

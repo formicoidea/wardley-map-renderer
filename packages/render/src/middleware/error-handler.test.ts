@@ -48,9 +48,9 @@ function createApp() {
   });
 
   // Route that throws ZodError
-  app.get("/throw-zod", () => {
+  app.get("/throw-zod", (c) => {
     const schema = z.object({ name: z.string(), age: z.number() });
-    schema.parse({ name: 123, age: "not a number" });
+    return c.json(schema.parse({ name: 123, age: "not a number" }));
   });
 
   // Route that throws a generic Error
@@ -59,9 +59,9 @@ function createApp() {
   });
 
   // Route that throws a non-standard Error (no status property)
-  app.get("/throw-type-error", () => {
+  app.get("/throw-type-error", (c) => {
     const obj: any = null;
-    obj.nonExistent(); // triggers TypeError
+    return c.json(obj.nonExistent()); // triggers TypeError
   });
 
   // Successful route (control)
@@ -72,9 +72,9 @@ function createApp() {
 
 // ── Helper ───────────────────────────────────────────────────────────
 
-async function getProblem(app: Hono, path: string): Promise<{ res: Response; body: ProblemDetail }> {
+async function getProblem(app: Hono, path: string): Promise<{ res: Response; body: ProblemDetail & { errors?: Array<{ path: string; message: string }> } }> {
   const res = await app.request(path);
-  const body = await res.json() as ProblemDetail;
+  const body = await res.json() as ProblemDetail & { errors?: Array<{ path: string; message: string }> };
   return { res, body };
 }
 
@@ -149,7 +149,7 @@ describe("RFC 7807 error handler", () => {
     it("maps generic Error to 500", async () => {
       const { res, body } = await getProblem(app, "/throw-generic");
       expect(res.status).toBe(500);
-      expect(body.type).toBe("about:blank");
+      expect(body.type).toBe("https://api.wardleyapi.com/problems/internal-error");
       expect(body.title).toBe("Internal Server Error");
       expect(body.status).toBe(500);
     });
@@ -167,7 +167,7 @@ describe("RFC 7807 error handler", () => {
       const { res, body } = await getProblem(app, "/nonexistent");
       expect(res.status).toBe(404);
       expect(res.headers.get("content-type")).toContain("application/problem+json");
-      expect(body.type).toBe("about:blank");
+      expect(body.type).toBe("https://api.wardleyapi.com/problems/not-found");
       expect(body.title).toBe("Not Found");
       expect(body.status).toBe(404);
       expect(body.detail).toContain("/nonexistent");

@@ -28,11 +28,15 @@ import {
   RelationTypeEnum,
   FlowSchema,
   RelationSchema,
-  GridSizeSchema,
+  LabelPositionSchema,
+  LabelSchema,
+  EvolutionFieldSchema,
+  VisibilityFieldSchema,
+  PositionSchema,
   LocaleEnum,
   AxisLabelsSchema,
-  AxesSchema,
   LegendPositionEnum,
+  LegendPositionXYSchema,
   LegendSchema,
   EvolveStyleSchema,
   RenderConfigSchema,
@@ -84,11 +88,38 @@ export function registerSchemas(): void {
     description: "Position of the legend on the rendered map.",
   }));
 
+  registry.register("LegendPositionXY", LegendPositionXYSchema.openapi({
+    description: "Absolute {x, y} coordinates for legend placement.",
+  }));
+
   registry.register("Locale", LocaleEnum.openapi({
     description: "Supported locale for axis label presets.",
   }));
 
   // ── Object schemas ─────────────────────────────────────────
+
+  registry.register("LabelPosition", LabelPositionSchema.openapi({
+    description: "Optional label offset for rendering (pixels relative to component center).",
+  }));
+
+  registry.register("Label", LabelSchema.openapi({
+    description: "Component label with name and optional position offset.",
+    example: { name: "Platform", position: { dx: 10, dy: -5 } },
+  }));
+
+  registry.register("EvolutionField", EvolutionFieldSchema.openapi({
+    description: "Evolution axis value with optional uncertainty range.",
+    example: { scalar: 0.65, range: [0.5, 0.8] },
+  }));
+
+  registry.register("VisibilityField", VisibilityFieldSchema.openapi({
+    description: "Visibility axis value (0 = top/visible, 1 = bottom/invisible).",
+    example: { scalar: 0.3 },
+  }));
+
+  registry.register("Position", PositionSchema.openapi({
+    description: "Component position on evolution and visibility axes.",
+  }));
 
   registry.register("EvolvesTo", EvolvesToSchema.openapi({
     description: "Evolution movement target for a component.",
@@ -102,10 +133,12 @@ export function registerSchemas(): void {
     description: "A single component on the Wardley Map.",
     example: {
       id: "platform",
-      label: "Platform",
+      label: { name: "Platform" },
       type: "component",
-      evolution: 0.65,
-      visibility: 0.3,
+      position: {
+        evolution: { scalar: 0.65 },
+        visibility: { scalar: 0.3 },
+      },
     },
   }));
 
@@ -122,16 +155,8 @@ export function registerSchemas(): void {
     },
   }));
 
-  registry.register("GridSize", GridSizeSchema.openapi({
-    description: "Grid dimensions for coordinate mapping (default 1600×800).",
-  }));
-
   registry.register("AxisLabels", AxisLabelsSchema.openapi({
     description: "i18n axis labels with locale-aware defaults and per-field overrides.",
-  }));
-
-  registry.register("Axes", AxesSchema.openapi({
-    description: "Axes visibility toggles and label configuration.",
   }));
 
   registry.register("Legend", LegendSchema.openapi({
@@ -153,9 +178,24 @@ export function registerSchemas(): void {
     example: {
       title: "Example Map",
       components: [
-        { id: "user", label: "User", type: "user-need", evolution: 0.95, visibility: 0.05 },
-        { id: "web-app", label: "Web App", type: "component", evolution: 0.65, visibility: 0.3 },
-        { id: "platform", label: "Platform", type: "component", evolution: 0.45, visibility: 0.6 },
+        {
+          id: "user",
+          label: { name: "User" },
+          type: "user-need",
+          position: { evolution: { scalar: 0.95 }, visibility: { scalar: 0.05 } },
+        },
+        {
+          id: "web-app",
+          label: { name: "Web App" },
+          type: "component",
+          position: { evolution: { scalar: 0.65 }, visibility: { scalar: 0.3 } },
+        },
+        {
+          id: "platform",
+          label: { name: "Platform" },
+          type: "component",
+          position: { evolution: { scalar: 0.45 }, visibility: { scalar: 0.6 } },
+        },
       ],
       relations: [
         { source: "user", target: "web-app", type: "DependsOn" },
@@ -174,7 +214,7 @@ export function registerSchemas(): void {
       status: 422,
       detail: "Request validation failed",
       instance: "/v1/render",
-      errors: [{ path: "components.0.evolution", message: "Number must be at most 1" }],
+      errors: [{ path: "components.0.position.evolution.scalar", message: "Number must be at most 1" }],
     },
   }));
 

@@ -15,17 +15,12 @@
  */
 
 import type { Context, Next } from "hono";
-
-/**
- * RFC 7807 Problem Details for authentication errors.
- */
-export interface ProblemDetail {
-  type: string;
-  title: string;
-  status: number;
-  detail: string;
-  instance?: string;
-}
+import {
+  ProblemTypes,
+  PROBLEM_CONTENT_TYPE,
+  PROBLEM_HINTS,
+  type ProblemDetail,
+} from "./problem-details.js";
 
 /**
  * Extract API key from request headers.
@@ -133,15 +128,16 @@ function getApiKey(c: Context): string | undefined {
  */
 function unauthorized(c: Context, detail: string) {
   const problem: ProblemDetail = {
-    type: "https://wardleyapi.dev/problems/unauthorized",
+    type: ProblemTypes.AUTHENTICATION_ERROR,
     title: "Unauthorized",
     status: 401,
     detail,
     instance: c.req.path,
+    hint: PROBLEM_HINTS[ProblemTypes.AUTHENTICATION_ERROR],
   };
 
   return c.json(problem, 401, {
-    "Content-Type": "application/problem+json",
+    "Content-Type": PROBLEM_CONTENT_TYPE,
     "WWW-Authenticate": 'Bearer realm="WardleyAPI"',
   });
 }

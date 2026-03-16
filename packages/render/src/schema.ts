@@ -36,10 +36,38 @@ export const NatureEnum = z
   ])
   .optional();
 
+// ── Label (nested: name + optional position offset) ─────────
+export const LabelPositionSchema = z.object({
+  dx: z.number(),
+  dy: z.number(),
+});
+
+export const LabelSchema = z.object({
+  name: z.string(),
+  position: LabelPositionSchema.optional(),
+});
+
+// ── Position (nested: evolution + visibility) ────────────────
+export const EvolutionFieldSchema = z.object({
+  scalar: EvolutionSchema,
+  range: EvolutionRangeSchema.optional(),
+});
+
+export const VisibilityFieldSchema = z.object({
+  scalar: z.number().min(0).max(1),
+});
+
+export const PositionSchema = z.object({
+  evolution: EvolutionFieldSchema,
+  visibility: VisibilityFieldSchema,
+});
+
 // ── EvolvesTo target ────────────────────────────────────────
 export const EvolvesToSchema = z.object({
-  evolution: EvolutionSchema,
-  visibility: z.number().min(0).max(1),
+  position: z.object({
+    evolution: z.object({ scalar: EvolutionSchema }),
+    visibility: z.object({ scalar: z.number().min(0).max(1) }),
+  }),
   evolveType: z.enum(["natural", "ecosystem", "forced", "late"]).default("natural"),
 });
 
@@ -56,20 +84,11 @@ export const PipelineGeometrySchema = z.object({
 // ── Component ──────────────────────────────────────────────
 export const ComponentSchema = z.object({
   id: z.string(),
-  label: z.string(),
+  label: LabelSchema,
   type: ComponentTypeEnum,
   nature: NatureEnum,
-  evolution: EvolutionSchema,
-  // Visibility on the value chain: 0 = top/visible to user, 1 = bottom/invisible
-  // OWM convention: 0 = top of map (visible), 1 = bottom (invisible infrastructure)
-  visibility: z.number().min(0).max(1),
+  position: PositionSchema,
   description: z.string().optional(),
-  // Optional label offset for rendering (pixels relative to component center)
-  labelPosition: z
-    .object({ dx: z.number(), dy: z.number() })
-    .optional(),
-  // Optional evolution range: [min, max] span for evolution uncertainty or breadth
-  evolutionRange: EvolutionRangeSchema.optional(),
   // Evolution movement targets
   evolvesTo: z.array(EvolvesToSchema).optional(),
   // Pipeline geometry (only for type === "pipeline")
@@ -102,12 +121,6 @@ export const RelationSchema = z.object({
   flow: FlowSchema.optional(),
 });
 
-// ── Grid size ──────────────────────────────────────────────
-export const GridSizeSchema = z.object({
-  width: z.number().positive(),
-  height: z.number().positive(),
-});
-
 // ── Supported locales for axis labels ─────────────────────
 export const LocaleEnum = z.enum(["en", "fr"]);
 
@@ -132,38 +145,19 @@ export const AxisLabelsSchema = z.object({
   visibilityLow: z.string().optional(),
 });
 
-/**
- * AxisLabelsOverrideSchema — variant for renderConfig.axisLabels.
- * Unlike AxisLabelsSchema, locale is optional WITHOUT a default,
- * so unset locale doesn't override axes.labels locale.
- */
-export const AxisLabelsOverrideSchema = z.object({
-  locale: LocaleEnum.optional(),
-  xAxis: z.string().optional(),
-  yAxis: z.string().optional(),
-  phases: z.tuple([z.string(), z.string(), z.string(), z.string()]).optional(),
-  evolutionStart: z.string().optional(),
-  evolutionEnd: z.string().optional(),
-  visibilityHigh: z.string().optional(),
-  visibilityLow: z.string().optional(),
-});
-
-// ── Axes visibility ────────────────────────────────────────
-export const AxesSchema = z.object({
-  valueChain: z.boolean().default(true),
-  evolution: z.boolean().default(true),
-  /** i18n axis labels — locale-aware with per-field overrides */
-  labels: AxisLabelsSchema.optional(),
-});
-
 // ── Legend config ──────────────────────────────────────────
 export const LegendPositionEnum = z.enum([
   "top-left", "top-right", "bottom-left", "bottom-right", "auto"
 ]);
 
+export const LegendPositionXYSchema = z.object({
+  x: z.number(),
+  y: z.number(),
+});
+
 export const LegendSchema = z.object({
   show: z.boolean().default(true),
-  position: LegendPositionEnum.default("auto"),
+  position: z.union([LegendPositionEnum, LegendPositionXYSchema]).default("bottom-right"),
 });
 
 // ── Render config (optional visual overrides embedded in map JSON) ──
@@ -177,9 +171,9 @@ export const EvolveStyleSchema = z.object({
 });
 
 export const RenderConfigSchema = z.object({
-  /** Override canvas width (defaults to gridSize.width) */
+  /** Override canvas width (defaults to 1600) */
   width: z.number().positive().optional(),
-  /** Override canvas height (defaults to gridSize.height) */
+  /** Override canvas height (defaults to 800) */
   height: z.number().positive().optional(),
   /** Background color hex string (defaults to "#ffffff") */
   backgroundColor: z.string().regex(/^#[0-9a-fA-F]{3,8}$/, "Must be a valid hex color").optional(),
@@ -213,10 +207,11 @@ export const RenderConfigSchema = z.object({
     ecosystem: EvolveStyleSchema.optional(),
     forced: EvolveStyleSchema.optional(),
   }).strict().optional(),
-  /** Axis label overrides — applied on top of map.axes.labels (highest priority).
-   *  Uses AxisLabelsOverrideSchema (locale has no default) so unset fields
-   *  fall through to map.axes.labels or locale preset. */
-  axisLabels: AxisLabelsOverrideSchema.optional(),
+  /** i18n axis labels — locale-aware with per-field overrides.
+   *  Uses AxisLabelsSchema (locale defaults to "en") as the single source. */
+  axisLabels: AxisLabelsSchema.optional(),
+  /** Legend visibility and position (consolidated from former top-level field) */
+  legend: LegendSchema.optional(),
 });
 
 // ── Wardley Map ────────────────────────────────────────────
@@ -225,33 +220,47 @@ export const WardleyMapSchema = z.object({
   components: z.array(ComponentSchema),
   relations: z.array(RelationSchema),
   context: z.string().optional(),
-  // Grid dimensions for coordinate mapping (default 1600×800)
-  gridSize: GridSizeSchema.default({ width: 1600, height: 800 }),
-  // Axes visibility toggles
-  axes: AxesSchema.default({ valueChain: true, evolution: true }),
-  // Legend visibility and position
-  legend: LegendSchema.default({ show: true, position: "auto" }),
-  // Optional render config — visual overrides that travel with the map payload
+  // Optional render config — single source of truth for all visual overrides
+  // Canvas dimensions: renderConfig.width (default 1600), renderConfig.height (default 800)
   renderConfig: RenderConfigSchema.optional(),
 });
 
 // ── TypeScript types derived from Zod ──────────────────────
 export type Component = z.infer<typeof ComponentSchema>;
+export type Label = z.infer<typeof LabelSchema>;
+export type LabelPosition = z.infer<typeof LabelPositionSchema>;
+export type EvolutionField = z.infer<typeof EvolutionFieldSchema>;
+export type VisibilityField = z.infer<typeof VisibilityFieldSchema>;
+export type Position = z.infer<typeof PositionSchema>;
 export type EvolutionRange = z.infer<typeof EvolutionRangeSchema>;
 export type EvolvesTo = z.infer<typeof EvolvesToSchema>;
 export type PipelineGeometry = z.infer<typeof PipelineGeometrySchema>;
 export type Relation = z.infer<typeof RelationSchema>;
 export type Flow = z.infer<typeof FlowSchema>;
 export type RelationType = z.infer<typeof RelationTypeEnum>;
-export type GridSize = z.infer<typeof GridSizeSchema>;
-export type Axes = z.infer<typeof AxesSchema>;
 export type AxisLabels = z.infer<typeof AxisLabelsSchema>;
 export type Locale = z.infer<typeof LocaleEnum>;
 export type Legend = z.infer<typeof LegendSchema>;
 export type LegendPosition = z.infer<typeof LegendPositionEnum>;
+export type LegendPositionXY = z.infer<typeof LegendPositionXYSchema>;
 export type RenderConfig = z.infer<typeof RenderConfigSchema>;
 export type EvolveStyle = z.infer<typeof EvolveStyleSchema>;
 export type WardleyMap = z.infer<typeof WardleyMapSchema>;
+
+// ── Accessor shortcuts ──────────────────────────────────────
+// Reduce verbosity of .position.evolution.scalar everywhere
+
+/** Get evolution scalar from a component */
+export function evo(c: Component): number { return c.position.evolution.scalar; }
+
+/** Get visibility scalar from a component */
+export function vis(c: Component): number { return c.position.visibility.scalar; }
+
+/** Get evolution scalar from an evolvesTo target */
+export function evoTarget(e: EvolvesTo): number { return e.position.evolution.scalar; }
+
+/** Get visibility scalar from an evolvesTo target */
+export function visTarget(e: EvolvesTo): number { return e.position.visibility.scalar; }
 
 // ── Color mapping ──────────────────────────────────────────
 // Minimal Tailwind-to-hex mapping with black fallback
@@ -280,23 +289,24 @@ export function validateComponent(c: Component): string[] {
   // Pipeline must have pipelineGeometry
   if (c.type === "pipeline" && !c.pipelineGeometry) {
     errors.push(
-      `Pipeline "${c.label}" should have pipelineGeometry defined`
+      `Pipeline "${c.label.name}" should have pipelineGeometry defined`
     );
   }
 
   // Non-pipeline should not have pipelineGeometry
   if (c.type !== "pipeline" && c.pipelineGeometry) {
     errors.push(
-      `Non-pipeline "${c.label}" should not have pipelineGeometry`
+      `Non-pipeline "${c.label.name}" should not have pipelineGeometry`
     );
   }
 
   // Validate evolutionRange consistency with evolution point
-  if (c.evolutionRange) {
-    const [min, max] = c.evolutionRange;
-    if (c.evolution < min || c.evolution > max) {
+  const range = c.position.evolution.range;
+  if (range) {
+    const [min, max] = range;
+    if (evo(c) < min || evo(c) > max) {
       errors.push(
-        `Component "${c.label}" evolution (${c.evolution}) is outside its evolutionRange [${min}, ${max}]`
+        `Component "${c.label.name}" evolution (${evo(c)}) is outside its evolutionRange [${min}, ${max}]`
       );
     }
   }
@@ -304,9 +314,9 @@ export function validateComponent(c: Component): string[] {
   // Validate evolvesTo targets
   if (c.evolvesTo) {
     for (const e of c.evolvesTo) {
-      if (e.evolution <= c.evolution) {
+      if (evoTarget(e) <= evo(c)) {
         errors.push(
-          `Component "${c.label}" evolvesTo target (evo=${e.evolution}) should be further right than source (evo=${c.evolution})`
+          `Component "${c.label.name}" evolvesTo target (evo=${evoTarget(e)}) should be further right than source (evo=${evo(c)})`
         );
       }
     }
@@ -387,28 +397,9 @@ function clamp01(v: number): number {
  *  - Auto-populate pipelineGeometry from flat fields
  *  - Deduplicate relations
  *  - Remove orphan relations (referencing non-existent component IDs)
- *  - Default gridSize and axes if missing
  */
 export function sanitizeMap(raw: WardleyMap): WardleyMap {
   const map = structuredClone(raw);
-
-  // Ensure gridSize defaults
-  if (!map.gridSize) {
-    (map as any).gridSize = { width: 1600, height: 800 };
-  } else {
-    if (!map.gridSize.width || map.gridSize.width <= 0) map.gridSize.width = 1600;
-    if (!map.gridSize.height || map.gridSize.height <= 0) map.gridSize.height = 800;
-  }
-
-  // Ensure axes defaults
-  if (!map.axes) {
-    (map as any).axes = { valueChain: true, evolution: true };
-  }
-
-  // Ensure legend defaults
-  if (!map.legend) {
-    (map as any).legend = { show: true, position: "auto" };
-  }
 
   for (const c of map.components) {
     // Migrate legacy type names (LLM might still produce old types)
@@ -422,23 +413,25 @@ export function sanitizeMap(raw: WardleyMap): WardleyMap {
     }
 
     // Clamp evolution and visibility to [0,1]
-    c.evolution = clamp01(c.evolution);
-    c.visibility = clamp01(c.visibility);
+    c.position.evolution.scalar = clamp01(c.position.evolution.scalar);
+    c.position.visibility.scalar = clamp01(c.position.visibility.scalar);
 
     // Sanitize evolutionRange: clamp and ensure min ≤ max
-    if (c.evolutionRange) {
-      c.evolutionRange[0] = clamp01(c.evolutionRange[0]);
-      c.evolutionRange[1] = clamp01(c.evolutionRange[1]);
-      if (c.evolutionRange[0] > c.evolutionRange[1]) {
-        [c.evolutionRange[0], c.evolutionRange[1]] = [c.evolutionRange[1], c.evolutionRange[0]];
+    if (c.position.evolution.range) {
+      c.position.evolution.range[0] = clamp01(c.position.evolution.range[0]);
+      c.position.evolution.range[1] = clamp01(c.position.evolution.range[1]);
+      if (c.position.evolution.range[0] > c.position.evolution.range[1]) {
+        [c.position.evolution.range[0], c.position.evolution.range[1]] = [
+          c.position.evolution.range[1], c.position.evolution.range[0],
+        ];
       }
     }
 
     // Sanitize evolvesTo entries
     if (c.evolvesTo) {
       for (const e of c.evolvesTo) {
-        e.evolution = clamp01(e.evolution);
-        e.visibility = clamp01(e.visibility);
+        e.position.evolution.scalar = clamp01(e.position.evolution.scalar);
+        e.position.visibility.scalar = clamp01(e.position.visibility.scalar);
         // Ensure evolveType has a default
         if (!e.evolveType) {
           e.evolveType = "natural";
@@ -472,9 +465,9 @@ export function sanitizeMap(raw: WardleyMap): WardleyMap {
       if (rawComp.evoStart !== undefined) {
         c.pipelineGeometry = {
           evoStart: clamp01(rawComp.evoStart),
-          evoEnd: clamp01(rawComp.evoEnd ?? c.evolution),
-          visStart: clamp01(rawComp.visStart ?? c.visibility),
-          visEnd: clamp01(rawComp.visEnd ?? c.visibility),
+          evoEnd: clamp01(rawComp.evoEnd ?? evo(c)),
+          visStart: clamp01(rawComp.visStart ?? vis(c)),
+          visEnd: clamp01(rawComp.visEnd ?? vis(c)),
           handleEvolution: rawComp.handleEvolution !== undefined
             ? clamp01(rawComp.handleEvolution)
             : undefined,
@@ -483,8 +476,8 @@ export function sanitizeMap(raw: WardleyMap): WardleyMap {
     }
 
     // Strip empty label
-    if (!c.label || c.label.trim() === "") {
-      c.label = c.id;
+    if (!c.label.name || c.label.name.trim() === "") {
+      c.label.name = c.id;
     }
   }
 
@@ -535,9 +528,9 @@ export function toOWM(map: WardleyMap): string {
   for (const c of map.components) {
     if (c.type === "note") continue; // Notes not supported in OWM
     // OWM convention: 0=top, 1=bottom — same as our internal format, no conversion needed
-    const vis = c.visibility.toFixed(2);
-    const evo = c.evolution.toFixed(2);
-    lines.push(`component ${c.label} [${vis}, ${evo}]`);
+    const v = vis(c).toFixed(2);
+    const e = evo(c).toFixed(2);
+    lines.push(`component ${c.label.name} [${v}, ${e}]`);
   }
 
   lines.push("");
@@ -548,7 +541,7 @@ export function toOWM(map: WardleyMap): string {
     const src = byId.get(r.source);
     const tgt = byId.get(r.target);
     if (src && tgt) {
-      lines.push(`${src.label}->${tgt.label}`);
+      lines.push(`${src.label.name}->${tgt.label.name}`);
     }
   }
 
@@ -559,27 +552,34 @@ export function toOWM(map: WardleyMap): string {
 
 /** Convert a raw MapKeep JSON map to the pivot WardleyMap schema.
  *  Handles flat pipeline fields → pipelineGeometry and from/to → source/target.
+ *  MapKeep format is flat (label: string, evolution: number, etc.) — we map to nested.
  */
 export function fromMapKeep(raw: any): WardleyMap {
   const components = (raw.components ?? []).map((c: any) => {
     const base: any = {
       id: c.id,
-      label: c.label,
+      label: {
+        name: c.label,
+        ...(c.labelPosition ? { position: c.labelPosition } : {}),
+      },
       type: c.type,
-      evolution: c.evolution,
-      visibility: c.visibility,
+      position: {
+        evolution: { scalar: c.evolution },
+        visibility: { scalar: c.visibility },
+      },
     };
 
     if (c.nature) base.nature = c.nature;
     if (c.color) base.color = c.color;
     if (c.description) base.description = c.description;
-    if (c.labelPosition) base.labelPosition = c.labelPosition;
 
-    // Map evolvesTo
+    // Map evolvesTo (flat MapKeep format → nested)
     if (c.evolvesTo && c.evolvesTo.length > 0) {
       base.evolvesTo = c.evolvesTo.map((e: any) => ({
-        evolution: e.evolution,
-        visibility: e.visibility,
+        position: {
+          evolution: { scalar: e.evolution },
+          visibility: { scalar: e.visibility },
+        },
         evolveType: e.evolveType ?? "natural",
       }));
     }
@@ -610,8 +610,10 @@ export function fromMapKeep(raw: any): WardleyMap {
     if (!src || !tgt) continue;
     if (!src.evolvesTo) src.evolvesTo = [];
     src.evolvesTo.push({
-      evolution: tgt.evolution,
-      visibility: tgt.visibility,
+      position: {
+        evolution: { scalar: tgt.position.evolution.scalar },
+        visibility: { scalar: tgt.position.visibility.scalar },
+      },
       evolveType: "natural",
     });
   }
@@ -632,8 +634,13 @@ export function fromMapKeep(raw: any): WardleyMap {
     title: raw.title ?? "Untitled",
     components,
     relations,
-    gridSize: raw.gridSize ?? { width: 1600, height: 800 },
-    axes: raw.axes ?? { valueChain: true, evolution: true },
     context: raw.context,
+    // Map gridSize → renderConfig dimensions
+    ...(raw.gridSize ? {
+      renderConfig: {
+        width: raw.gridSize.width ?? 1600,
+        height: raw.gridSize.height ?? 800,
+      },
+    } : {}),
   });
 }
