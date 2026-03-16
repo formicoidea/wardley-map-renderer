@@ -138,7 +138,6 @@ export const AxisLabelsSchema = z.object({
  * so unset locale doesn't override axes.labels locale.
  */
 export const AxisLabelsOverrideSchema = z.object({
-  /** Locale preset override (no default — only overrides if explicitly set) */
   locale: LocaleEnum.optional(),
   xAxis: z.string().optional(),
   yAxis: z.string().optional(),

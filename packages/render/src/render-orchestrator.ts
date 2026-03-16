@@ -2,7 +2,7 @@
  * Render orchestrator — public API for the modular rendering pipeline.
  *
  * Chains Phase 1 (buildRenderContext) → Phase 2 (composeSVG) using the
- * 8-layer modular renderer from src/render/.
+ * 9-layer modular renderer from src/render/.
  *
  * Architecture:
  *   Phase 1 — buildRenderContext(map):
@@ -12,7 +12,7 @@
  *
  *   Phase 2 — composeSVG(ctx, layers):
  *     Generates SVG string by calling each layer renderer in z-order.
- *     8 layers: title → axes → pipelines → edges → evolvesTo → nodes → labels → notes
+ *     9 layers: title → axes → pipelines → edges → evolvesTo → nodes → labels → notes → legend
  *
  * @module render-orchestrator
  */
@@ -21,26 +21,26 @@ import {
   sanitizeMap,
   type WardleyMap,
 } from "./schema.js";
-import { buildRenderContext } from "./build-context.js";
-import { composeSVG } from "./svg-composer.js";
-import type {
-  RenderContext,
-  RenderGeometry,
-  RenderOptions,
-  LayerRegistration,
-} from "./types.js";
-import { LAYER_ORDER } from "./registry.js";
+import {
+  buildRenderContext,
+  composeSVG,
+  type RenderContext,
+  type RenderGeometry,
+  type RenderOptions,
+  type LayerRegistration,
+  LAYER_ORDER,
+} from "./render/index.js";
 
-// ── Import all 8 layer renderers ─────────────────────────────────────
-import { renderTitleLayer } from "./title-layer.js";
-import { renderAxesLayer } from "./axes-layer.js";
-import { renderPipelinesLayer } from "./pipelines-layer.js";
-import { renderEdgesLayer } from "./edges-layer.js";
-import { renderEvolvesToLayer } from "./evolvesto-layer.js";
-import { renderNodesLayer } from "./nodes-layer.js";
-import { renderLabelsLayer } from "./labels-layer.js";
-import { renderNotesLayer } from "./notes-layer.js";
-import { renderLegendLayer } from "./legend-layer.js";
+// ── Import all 9 layer renderers ─────────────────────────────────────
+import { renderTitleLayer } from "./render/title-layer.js";
+import { renderAxesLayer } from "./render/axes-layer.js";
+import { renderPipelinesLayer } from "./render/pipelines-layer.js";
+import { renderEdgesLayer } from "./render/edges-layer.js";
+import { renderEvolvesToLayer } from "./render/evolvesto-layer.js";
+import { renderNodesLayer } from "./render/nodes-layer.js";
+import { renderLabelsLayer } from "./render/labels-layer.js";
+import { renderNotesLayer } from "./render/notes-layer.js";
+import { renderLegendLayer } from "./render/legend-layer.js";
 
 // ── Build explicit layer list (no global registry mutation) ──────────
 
@@ -88,7 +88,7 @@ export interface RenderResult {
  * Pipeline:
  *   1. sanitizeMap() — clamp coordinates, deduplicate relations
  *   2. Phase 1: buildRenderContext() — pixel positions, pipeline containment
- *   3. Phase 2: composeSVG() — assemble SVG string from 8 layers
+ *   3. Phase 2: composeSVG() — assemble SVG string from 9 layers
  *   4. (optional) SVG→PNG rasterisation via resvg-js
  */
 export async function render(
@@ -103,7 +103,7 @@ export async function render(
   // Step 2: Phase 1 — Geometry computation
   const ctx = buildRenderContext(map, renderOptions);
 
-  // Step 3: Phase 2 — SVG generation via 8 layers
+  // Step 3: Phase 2 — SVG generation via 9 layers
   const svg = composeSVG(ctx, LAYERS);
 
   // Step 4: Optional PNG rasterisation
@@ -172,24 +172,13 @@ async function loadInterFont(): Promise<Uint8Array> {
 
   const fs = await import("node:fs/promises");
   const path = await import("node:path");
-  // Look for font in multiple locations:
-  // 1. Package-local assets/fonts/ (packages/render/assets/)
-  // 2. Monorepo root assets/fonts/ (3 levels up from src/)
-  const baseDir = import.meta.dirname ?? ".";
-  const candidates = [
-    path.join(baseDir, "..", "assets", "fonts", "Inter-Regular.ttf"),
-    path.join(baseDir, "..", "..", "..", "assets", "fonts", "Inter-Regular.ttf"),
-  ];
-  let fontPath = candidates[0];
-  for (const candidate of candidates) {
-    try {
-      await fs.access(candidate);
-      fontPath = candidate;
-      break;
-    } catch {
-      // try next candidate
-    }
-  }
+  const fontPath = path.join(
+    import.meta.dirname ?? ".",
+    "..",
+    "assets",
+    "fonts",
+    "Inter-Regular.ttf"
+  );
 
   try {
     interFontData = new Uint8Array(await fs.readFile(fontPath));
@@ -230,4 +219,4 @@ export type {
   RenderGeometry,
   RenderOptions,
   LayerRegistration,
-} from "./types.js";
+} from "./render/index.js";
