@@ -1,7 +1,7 @@
 /**
  * EvolvesToLayer — renders evolution arrows between component positions.
  *
- * Part of the 8-layer modular rendering architecture (Layer 5).
+ * Part of the 9-layer modular rendering architecture (Layer 5).
  * Pure function: takes RenderContext, returns SVG fragment strings.
  *
  * Evolution arrows are drawn as dashed lines with an arrowhead,

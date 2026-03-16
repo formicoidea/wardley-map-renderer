@@ -1,7 +1,7 @@
 /**
  * PipelinesLayer — renders pipeline components as background visual rectangles.
  *
- * Part of the 8-layer modular rendering architecture (Layer 3).
+ * Part of the 9-layer modular rendering architecture (Layer 3).
  * Pipelines are rendered as semi-transparent rounded rectangles in the
  * background, behind edges and component nodes. They have no impact on
  * label placement (treated as fond visuel per specification).
@@ -18,11 +18,11 @@ import type { RenderContext, LayerRenderer } from "./types.js";
 /** Pipeline rectangle fill color (white semi-transparent) */
 const PIPELINE_FILL = "rgba(255, 255, 255, 0.35)";
 /** Pipeline rectangle stroke color */
-const PIPELINE_STROKE = "#bbbbbb";
+const PIPELINE_STROKE = "#999999";
 /** Pipeline rectangle stroke width */
 const PIPELINE_STROKE_WIDTH = 1;
 /** Pipeline rectangle corner radius */
-const PIPELINE_RX = 4;
+const PIPELINE_RX = 0;
 /** Handle square half-size in pixels (same as NODE_RADIUS for visual consistency) */
 const HANDLE_HALF = 7;
 

@@ -7,7 +7,7 @@
 
 import { describe, it, expect } from "vitest";
 import { Hono } from "hono";
-import { renderRoute, negotiateFormat } from "./render.js";
+import { renderRoute, negotiateFormat } from "./render-route.js";
 import { rfc7807ErrorHandler, rfc7807NotFound } from "./middleware/error-handler.js";
 
 // ── Test app setup ──────────────────────────────────────────────────
@@ -107,16 +107,14 @@ describe("POST /render error handling", () => {
     expect(Array.isArray(json.errors)).toBe(true);
   });
 
-  it("returns 422 JSON when components array is empty", async () => {
+  it("returns 200 for empty components (renders fond de carte)", async () => {
     const res = await postRender(app, {
       title: "Empty",
       components: [],
       relations: [],
     });
-    expect(res.status).toBe(422);
-    expect(res.headers.get("content-type")).toContain("json");
-    const json = await res.json();
-    expect(json).toHaveProperty("title");
+    // Empty maps are valid — render axes/title only (fond de carte)
+    expect(res.status).toBe(200);
   });
 
   it("returns 422 JSON when evolution is out of range", async () => {

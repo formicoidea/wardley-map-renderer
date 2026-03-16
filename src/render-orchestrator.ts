@@ -2,7 +2,7 @@
  * Render orchestrator — public API for the modular rendering pipeline.
  *
  * Chains Phase 1 (buildRenderContext) → Phase 2 (composeSVG) using the
- * 8-layer modular renderer from src/render/.
+ * 9-layer modular renderer from src/render/.
  *
  * Architecture:
  *   Phase 1 — buildRenderContext(map):
@@ -12,7 +12,7 @@
  *
  *   Phase 2 — composeSVG(ctx, layers):
  *     Generates SVG string by calling each layer renderer in z-order.
- *     8 layers: title → axes → pipelines → edges → evolvesTo → nodes → labels → notes
+ *     9 layers: title → axes → pipelines → edges → evolvesTo → nodes → labels → notes → legend
  *
  * @module render-orchestrator
  */
@@ -31,7 +31,7 @@ import {
   LAYER_ORDER,
 } from "./render/index.js";
 
-// ── Import all 8 layer renderers ─────────────────────────────────────
+// ── Import all 9 layer renderers ─────────────────────────────────────
 import { renderTitleLayer } from "./render/title-layer.js";
 import { renderAxesLayer } from "./render/axes-layer.js";
 import { renderPipelinesLayer } from "./render/pipelines-layer.js";
@@ -88,7 +88,7 @@ export interface RenderResult {
  * Pipeline:
  *   1. sanitizeMap() — clamp coordinates, deduplicate relations
  *   2. Phase 1: buildRenderContext() — pixel positions, pipeline containment
- *   3. Phase 2: composeSVG() — assemble SVG string from 8 layers
+ *   3. Phase 2: composeSVG() — assemble SVG string from 9 layers
  *   4. (optional) SVG→PNG rasterisation via resvg-js
  */
 export async function render(
@@ -103,7 +103,7 @@ export async function render(
   // Step 2: Phase 1 — Geometry computation
   const ctx = buildRenderContext(map, renderOptions);
 
-  // Step 3: Phase 2 — SVG generation via 8 layers
+  // Step 3: Phase 2 — SVG generation via 9 layers
   const svg = composeSVG(ctx, LAYERS);
 
   // Step 4: Optional PNG rasterisation

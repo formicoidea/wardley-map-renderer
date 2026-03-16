@@ -1,7 +1,7 @@
 /**
  * TitleLayer — renders the map title as a bordered box above the axes area.
  *
- * Part of the 8-layer modular rendering architecture (Layer 1).
+ * Part of the 9-layer modular rendering architecture (Layer 1).
  * Pure function: takes RenderContext, returns SVG fragment strings.
  *
  * Style: centered horizontally above the plot area, white background rect

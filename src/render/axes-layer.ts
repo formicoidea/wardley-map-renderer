@@ -2,7 +2,7 @@
  * AxesLayer — renders the plot border, grid lines, axis arrows,
  * evolution phase dividers, phase labels, axis labels, and direction indicators.
  *
- * Part of the 8-layer modular rendering architecture (Layer 2).
+ * Part of the 9-layer modular rendering architecture (Layer 2).
  * Pure function: takes RenderContext, returns SVG fragment strings.
  *
  * @module render/axes-layer

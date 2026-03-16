@@ -1,7 +1,7 @@
 /**
  * EdgesLayer — renders relation edges between components.
  *
- * Part of the 8-layer modular rendering architecture (Layer 4).
+ * Part of the 9-layer modular rendering architecture (Layer 4).
  * Uses pre-computed EdgeGeometry from the RenderContext (Phase 1 output).
  *
  * Supports three relation types with distinct visual styles:

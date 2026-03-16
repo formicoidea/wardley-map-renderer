@@ -1,7 +1,7 @@
 /**
  * NotesLayer — renders note components as text annotations on the map.
  *
- * Part of the 8-layer modular rendering architecture (Layer 8).
+ * Part of the 9-layer modular rendering architecture (Layer 8).
  * Pure function: takes RenderContext, returns SVG fragment strings.
  *
  * Notes are rendered as italic text at their computed position.

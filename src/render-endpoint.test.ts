@@ -5,7 +5,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { Hono } from "hono";
-import { renderRoute } from "./render.js";
+import { renderRoute } from "./render-route.js";
 import { rfc7807ErrorHandler } from "./middleware/error-handler.js";
 
 const app = new Hono();

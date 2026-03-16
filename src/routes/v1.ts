@@ -15,7 +15,7 @@
 import { Hono } from "hono";
 import { generateMap } from "../llm.js";
 import { validateMap, toOWM } from "../schema.js";
-import { renderRoute } from "../render.js";
+import { renderRoute } from "../render-route.js";
 import { HttpProblem } from "../middleware/error-handler.js";
 import { getOpenApiDocument } from "../openapi.js";
 

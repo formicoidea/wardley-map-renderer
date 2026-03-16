@@ -1,7 +1,7 @@
 /**
  * NodesLayer — renders component nodes as circles on the map.
  *
- * Part of the 8-layer modular rendering architecture (Layer 6).
+ * Part of the 9-layer modular rendering architecture (Layer 6).
  * Pure function: takes RenderContext, returns SVG fragment strings.
  *
  * Node appearance varies by component type:

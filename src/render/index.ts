@@ -1,7 +1,7 @@
 /**
  * Modular Wardley Map renderer — public API.
  *
- * Re-exports core types, registry, and all 8 layer renderers.
+ * Re-exports core types, registry, and all 9 layer renderers.
  *
  * Layer execution order (back-to-front z-order):
  *   1. title      — Map title text above the plot area

@@ -1,11 +1,10 @@
 /**
  * LabelsLayer — renders component labels with collision avoidance.
  *
- * Part of the 8-layer modular rendering architecture (Layer 7).
+ * Part of the 9-layer modular rendering architecture (Layer 7).
  * Pure function: takes RenderContext, returns SVG fragment strings.
  *
- * Uses the existing avoidLabelCollisions() algorithm from render.ts
- * (to be extracted to label-placement.ts) with:
+ * Uses avoidLabelCollisions() from label-placement.ts with:
  *   - Phase 1: Alternate placement (4 candidates: right, left, top, bottom)
  *   - Phase 2: Vertical push-apart for remaining overlaps
  *   - Phase 3: Label-edge collision avoidance (Liang-Barsky)
@@ -17,8 +16,8 @@
  */
 
 import type { RenderContext, LayerRenderer } from "./types.js";
-import type { LabelPlacement, EdgeSegment } from "../render.js";
-import { avoidLabelCollisions } from "../render.js";
+import type { LabelPlacement, EdgeSegment } from "./label-placement.js";
+import { avoidLabelCollisions } from "./label-placement.js";
 
 // ── Visual constants ─────────────────────────────────────────────────
 

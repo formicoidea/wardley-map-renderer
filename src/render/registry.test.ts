@@ -2,7 +2,7 @@
  * Tests for the layer registry and type definitions.
  *
  * Validates:
- * - 8 layers are defined in correct order
+ * - 9 layers are defined in correct order
  * - registerLayer / getOrderedLayers / getLayer work correctly
  * - validateRegistry detects missing layers
  * - Layers execute in z-order (back-to-front)
@@ -165,7 +165,7 @@ describe("Layer execution order (z-order)", () => {
   });
 
   it("produces SVG fragments in back-to-front order", () => {
-    // Register all 8 layers with traceable output
+    // Register all 9 layers with traceable output
     for (const name of LAYER_NAMES) {
       registerLayer(name, () => [`<!-- layer:${name} -->`]);
     }
