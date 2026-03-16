@@ -41,7 +41,6 @@ import {
   WARDLEY_MAP_DEFAULT_HEIGHT,
   EVOLUTION_PHASES,
   EVOLUTION_BOUNDARIES,
-  AXIS_MARGIN_LEFT,
   AXIS_MARGIN_BOTTOM,
   AXIS_MARGIN_TOP,
   BORDER_COLOR,
@@ -53,29 +52,17 @@ import {
   PHASE_LABEL_FONT_SIZE,
   DIRECTION_LABEL_FONT_SIZE,
   TITLE_FONT_SIZE,
-  DEFAULT_X_AXIS_LABEL,
-  DEFAULT_Y_AXIS_LABEL,
   resolveAxisLabels,
+  type ResolvedAxisLabels,
 } from "./blocks/wardley-map/wardley-map-consts.js";
 
 // ── Dimensions ──────────────────────────────────────────────────────
 const W = WARDLEY_MAP_DEFAULT_WIDTH; // 1600
 const H = WARDLEY_MAP_DEFAULT_HEIGHT; // 900
 
-// Layout margins (right margin matches Lit spike reference)
-const MARGIN_RIGHT = 20;
-
-// Drawable area (inside margins)
-const PLOT_LEFT = AXIS_MARGIN_LEFT;
+// Default plot bounds (used as fallback in avoidLabelCollisions)
 const PLOT_TOP = AXIS_MARGIN_TOP;
-const PLOT_RIGHT = W - MARGIN_RIGHT;
 const PLOT_BOTTOM = H - AXIS_MARGIN_BOTTOM;
-const PLOT_W = PLOT_RIGHT - PLOT_LEFT;
-const PLOT_H = PLOT_BOTTOM - PLOT_TOP;
-
-// Horizontal grid lines for visibility axis (matching Lit spike)
-const GRID_COLOR = "#e8e8e8";
-const GRID_LINE_COUNT = 8;
 
 // ── Component visual constants ──────────────────────────────────────
 const NODE_RADIUS = 5;
@@ -93,7 +80,7 @@ const COMPONENT_LABEL_FONT_SIZE = 12;
 const COMPONENT_LABEL_COLOR = "#333333";
 
 // ── Pipeline visual constants ───────────────────────────────────────
-const PIPELINE_FILL = "rgba(230, 230, 230, 0.35)";
+const PIPELINE_FILL = "rgb(255, 255, 255, 0.35)";
 const PIPELINE_STROKE = "#999999";
 const PIPELINE_STROKE_WIDTH = 1;
 const PIPELINE_CORNER_RADIUS = 4;
@@ -133,16 +120,6 @@ function esc(s: string): string {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
-}
-
-/** Map evolution (0-1) to pixel x inside plot area */
-function evoToX(evolution: number): number {
-  return PLOT_LEFT + evolution * PLOT_W;
-}
-
-/** Map visibility (0=top, 1=bottom) to pixel y inside plot area */
-function visToY(visibility: number): number {
-  return PLOT_TOP + visibility * PLOT_H;
 }
 
 // ── Label collision avoidance (label-label + label-edge) ────────────
@@ -447,6 +424,8 @@ export interface RenderGeometry {
   readonly initialLabels: readonly LabelPlacement[];
   /** Edge segments for collision avoidance (matches edges but typed for avoidLabelCollisions) */
   readonly edgeSegmentsForCollision: readonly EdgeSegment[];
+  /** Resolved i18n axis labels */
+  readonly axisLabels: ResolvedAxisLabels;
 }
 
 /**
@@ -612,6 +591,7 @@ export function computeGeometry(inputMap: WardleyMap): RenderGeometry {
     evolveArrows,
     initialLabels,
     edgeSegmentsForCollision,
+    axisLabels: resolveAxisLabels(map.axes.labels),
   };
 }
 
@@ -677,13 +657,16 @@ export function renderSvg(
   );
 
   // Horizontal grid lines (visibility axis)
-  for (let i = 1; i < GRID_LINE_COUNT; i++) {
-    const y = ctx.plotTop + (ctx.plotHeight * i) / GRID_LINE_COUNT;
-    parts.push(
-      `<line x1="${ctx.plotLeft}" y1="${y}" x2="${ctx.plotRight}" y2="${y}" ` +
-        `stroke="${GRID_COLOR}" stroke-width="0.5" />`
-    );
-  }
+  // for (let i = 1; i < GRID_LINE_COUNT; i++) {
+  //   const y = ctx.plotTop + (ctx.plotHeight * i) / GRID_LINE_COUNT;
+  //   parts.push(
+  //     `<line x1="${ctx.plotLeft}" y1="${y}" x2="${ctx.plotRight}" y2="${y}" ` +
+  //       `stroke="${GRID_COLOR}" stroke-width="0.5" />`
+  //   );
+  // }
+
+  // Resolved i18n axis labels
+  const axisLabels = geometry.axisLabels;
 
   // Evolution phase dividers (vertical dashed lines)
   if (geometry.showEvolutionAxis) {
@@ -696,13 +679,15 @@ export function renderSvg(
     }
 
     // Phase labels (below x-axis)
-    for (const phase of EVOLUTION_PHASES) {
+    for (let i = 0; i < EVOLUTION_PHASES.length; i++) {
+      const phase = EVOLUTION_PHASES[i];
+      const phaseLabel = axisLabels.phases[i] ?? phase.label;
       const cx = ctx.plotLeft + ((phase.startRatio + phase.endRatio) / 2) * ctx.plotWidth;
       const cy = ctx.plotBottom + AXIS_MARGIN_BOTTOM / 2 + 4;
       parts.push(
         `<text x="${cx}" y="${cy}" text-anchor="middle" ` +
           `font-family="Inter, sans-serif" font-size="${PHASE_LABEL_FONT_SIZE}" ` +
-          `fill="${LABEL_COLOR}">${esc(phase.label)}</text>`
+          `fill="${LABEL_COLOR}">${esc(phaseLabel)}</text>`
       );
     }
 
@@ -710,7 +695,7 @@ export function renderSvg(
     parts.push(
       `<text x="${ctx.plotLeft + ctx.plotWidth / 2}" y="${H - 4}" text-anchor="middle" ` +
         `font-family="Inter, sans-serif" font-size="${AXIS_LABEL_FONT_SIZE}" ` +
-        `fill="${AXIS_LABEL_COLOR}">${esc(DEFAULT_X_AXIS_LABEL)}</text>`
+        `fill="${AXIS_LABEL_COLOR}">${esc(axisLabels.xAxis)}</text>`
     );
   }
 
@@ -720,17 +705,17 @@ export function renderSvg(
       `<text x="14" y="${ctx.plotTop + ctx.plotHeight / 2}" text-anchor="middle" ` +
         `font-family="Inter, sans-serif" font-size="${AXIS_LABEL_FONT_SIZE}" ` +
         `fill="${AXIS_LABEL_COLOR}" ` +
-        `transform="rotate(-90, 14, ${ctx.plotTop + ctx.plotHeight / 2})">${esc(DEFAULT_Y_AXIS_LABEL)}</text>`
+        `transform="rotate(-90, 14, ${ctx.plotTop + ctx.plotHeight / 2})">${esc(axisLabels.yAxis)}</text>`
     );
 
     // Visibility direction indicators
     parts.push(
       `<text x="${ctx.plotLeft + 4}" y="${ctx.plotTop + 14}" ` +
-        `font-family="Inter, sans-serif" font-size="${DIRECTION_LABEL_FONT_SIZE}" fill="${LABEL_COLOR}">Visible</text>`
+        `font-family="Inter, sans-serif" font-size="${DIRECTION_LABEL_FONT_SIZE}" fill="${LABEL_COLOR}">${esc(axisLabels.visibilityHigh)}</text>`
     );
     parts.push(
       `<text x="${ctx.plotLeft + 4}" y="${ctx.plotBottom - 4}" ` +
-        `font-family="Inter, sans-serif" font-size="${DIRECTION_LABEL_FONT_SIZE}" fill="${LABEL_COLOR}">Invisible</text>`
+        `font-family="Inter, sans-serif" font-size="${DIRECTION_LABEL_FONT_SIZE}" fill="${LABEL_COLOR}">${esc(axisLabels.visibilityLow)}</text>`
     );
   }
 
@@ -847,240 +832,15 @@ export function renderSvg(
   return parts.join("\n");
 }
 
-// ── SVG Generation (legacy monolithic — delegates to Phase 1+2) ─────
+// ── SVG Generation (delegates to Phase 1+2) ─────────────────────────
 
 /**
  * Render a WardleyMap to an SVG string.
  *
- * This is the original monolithic entry point, now implemented as
- * a thin wrapper around the 2-phase pipeline: computeGeometry → renderSvg.
+ * Thin wrapper around the 2-phase pipeline: computeGeometry → renderSvg.
  */
 export function renderMapToSVG(inputMap: WardleyMap): string {
-  // Apply pipeline containment before rendering (clamps sub-components to pipeline bounds)
-  const map = applyPipelineContainment(inputMap);
-  const parts: string[] = [];
-
-  // SVG header
-  parts.push(
-    `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">`
-  );
-
-  // Background
-  parts.push(
-    `<rect width="${W}" height="${H}" fill="${BACKGROUND_COLOR}" />`
-  );
-
-  // ── Title (above axes) ──────────────────────────────────
-  if (map.title.trim()) {
-    // Position title baseline just above the plot area border.
-    // PLOT_TOP is 24 (AXIS_MARGIN_TOP), so titleY ≈ 18 keeps the
-    // title clearly above the axes while staying within the viewport.
-    const titleY = PLOT_TOP - 6;
-    parts.push(
-      `<text x="${W / 2}" y="${titleY}" text-anchor="middle" ` +
-        `font-family="Inter, sans-serif" font-size="${TITLE_FONT_SIZE}" ` +
-        `font-weight="600" fill="#333333">${esc(map.title.trim())}</text>`
-    );
-  }
-
-  // ── Plot area border ────────────────────────────────────
-  parts.push(
-    `<rect x="${PLOT_LEFT}" y="${PLOT_TOP}" width="${PLOT_W}" height="${PLOT_H}" ` +
-      `fill="none" stroke="${BORDER_COLOR}" stroke-width="1" />`
-  );
-
-  // ── Horizontal grid lines (visibility axis) ────────────
-  for (let i = 1; i < GRID_LINE_COUNT; i++) {
-    const y = PLOT_TOP + (PLOT_H * i) / GRID_LINE_COUNT;
-    parts.push(
-      `<line x1="${PLOT_LEFT}" y1="${y}" x2="${PLOT_RIGHT}" y2="${y}" ` +
-        `stroke="${GRID_COLOR}" stroke-width="0.5" />`
-    );
-  }
-
-  // ── Evolution phase dividers (vertical dashed lines) ───
-  for (const ratio of EVOLUTION_BOUNDARIES) {
-    const x = evoToX(ratio);
-    parts.push(
-      `<line x1="${x}" y1="${PLOT_TOP}" x2="${x}" y2="${PLOT_BOTTOM}" ` +
-        `stroke="${DIVIDER_COLOR}" stroke-width="1" stroke-dasharray="4,4" />`
-    );
-  }
-
-  // ── Resolve i18n axis labels ────────────────────────────
-  const axisLabels = resolveAxisLabels(map.axes.labels);
-
-  // ── Phase labels (below x-axis) ────────────────────────
-  for (let i = 0; i < EVOLUTION_PHASES.length; i++) {
-    const phase = EVOLUTION_PHASES[i];
-    const phaseLabel = axisLabels.phases[i] ?? phase.label;
-    const cx = evoToX((phase.startRatio + phase.endRatio) / 2);
-    const cy = PLOT_BOTTOM + AXIS_MARGIN_BOTTOM / 2 + 4;
-    parts.push(
-      `<text x="${cx}" y="${cy}" text-anchor="middle" ` +
-        `font-family="Inter, sans-serif" font-size="${PHASE_LABEL_FONT_SIZE}" ` +
-        `fill="${LABEL_COLOR}">${esc(phaseLabel)}</text>`
-    );
-  }
-
-  // ── Axis labels ─────────────────────────────────────────
-  // X-axis label
-  parts.push(
-    `<text x="${PLOT_LEFT + PLOT_W / 2}" y="${H - 4}" text-anchor="middle" ` +
-      `font-family="Inter, sans-serif" font-size="${AXIS_LABEL_FONT_SIZE}" ` +
-      `fill="${AXIS_LABEL_COLOR}">${esc(axisLabels.xAxis)}</text>`
-  );
-
-  // Y-axis label (rotated)
-  parts.push(
-    `<text x="14" y="${PLOT_TOP + PLOT_H / 2}" text-anchor="middle" ` +
-      `font-family="Inter, sans-serif" font-size="${AXIS_LABEL_FONT_SIZE}" ` +
-      `fill="${AXIS_LABEL_COLOR}" ` +
-      `transform="rotate(-90, 14, ${PLOT_TOP + PLOT_H / 2})">${esc(axisLabels.yAxis)}</text>`
-  );
-
-  // ── Visibility direction indicators ─────────────────────
-  parts.push(
-    `<text x="${PLOT_LEFT + 4}" y="${PLOT_TOP + 14}" ` +
-      `font-family="Inter, sans-serif" font-size="${DIRECTION_LABEL_FONT_SIZE}" fill="${LABEL_COLOR}">${esc(axisLabels.visibilityHigh)}</text>`
-  );
-  parts.push(
-    `<text x="${PLOT_LEFT + 4}" y="${PLOT_BOTTOM - 4}" ` +
-      `font-family="Inter, sans-serif" font-size="${DIRECTION_LABEL_FONT_SIZE}" fill="${LABEL_COLOR}">${esc(axisLabels.visibilityLow)}</text>`
-  );
-
-  // ── Build component lookup ──────────────────────────────
-  const compById = new Map(map.components.map((c) => [c.id, c]));
-
-  // ── Pipelines (background rectangles) ──────────────────
-  // Rendered before edges/nodes so they appear behind everything.
-  // Per constraint: "Pipelines traités comme fond visuel sans impact sur placement des labels"
-  const resolvedPipelines = resolvePipelines(map);
-
-  for (const rp of resolvedPipelines) {
-    const pg = rp.geometry;
-
-    // Convert normalised [0-1] coordinates to pixel positions
-    const x = evoToX(pg.evoStart) - PIPELINE_PADDING;
-    const y = visToY(pg.visStart) - PIPELINE_PADDING;
-    const w = evoToX(pg.evoEnd) - evoToX(pg.evoStart) + PIPELINE_PADDING * 2;
-    const h = visToY(pg.visEnd) - visToY(pg.visStart) + PIPELINE_PADDING * 2;
-
-    // Pipeline rectangle (rounded corners)
-    parts.push(
-      `<rect x="${x}" y="${y}" width="${w}" height="${h}" ` +
-        `rx="${PIPELINE_CORNER_RADIUS}" ry="${PIPELINE_CORNER_RADIUS}" ` +
-        `fill="${PIPELINE_FILL}" stroke="${PIPELINE_STROKE}" ` +
-        `stroke-width="${PIPELINE_STROKE_WIDTH}" />`
-    );
-
-    // Pipeline label — positioned at handleEvolution along x-axis,
-    // above the pipeline rectangle. handleEvolution determines where
-    // the pipeline's label/handle sits within its evolution range.
-    const handleEvo = resolveHandleEvolution(pg);
-    const labelX = evoToX(handleEvo);
-    const labelY = y - 4; // 4px above the rectangle top
-    parts.push(
-      `<text x="${labelX}" y="${labelY}" text-anchor="start" ` +
-        `font-family="Inter, sans-serif" font-size="${PIPELINE_LABEL_FONT_SIZE}" ` +
-        `fill="${PIPELINE_LABEL_COLOR}">${esc(rp.component.label)}</text>`
-    );
-  }
-
-  // ── Relations (edges) ───────────────────────────────────
-  const edgeSegments: EdgeSegment[] = [];
-  for (const rel of map.relations) {
-    const src = compById.get(rel.source);
-    const tgt = compById.get(rel.target);
-    if (!src || !tgt) continue;
-
-    const x1 = evoToX(src.evolution);
-    const y1 = visToY(src.visibility);
-    const x2 = evoToX(tgt.evolution);
-    const y2 = visToY(tgt.visibility);
-
-    edgeSegments.push({ x1, y1, x2, y2 });
-
-    // Resolve visual style from relation type
-    const typeStyle = RELATION_TYPE_STYLES[rel.type ?? "DependsOn"] ?? RELATION_TYPE_STYLES.DependsOn;
-    let strokeColor = typeStyle.color;
-    let strokeWidth = 1.5;
-    let dashArray = typeStyle.dashArray;
-
-    // Flow metadata can override line style
-    const flowStyle = rel.flow?.style ?? "solid";
-    if (flowStyle === "dashed") {
-      dashArray = "6,4";
-    } else if (flowStyle === "bold") {
-      strokeWidth = 3;
-    }
-
-    const dashAttr = dashArray ? ` stroke-dasharray="${dashArray}"` : "";
-    parts.push(
-      `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" ` +
-        `stroke="${strokeColor}" stroke-width="${strokeWidth}"${dashAttr} />`
-    );
-  }
-
-  // ── Components (nodes) ──────────────────────────────────
-  const labelPlacements: LabelPlacement[] = [];
-
-  for (const comp of map.components) {
-    // Skip pipeline components — they are rendered as rectangles above
-    if (comp.type === "pipeline") continue;
-
-    const cx = evoToX(comp.evolution);
-    const cy = visToY(comp.visibility);
-
-    // Node circle
-    parts.push(
-      `<circle cx="${cx}" cy="${cy}" r="${NODE_RADIUS}" ` +
-        `fill="${NODE_FILL}" stroke="${NODE_STROKE}" stroke-width="1.5" />`
-    );
-
-    // Collect label for collision avoidance
-    // Use labelPosition offset if provided, otherwise default to right of node
-    const hasCustomPos = comp.labelPosition != null;
-    const dx = comp.labelPosition?.dx ?? NODE_RADIUS + 4;
-    const dy = comp.labelPosition?.dy ?? 4;
-    labelPlacements.push({
-      x: cx + dx,
-      y: cy + dy,
-      text: comp.label,
-      anchor: dx < 0 ? "end" : "start",
-      nodeCx: cx,
-      nodeCy: cy,
-      pinned: hasCustomPos,
-    });
-  }
-
-  // Add pipeline borders as collision segments (4 sides per pipeline)
-  for (const rp of resolvedPipelines) {
-    const pg = rp.geometry;
-    const left = evoToX(pg.evoStart) - PIPELINE_PADDING;
-    const top = visToY(pg.visStart) - PIPELINE_PADDING;
-    const right = evoToX(pg.evoEnd) + PIPELINE_PADDING;
-    const bottom = visToY(pg.visEnd) + PIPELINE_PADDING;
-    edgeSegments.push(
-      { x1: left, y1: top, x2: right, y2: top },
-      { x1: left, y1: bottom, x2: right, y2: bottom },
-      { x1: left, y1: top, x2: left, y2: bottom },
-      { x1: right, y1: top, x2: right, y2: bottom },
-    );
-  }
-
-  // ── Apply label collision avoidance and render labels ───
-  const adjusted = avoidLabelCollisions(labelPlacements, edgeSegments);
-  for (const lbl of adjusted) {
-    parts.push(
-      `<text x="${lbl.x}" y="${lbl.y}" text-anchor="${lbl.anchor}" ` +
-        `font-family="Inter, sans-serif" font-size="${COMPONENT_LABEL_FONT_SIZE}" ` +
-        `fill="${COMPONENT_LABEL_COLOR}">${esc(lbl.text)}</text>`
-    );
-  }
-
-  parts.push("</svg>");
-  return parts.join("\n");
+  return renderSvg(computeGeometry(inputMap));
 }
 
 // ── PNG Rasterisation ───────────────────────────────────────────────

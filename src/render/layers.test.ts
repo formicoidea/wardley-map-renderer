@@ -151,21 +151,12 @@ describe("renderAxesLayer", () => {
     expect(borderPart).toContain("<rect");
   });
 
-  it("renders horizontal grid lines when valueChain is true", () => {
+  it("does not render horizontal grid lines (removed for cleaner visual)", () => {
     const map = makeSimpleMap({ axes: { valueChain: true, evolution: false } });
     const ctx = buildRenderContext(map);
     const parts = renderAxesLayer(ctx);
 
-    // 7 grid lines for 8 divisions
-    const gridLines = parts.filter((p) => p.includes('stroke-width="0.5"'));
-    expect(gridLines).toHaveLength(7);
-  });
-
-  it("omits grid lines when valueChain is false", () => {
-    const map = makeSimpleMap({ axes: { valueChain: false, evolution: true } });
-    const ctx = buildRenderContext(map);
-    const parts = renderAxesLayer(ctx);
-
+    // Grid lines removed — no thin horizontal lines expected
     const gridLines = parts.filter((p) => p.includes('stroke-width="0.5"'));
     expect(gridLines).toHaveLength(0);
   });
@@ -254,7 +245,7 @@ describe("renderPipelinesLayer", () => {
     expect(rect).toContain("<rect");
     expect(rect).toContain("rx=");
     expect(rect).toContain("ry=");
-    expect(rect).toContain("rgba(200, 200, 200, 0.15)");
+    expect(rect).toContain("rgba(255, 255, 255, 0.35)");
     expect(rect).toContain("#bbbbbb");
   });
 

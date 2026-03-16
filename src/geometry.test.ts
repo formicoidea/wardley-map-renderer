@@ -111,14 +111,14 @@ describe("evoToX", () => {
 describe("visToY", () => {
   const ctx = createRenderContext(makeMap());
 
-  it("maps 0 (invisible/bottom) to plotBottom", () => {
-    // MapKeep convention: visibility 0 = invisible = bottom of map
-    expect(visToY(0, ctx)).toBe(ctx.plotTop + ctx.plotHeight);
+  it("maps 0 (visible/top) to plotTop", () => {
+    // OWM convention: visibility 0 = visible = top of map
+    expect(visToY(0, ctx)).toBe(ctx.plotTop);
   });
 
-  it("maps 1 (visible/top) to plotTop", () => {
-    // MapKeep convention: visibility 1 = visible = top of map
-    expect(visToY(1, ctx)).toBe(ctx.plotTop);
+  it("maps 1 (invisible/bottom) to plotBottom", () => {
+    // OWM convention: visibility 1 = invisible = bottom of map
+    expect(visToY(1, ctx)).toBe(ctx.plotTop + ctx.plotHeight);
   });
 });
 
@@ -152,7 +152,7 @@ describe("computePipelineRect", () => {
     expect(rect.x2).toBeCloseTo(expectedX2);
     expect(rect.width).toBeCloseTo(expectedX2 - expectedX1);
 
-    // y: visToY uses MapKeep convention (higher vis → lower pixel y)
+    // y: visToY uses OWM convention (lower vis value → lower pixel y = higher on screen)
     // computePipelineRect normalises with Math.min/max
     const vy1 = visToY(0.3, ctx);
     const vy2 = visToY(0.7, ctx);
@@ -205,7 +205,7 @@ describe("computePipelineRect", () => {
 
     expect(rect.x).toBeCloseTo(evoToX(0.196, ctx));
     expect(rect.x2).toBeCloseTo(evoToX(0.735, ctx));
-    // visToY uses MapKeep convention: higher vis → lower pixel y
+    // visToY uses OWM convention: lower vis value → lower pixel y
     // computePipelineRect normalises with Math.min/max
     const vy664 = visToY(0.664, ctx);
     const vy704 = visToY(0.704, ctx);

@@ -58,7 +58,7 @@ function buildContext(map: WardleyMap): RenderContext {
     pipelines: [],
     componentById: new Map(),
     evoToX: (evo: number) => plot.left + evo * plot.width,
-    visToY: (vis: number) => plot.top + (1 - vis) * plot.height,
+    visToY: (vis: number) => plot.top + vis * plot.height,
     options,
   };
 }

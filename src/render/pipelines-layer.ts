@@ -15,8 +15,8 @@ import type { RenderContext, LayerRenderer } from "./types.js";
 
 // ── Visual constants ────────────────────────────────────────────────
 
-/** Pipeline rectangle fill color (light gray semi-transparent) */
-const PIPELINE_FILL = "rgba(200, 200, 200, 0.15)";
+/** Pipeline rectangle fill color (white semi-transparent) */
+const PIPELINE_FILL = "rgba(255, 255, 255, 0.35)";
 /** Pipeline rectangle stroke color */
 const PIPELINE_STROKE = "#bbbbbb";
 /** Pipeline rectangle stroke width */

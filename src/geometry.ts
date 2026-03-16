@@ -74,11 +74,11 @@ export function evoToX(evolution: number, ctx: RenderContext): number {
   return ctx.plotLeft + evolution * ctx.plotWidth;
 }
 
-/** Map visibility (1=top/visible, 0=bottom/invisible in MapKeep convention) → pixel y */
+/** Map visibility (0=top/visible, 1=bottom/invisible — OWM convention) → pixel y */
 export function visToY(visibility: number, ctx: RenderContext): number {
-  // MapKeep convention: visibility 1 = top (visible), 0 = bottom (invisible)
-  // SVG convention: y increases downward → invert
-  return ctx.plotTop + (1 - visibility) * ctx.plotHeight;
+  // OWM convention: visibility 0 = top (visible), 1 = bottom (invisible)
+  // Matches SVG y-axis direction (y increases downward) — no inversion needed
+  return ctx.plotTop + visibility * ctx.plotHeight;
 }
 
 // ── Component position ───────────────────────────────────────────────
@@ -156,7 +156,7 @@ export interface PipelineRect {
  * The geometry normalised coordinates are:
  *   - evoStart/evoEnd: horizontal span on evolution axis [0-1]
  *   - visStart/visEnd: vertical span on value chain axis [0-1]
- *     (visStart < visEnd, where lower value = higher on screen)
+ *     (visStart < visEnd, OWM convention: 0=top, 1=bottom)
  *
  * @param comp - Pipeline component with pipelineGeometry
  * @param ctx  - RenderContext for coordinate conversion

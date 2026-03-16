@@ -255,9 +255,9 @@ describe("buildRenderContext()", () => {
     // evoToX(0) = plotLeft, evoToX(1) = plotRight
     expect(ctx.evoToX(0)).toBe(ctx.plot.left);
     expect(ctx.evoToX(1)).toBe(ctx.plot.right);
-    // MapKeep convention: visToY(1) = plotTop (visible), visToY(0) = plotBottom (invisible)
-    expect(ctx.visToY(1)).toBe(ctx.plot.top);
-    expect(ctx.visToY(0)).toBe(ctx.plot.bottom);
+    // OWM convention: visToY(0) = plotTop (visible), visToY(1) = plotBottom (invisible)
+    expect(ctx.visToY(0)).toBe(ctx.plot.top);
+    expect(ctx.visToY(1)).toBe(ctx.plot.bottom);
   });
 
   it("computes node positions for all components", () => {

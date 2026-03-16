@@ -60,8 +60,8 @@ export const ComponentSchema = z.object({
   type: ComponentTypeEnum,
   nature: NatureEnum,
   evolution: EvolutionSchema,
-  // Visibility on the value chain: 1 = top/visible to user, 0 = bottom/invisible
-  // MapKeep convention: higher = more visible to user = higher on the map
+  // Visibility on the value chain: 0 = top/visible to user, 1 = bottom/invisible
+  // OWM convention: 0 = top of map (visible), 1 = bottom (invisible infrastructure)
   visibility: z.number().min(0).max(1),
   description: z.string().optional(),
   // Optional label offset for rendering (pixels relative to component center)
@@ -535,8 +535,8 @@ export function toOWM(map: WardleyMap): string {
   // Components: "component Name [visibility, evolution]"
   for (const c of map.components) {
     if (c.type === "note") continue; // Notes not supported in OWM
-    // OWM uses 0-1 scale, visibility inverted (0=bottom, 1=top in OWM)
-    const vis = (1 - c.visibility).toFixed(2);
+    // OWM convention: 0=top, 1=bottom — same as our internal format, no conversion needed
+    const vis = c.visibility.toFixed(2);
     const evo = c.evolution.toFixed(2);
     lines.push(`component ${c.label} [${vis}, ${evo}]`);
   }

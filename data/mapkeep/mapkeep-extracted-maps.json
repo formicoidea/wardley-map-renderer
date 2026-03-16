@@ -1,433 +1,288 @@
 [
   {
-    "mapId": "01JAT0NX0NBHPMQQHD0T7B2MJ8",
+    "mapId": "01KKHQH2DW0SFE9NH8E0P5XDGB",
+    "name": "Test component inside map",
+    "error": "No React Flow nodes",
+    "components": [],
+    "edges": []
+  },
+  {
+    "mapId": "01JM9J3MZFCX1MS9P30P5VPHMJ",
     "title": "Untitled",
-    "url": "https://mapkeep.com/MathieuJolly/.wmp/01JAT0NX0NBHPMQQHD0T7B2MJ8",
-    "extractedAt": "2026-03-15T10:57:50.042Z",
+    "url": "https://mapkeep.com/MathieuJolly/.wmp/01JM9J3MZFCX1MS9P30P5VPHMJ",
+    "extractedAt": "2026-03-16T18:17:37.772Z",
     "gridSize": {
       "width": 1600,
-      "height": 736
+      "height": 800
     },
     "components": [
       {
-        "id": "n-01JAT2E2506C2PGZAKR1QTY9R4",
-        "label": "Trajet occasionnel en soirée",
+        "id": "n-01JM9JCPYMAY1110N1V05EB3QJ",
+        "label": "Multitasking AI Model",
         "type": "user-need",
-        "evolution": 0.662,
-        "visibility": 0.834
+        "evolution": 0.291,
+        "visibility": 0.094
       },
       {
-        "id": "n-01JAT2DK8E5R9HMTPG4FVF7G3S",
-        "label": "Usager",
+        "id": "n-01JM9JY7AGG6TSW0QY8FTRHY8C",
+        "label": "Blank page syndrom",
+        "type": "user-need",
+        "evolution": 0.553,
+        "visibility": 0.092
+      },
+      {
+        "id": "n-01JM9JZ0EXZM9A25DKW4FEV040",
+        "label": "Prevent energy-intensive task",
+        "type": "user-need",
+        "evolution": 0.925,
+        "visibility": 0.11
+      },
+      {
+        "id": "n-01JM9J3Y87R3CQH4YFG1K3JVKB",
+        "label": "Data",
+        "type": "component",
+        "evolution": 0.894,
+        "visibility": 0.849
+      },
+      {
+        "id": "n-01JM9J49PCSSFFA98VNXRC9VNC",
+        "label": "Reinforcement Learning\nwith human feedback Service",
+        "type": "component",
+        "evolution": 0.611,
+        "visibility": 0.666
+      },
+      {
+        "id": "n-01JM9J5PB0FW61VB0JZ7S182NH",
+        "label": "Annotator",
+        "type": "component",
+        "evolution": 0.573,
+        "visibility": 0.807
+      },
+      {
+        "id": "n-01JM9JC39V37CAFSTQ4EC7DK5F",
+        "label": "Orchestrator Model",
+        "type": "component",
+        "evolution": 0.293,
+        "visibility": 0.193
+      },
+      {
+        "id": "n-01JM9JTP3EXNN0370ZNTRJFNAY",
+        "label": "Universal multi-feedback\nannotation platform",
+        "type": "component",
+        "evolution": 0.557,
+        "visibility": 0.572
+      },
+      {
+        "id": "n-01JM9JW6M4VAC4HEWXQV3ENDF3",
+        "label": "Large-scale crowdsourced\nfeedback datasets",
+        "type": "component",
+        "evolution": 0.623,
+        "visibility": 0.483
+      },
+      {
+        "id": "n-01JM9JWQXHNXS7GT2CFRYKMSWX",
+        "label": "Modular offline RLHF\nbaseline implementations",
+        "type": "component",
+        "evolution": 0.727,
+        "visibility": 0.47
+      },
+      {
+        "id": "n-01JM9KAAWGHKBF5JN1S3PT0JQ6",
+        "label": "Other model",
+        "type": "component",
+        "evolution": 0.468,
+        "visibility": 0.944
+      },
+      {
+        "id": "n-01JM9KDKVVX22PHZK9P971H2SG",
+        "label": "Distillation practice",
+        "type": "component",
+        "evolution": 0.498,
+        "visibility": 0.897
+      },
+      {
+        "id": "n-01JM9KDZJ3HBKDDJN9RXZBY2EM",
+        "label": "Web",
+        "type": "component",
+        "evolution": 0.932,
+        "visibility": 0.92
+      },
+      {
+        "id": "n-01JM9JFFBBMGJNSH301FS6DX23",
+        "label": "User",
         "type": "anchor",
-        "evolution": 0.724,
-        "visibility": 0.948
+        "evolution": 0.553,
+        "visibility": 0.021
       },
       {
-        "id": "n-01JAT2ENE68KT1697G37DHMZT1",
-        "label": "Se déplacer",
+        "id": "n-01JM9JGGMP2FWQBEHFG6RFT6XZ",
+        "label": "The model",
+        "type": "anchor",
+        "evolution": 0.821,
+        "visibility": 0.031
+      },
+      {
+        "id": "n-01JM9JE42TWDA1SX319J5PYDCP",
+        "label": "App Interface design",
         "type": "pipeline",
-        "evolution": 0.346,
-        "visibility": 0.513,
-        "evoStart": 0.346,
-        "evoEnd": 0.926,
-        "visStart": 0.469,
-        "visEnd": 0.513,
-        "handleEvolution": 0.903
+        "evolution": 0.196,
+        "visibility": 0.296,
+        "evoStart": 0.196,
+        "evoEnd": 0.735,
+        "visStart": 0.296,
+        "visEnd": 0.336,
+        "handleEvolution": 0.245
       },
       {
-        "id": "n-01JAT2T5QYV5ZPER63EP96F0TV",
-        "label": "À Vélo",
+        "id": "n-01JM9VNK9PR3WKDTRTAN5F65S1",
+        "label": "Saas interface",
         "type": "component",
-        "evolution": 0.913,
-        "visibility": 0.495
+        "evolution": 0.721,
+        "visibility": 0.312
       },
       {
-        "id": "n-01JAT2TFVPJXZBS474WVZY80MS",
-        "label": "En Voiture",
+        "id": "n-01JM9VP4PDX8B4JCSH25RHJ2GZ",
+        "label": "Contextual Adaptative interface",
         "type": "component",
-        "evolution": 0.855,
-        "visibility": 0.498
-      },
-      {
-        "id": "n-01JAT2WP5RM8PM12WEC6E02VJ5",
-        "label": "En Train",
-        "type": "component",
-        "evolution": 0.786,
-        "visibility": 0.497
-      },
-      {
-        "id": "n-01JAT2WX32RDVJJB4M1FESKKZA",
-        "label": "À Moto",
-        "type": "component",
-        "evolution": 0.743,
-        "visibility": 0.497
-      },
-      {
-        "id": "n-01JAT318NQXX7G6XYB8ZK32HQ1",
-        "label": "En bus",
-        "type": "component",
-        "evolution": 0.707,
-        "visibility": 0.495
-      },
-      {
-        "id": "n-01JAT4DV73V8KEFYM4D5G6TP46",
-        "label": "À Vélo cargo",
-        "type": "component",
-        "evolution": 0.348,
-        "visibility": 0.496
-      },
-      {
-        "id": "n-01JAT2EY0G8HRAM7KH5CHXHZ4K",
-        "label": "Pratique de pilotage des véhicules\npour le rendre autonome",
-        "type": "pipeline",
-        "evolution": 0.128,
-        "visibility": 0.738,
-        "evoStart": 0.128,
-        "evoEnd": 0.854,
-        "visStart": 0.695,
-        "visEnd": 0.738,
-        "handleEvolution": 0.751
-      },
-      {
-        "id": "n-01JAT2PXJGVKZ2X9NSN5M8Y621",
-        "label": "Taxi",
-        "type": "component",
-        "evolution": 0.469,
-        "visibility": 0.72
-      },
-      {
-        "id": "n-01JAT2Q6WVWA8PVT79CYN0124N",
-        "label": "VTC",
-        "type": "component",
-        "evolution": 0.514,
-        "visibility": 0.72
-      },
-      {
-        "id": "n-01JAT2R9K1GKEYD20Z4E4GZDPE",
-        "label": "Conduite de poid lourd",
-        "type": "component",
-        "evolution": 0.411,
-        "visibility": 0.722
-      },
-      {
-        "id": "n-01JAT43GBT667WVB4A464HNQ7N",
-        "label": "VTC Uberisé",
-        "type": "component",
-        "evolution": 0.748,
-        "visibility": 0.722
-      },
-      {
-        "id": "n-01JAT4FW8XN0TZRNC8905ZJ1XV",
-        "label": "Nouvelle pratique du transport\nde personne",
-        "type": "component",
-        "evolution": 0.131,
-        "visibility": 0.722,
+        "evolution": 0.2,
+        "visibility": 0.313,
         "color": "red-600",
         "evolvesTo": [
           {
-            "evolution": 0.202,
-            "visibility": 0.72,
+            "evolution": 0.294,
+            "visibility": 0.313,
             "evolveType": "natural"
           }
         ]
       },
       {
-        "id": "n-01JATBQ9A9NF96HKJWK39DSNX0",
-        "label": "Conduite automatisé",
-        "type": "component",
-        "evolution": 0.842,
-        "visibility": 0.723,
-        "color": "red-600"
-      },
-      {
-        "id": "n-01JAT2FK7Q08QBMZ5MDXH986GV",
-        "label": "Voiture",
+        "id": "n-01JM9JEPJMA3DATYQWVKWY0EBW",
+        "label": "Feedback for the model",
         "type": "pipeline",
         "evolution": 0.279,
-        "visibility": 0.154,
+        "visibility": 0.395,
         "evoStart": 0.279,
-        "evoEnd": 0.814,
-        "visStart": 0.11,
-        "visEnd": 0.154,
-        "handleEvolution": 0.799
+        "evoEnd": 0.627,
+        "visStart": 0.395,
+        "visEnd": 0.435,
+        "handleEvolution": 0.591
       },
       {
-        "id": "n-01JAT3DCYQ3SJQTQ6F1HHRC45T",
-        "label": "Autolib",
+        "id": "n-01JM9K5W3S0FRD7XZKJ4Z79A23",
+        "label": "RLHF",
         "type": "component",
-        "evolution": 0.749,
-        "visibility": 0.138
+        "evolution": 0.606,
+        "visibility": 0.411
       },
       {
-        "id": "n-01JAT3DSWMTP1F39MKHX39K24D",
-        "label": "Citiz",
+        "id": "n-01JM9K728B83R84CRAHVV5TKP5",
+        "label": "Users feedback",
         "type": "component",
-        "evolution": 0.793,
-        "visibility": 0.138
+        "evolution": 0.281,
+        "visibility": 0.409
       },
       {
-        "id": "n-01JAT3JAC64Y0Y65MGNM328V27",
-        "label": "R5",
+        "id": "n-01JM9K7M63WMZSHJDQKZ15M4FV",
+        "label": "Distillation",
         "type": "component",
-        "evolution": 0.479,
-        "visibility": 0.136
-      },
-      {
-        "id": "n-01JAT3JKBHCA2GWD4Y412NT9HS",
-        "label": "Fiat multipla",
-        "type": "component",
-        "evolution": 0.418,
-        "visibility": 0.136
-      },
-      {
-        "id": "n-01JAT3JXFEJZ4EXPKD2GZX2J4Z",
-        "label": "Robin",
-        "type": "component",
-        "evolution": 0.35,
-        "visibility": 0.136
-      },
-      {
-        "id": "n-01JAT3K4PRR566Y81MDJ4N2BX5",
-        "label": "Koeninsegg",
-        "type": "component",
-        "evolution": 0.285,
-        "visibility": 0.138
-      },
-      {
-        "id": "n-01JAT3KRKTZB4GESR7J3S4APEX",
-        "label": "Renault",
-        "type": "component",
-        "evolution": 0.506,
-        "visibility": 0.138
-      },
-      {
-        "id": "n-01JAT3VH1588YX1T6NRV36EBGQ",
-        "label": "Toyota",
-        "type": "component",
-        "evolution": 0.682,
-        "visibility": 0.138
-      },
-      {
-        "id": "n-01JAT5RYVTV9SP01VWBBH2Q229",
-        "label": "Toyota\nAutonome",
-        "type": "component",
-        "evolution": 0.723,
-        "visibility": 0.138,
-        "color": "red-600"
-      },
-      {
-        "id": "n-01JAT4JM9CPM6HBSVA2AGQ10WS",
-        "label": "Vélo cargo",
-        "type": "pipeline",
-        "evolution": 0.242,
-        "visibility": 0.31,
-        "evoStart": 0.242,
-        "evoEnd": 0.355,
-        "visStart": 0.267,
-        "visEnd": 0.31,
-        "handleEvolution": 0.334
-      },
-      {
-        "id": "n-01JAT4N7GCY2TQ9FD13YGHD1QJ",
-        "label": "Triporteur",
-        "type": "component",
-        "evolution": 0.245,
-        "visibility": 0.294
-      },
-      {
-        "id": "n-01JAT4P3TYS2JZN4ZNWVKJ8VP4",
-        "label": "Biporteur",
-        "type": "component",
-        "evolution": 0.342,
-        "visibility": 0.294
-      },
-      {
-        "id": "n-01JAW2Y5WSRXEPD3PJYSE4QJ73",
-        "label": "Légende",
-        "type": "pipeline",
-        "evolution": 0.016,
-        "visibility": 0.533,
-        "evoStart": 0.016,
-        "evoEnd": 0.188,
-        "visStart": 0.048,
-        "visEnd": 0.533,
-        "handleEvolution": 0.015
-      },
-      {
-        "id": "n-01JAW2ZPMT29DWE4364PB96969",
-        "label": "Besoin de la partie prenante",
-        "type": "user-need",
-        "evolution": 0.025,
-        "visibility": 0.445
-      },
-      {
-        "id": "n-01JAW306716C9FCTSDXE71PZMV",
-        "label": "Capacité",
-        "type": "component",
-        "evolution": 0.025,
-        "visibility": 0.39
-      },
-      {
-        "id": "n-01JAW32BT40H0ETPPRSWSSQFSS",
-        "label": "​",
-        "type": "component",
-        "evolution": 0.026,
-        "visibility": 0.218
-      },
-      {
-        "id": "n-01JAW32GS3MY39QYRC3J507BG6",
-        "label": "Changement en cours",
-        "type": "component",
-        "evolution": 0.055,
-        "visibility": 0.218,
-        "color": "red-600"
-      },
-      {
-        "id": "n-01JAW33T9GN14EWVB3BYJB9GH2",
-        "label": "​",
-        "type": "component",
-        "evolution": 0.026,
-        "visibility": 0.158
-      },
-      {
-        "id": "n-01JAW33ZNVNE1XTBAFRQ91ASP1",
-        "label": "Changement historique",
-        "type": "component",
-        "evolution": 0.053,
-        "visibility": 0.158
-      },
-      {
-        "id": "n-01JAW3EA4Z1KPMG9T11BZPQPXK",
-        "label": "​",
-        "type": "component",
-        "evolution": 0.026,
-        "visibility": 0.094
-      },
-      {
-        "id": "n-01JAW3EFYSW9X26433N1R0VJ5S",
-        "label": "Rouge = Futur",
-        "type": "component",
-        "evolution": 0.053,
-        "visibility": 0.095,
-        "color": "red-600"
-      },
-      {
-        "id": "n-01JAW2Z4W7VE2KZ3KBN1KT85CK",
-        "label": "Repère : partie prenante",
-        "type": "anchor",
-        "evolution": 0.024,
-        "visibility": 0.499
-      },
-      {
-        "id": "n-01JAW310YA62K58Z7DT8ZHQRQF",
-        "label": "Pipeline : choix possibles",
-        "type": "pipeline",
-        "evolution": 0.022,
-        "visibility": 0.295,
-        "evoStart": 0.022,
-        "evoEnd": 0.056,
-        "visStart": 0.252,
-        "visEnd": 0.295,
-        "handleEvolution": 0.031
-      },
-      {
-        "id": "n-01JAW35KQGKVV7HQTXE0Q1HTAM",
-        "label": "Pipeline fermé = capacité",
-        "type": "pipeline",
-        "evolution": 0.022,
-        "visibility": 0.341,
-        "evoStart": 0.022,
-        "evoEnd": 0.037,
-        "visStart": 0.319,
-        "visEnd": 0.341,
-        "handleEvolution": 0.03
+        "evolution": 0.454,
+        "visibility": 0.41
       }
     ],
     "edges": [
       {
-        "source": "n-01JAT2DK8E5R9HMTPG4FVF7G3S",
-        "target": "n-01JAT2E2506C2PGZAKR1QTY9R4",
+        "source": "n-01JM9J49PCSSFFA98VNXRC9VNC",
+        "target": "n-01JM9J3Y87R3CQH4YFG1K3JVKB",
         "type": "DependsOn"
       },
       {
-        "source": "n-01JAT2E2506C2PGZAKR1QTY9R4",
-        "target": "n-01JAT2ENE68KT1697G37DHMZT1",
+        "source": "n-01JM9J49PCSSFFA98VNXRC9VNC",
+        "target": "n-01JM9J5PB0FW61VB0JZ7S182NH",
         "type": "DependsOn"
       },
       {
-        "source": "n-01JAT2PXJGVKZ2X9NSN5M8Y621",
-        "target": "n-01JAT2TFVPJXZBS474WVZY80MS",
+        "source": "n-01JM9JCPYMAY1110N1V05EB3QJ",
+        "target": "n-01JM9JC39V37CAFSTQ4EC7DK5F",
         "type": "DependsOn"
       },
       {
-        "source": "n-01JAT2Q6WVWA8PVT79CYN0124N",
-        "target": "n-01JAT2TFVPJXZBS474WVZY80MS",
+        "source": "n-01JM9JTP3EXNN0370ZNTRJFNAY",
+        "target": "n-01JM9J49PCSSFFA98VNXRC9VNC",
         "type": "DependsOn"
       },
       {
-        "source": "n-01JAT2R9K1GKEYD20Z4E4GZDPE",
-        "target": "n-01JAT318NQXX7G6XYB8ZK32HQ1",
+        "source": "n-01JM9JW6M4VAC4HEWXQV3ENDF3",
+        "target": "n-01JM9J49PCSSFFA98VNXRC9VNC",
         "type": "DependsOn"
       },
       {
-        "source": "n-01JAT2Q6WVWA8PVT79CYN0124N",
-        "target": "n-01JAT43GBT667WVB4A464HNQ7N",
-        "type": "EvolveTo"
-      },
-      {
-        "source": "n-01JAT4FW8XN0TZRNC8905ZJ1XV",
-        "target": "n-01JAT4DV73V8KEFYM4D5G6TP46",
+        "source": "n-01JM9JWQXHNXS7GT2CFRYKMSWX",
+        "target": "n-01JM9J49PCSSFFA98VNXRC9VNC",
         "type": "DependsOn"
       },
       {
-        "source": "n-01JAT43GBT667WVB4A464HNQ7N",
-        "target": "n-01JATBQ9A9NF96HKJWK39DSNX0",
-        "type": "EvolveTo"
-      },
-      {
-        "source": "n-01JATBQ9A9NF96HKJWK39DSNX0",
-        "target": "n-01JAT2TFVPJXZBS474WVZY80MS",
+        "source": "n-01JM9J3Y87R3CQH4YFG1K3JVKB",
+        "target": "n-01JM9KDKVVX22PHZK9P971H2SG",
         "type": "DependsOn"
       },
       {
-        "source": "n-01JAT2TFVPJXZBS474WVZY80MS",
-        "target": "n-01JAT2FK7Q08QBMZ5MDXH986GV",
+        "source": "n-01JM9KDKVVX22PHZK9P971H2SG",
+        "target": "n-01JM9KAAWGHKBF5JN1S3PT0JQ6",
         "type": "DependsOn"
       },
       {
-        "source": "n-01JAT3VH1588YX1T6NRV36EBGQ",
-        "target": "n-01JAT5RYVTV9SP01VWBBH2Q229",
-        "type": "EvolveTo"
-      },
-      {
-        "source": "n-01JAT4DV73V8KEFYM4D5G6TP46",
-        "target": "n-01JAT4JM9CPM6HBSVA2AGQ10WS",
+        "source": "n-01JM9J3Y87R3CQH4YFG1K3JVKB",
+        "target": "n-01JM9KDZJ3HBKDDJN9RXZBY2EM",
         "type": "DependsOn"
       },
       {
-        "source": "n-01JAT4N7GCY2TQ9FD13YGHD1QJ",
-        "target": "n-01JAT4P3TYS2JZN4ZNWVKJ8VP4",
-        "type": "EvolveTo"
+        "source": "n-01JM9JFFBBMGJNSH301FS6DX23",
+        "target": "n-01JM9JZ0EXZM9A25DKW4FEV040",
+        "type": "DependsOn"
       },
       {
-        "source": "n-01JAW32BT40H0ETPPRSWSSQFSS",
-        "target": "n-01JAW32GS3MY39QYRC3J507BG6",
-        "type": "EvolveTo"
+        "source": "n-01JM9JFFBBMGJNSH301FS6DX23",
+        "target": "n-01JM9JY7AGG6TSW0QY8FTRHY8C",
+        "type": "DependsOn"
       },
       {
-        "source": "n-01JAW33T9GN14EWVB3BYJB9GH2",
-        "target": "n-01JAW33ZNVNE1XTBAFRQ91ASP1",
-        "type": "EvolveTo"
+        "source": "n-01JM9JFFBBMGJNSH301FS6DX23",
+        "target": "n-01JM9JCPYMAY1110N1V05EB3QJ",
+        "type": "DependsOn"
       },
       {
-        "source": "n-01JAW3EFYSW9X26433N1R0VJ5S",
-        "target": "n-01JAW3EA4Z1KPMG9T11BZPQPXK",
+        "source": "n-01JM9JC39V37CAFSTQ4EC7DK5F",
+        "target": "n-01JM9JE42TWDA1SX319J5PYDCP",
+        "type": "DependsOn"
+      },
+      {
+        "source": "n-01JM9JGGMP2FWQBEHFG6RFT6XZ",
+        "target": "n-01JM9JEPJMA3DATYQWVKWY0EBW",
+        "type": "DependsOn"
+      },
+      {
+        "source": "n-01JM9K5W3S0FRD7XZKJ4Z79A23",
+        "target": "n-01JM9JTP3EXNN0370ZNTRJFNAY",
+        "type": "DependsOn"
+      },
+      {
+        "source": "n-01JM9K5W3S0FRD7XZKJ4Z79A23",
+        "target": "n-01JM9JW6M4VAC4HEWXQV3ENDF3",
+        "type": "DependsOn"
+      },
+      {
+        "source": "n-01JM9K5W3S0FRD7XZKJ4Z79A23",
+        "target": "n-01JM9JWQXHNXS7GT2CFRYKMSWX",
+        "type": "DependsOn"
+      },
+      {
+        "source": "n-01JM9JE42TWDA1SX319J5PYDCP",
+        "target": "n-01JM9K728B83R84CRAHVV5TKP5",
         "type": "DependsOn"
       }
     ],
     "meta": {
-      "name": "Meilleur usage des pipelines"
+      "name": "Text generative AI value chain"
     },
     "axes": {
       "valueChain": true,
@@ -438,7 +293,7 @@
     "mapId": "01KJWR85T6243ZFX3G50HN38VM",
     "title": "Untitled",
     "url": "https://mapkeep.com/MathieuJolly/.wmp/01KJWR85T6243ZFX3G50HN38VM",
-    "extractedAt": "2026-03-15T10:57:55.434Z",
+    "extractedAt": "2026-03-16T18:17:43.071Z",
     "gridSize": {
       "width": 2041,
       "height": 1308
@@ -449,32 +304,32 @@
         "label": "Simuler\nl'abondement",
         "type": "user-need",
         "evolution": 0.233,
-        "visibility": 0.781
+        "visibility": 0.219
       },
       {
         "id": "n-01KJWR85WCFRDH34M9V7SDC58G",
         "label": "Centraliser les ordres",
         "type": "user-need",
         "evolution": 0.604,
-        "visibility": 0.39
+        "visibility": 0.61
       },
       {
         "id": "n-01KJWR85WCENFZRPZK3KGDD6NV",
         "label": "Dépositaire",
         "type": "anchor",
         "evolution": 0.598,
-        "visibility": 0.434
+        "visibility": 0.566
       },
       {
         "id": "n-01KJWR85WCKZ99500RQFZ0DZF6",
         "label": "Fiscalité ?",
         "type": "pipeline",
         "evolution": 0.038,
-        "visibility": 0.367,
+        "visibility": 0.633,
         "evoStart": 0.038,
         "evoEnd": 0.132,
-        "visStart": 0.342,
-        "visEnd": 0.367,
+        "visStart": 0.633,
+        "visEnd": 0.658,
         "handleEvolution": 0.074
       },
       {
@@ -482,18 +337,18 @@
         "label": "Données\nde fiscalité ?",
         "type": "user-need",
         "evolution": 0.043,
-        "visibility": 0.359
+        "visibility": 0.641
       },
       {
         "id": "n-01KJWR85THPN31Z077JKVFW9DP",
         "label": "Opérations d'épargne salariale",
         "type": "pipeline",
         "evolution": 0.759,
-        "visibility": 0.607,
+        "visibility": 0.393,
         "evoStart": 0.759,
         "evoEnd": 0.974,
-        "visStart": 0.31,
-        "visEnd": 0.607,
+        "visStart": 0.393,
+        "visEnd": 0.69,
         "handleEvolution": 0.794
       },
       {
@@ -501,11 +356,11 @@
         "label": "Epargant",
         "type": "pipeline",
         "evolution": 0.866,
-        "visibility": 0.554,
+        "visibility": 0.446,
         "evoStart": 0.866,
         "evoEnd": 0.96,
-        "visStart": 0.473,
-        "visEnd": 0.554,
+        "visStart": 0.446,
+        "visEnd": 0.527,
         "handleEvolution": 0.902
       },
       {
@@ -513,11 +368,11 @@
         "label": "Paiement et encaissements",
         "type": "pipeline",
         "evolution": 0.859,
-        "visibility": 0.416,
+        "visibility": 0.584,
         "evoStart": 0.859,
         "evoEnd": 0.953,
-        "visStart": 0.325,
-        "visEnd": 0.416,
+        "visStart": 0.584,
+        "visEnd": 0.675,
         "handleEvolution": 0.894
       },
       {
@@ -525,11 +380,11 @@
         "label": "Tenue de compte",
         "type": "pipeline",
         "evolution": 0.316,
-        "visibility": 0.54,
+        "visibility": 0.46,
         "evoStart": 0.316,
         "evoEnd": 0.428,
-        "visStart": 0.254,
-        "visEnd": 0.54,
+        "visStart": 0.46,
+        "visEnd": 0.746,
         "handleEvolution": 0.351
       },
       {
@@ -537,11 +392,11 @@
         "label": "Relation tiers",
         "type": "pipeline",
         "evolution": 0.054,
-        "visibility": 0.714,
+        "visibility": 0.286,
         "evoStart": 0.054,
         "evoEnd": 0.152,
-        "visStart": 0.438,
-        "visEnd": 0.714,
+        "visStart": 0.286,
+        "visEnd": 0.562,
         "handleEvolution": 0.076
       },
       {
@@ -549,11 +404,11 @@
         "label": "Pamétrage Accords Entreprise",
         "type": "pipeline",
         "evolution": 0.194,
-        "visibility": 0.703,
+        "visibility": 0.297,
         "evoStart": 0.194,
         "evoEnd": 0.288,
-        "visStart": 0.45,
-        "visEnd": 0.703,
+        "visStart": 0.297,
+        "visEnd": 0.55,
         "handleEvolution": 0.23
       },
       {
@@ -561,11 +416,11 @@
         "label": "Entreprise",
         "type": "pipeline",
         "evolution": 0.567,
-        "visibility": 0.619,
+        "visibility": 0.381,
         "evoStart": 0.567,
         "evoEnd": 0.661,
-        "visStart": 0.531,
-        "visEnd": 0.619,
+        "visStart": 0.381,
+        "visEnd": 0.469,
         "handleEvolution": 0.602
       },
       {
@@ -573,18 +428,18 @@
         "label": "Connaitre le statut\ndu salarié",
         "type": "component",
         "evolution": 0.578,
-        "visibility": 0.569
+        "visibility": 0.431
       },
       {
         "id": "n-01KJWR85V1CSB7TGXZZAD8V62W",
         "label": "Carnet d'ordres",
         "type": "pipeline",
         "evolution": 0.641,
-        "visibility": 0.358,
+        "visibility": 0.642,
         "evoStart": 0.641,
         "evoEnd": 0.735,
-        "visStart": 0.251,
-        "visEnd": 0.358,
+        "visStart": 0.642,
+        "visEnd": 0.749,
         "handleEvolution": 0.676
       },
       {
@@ -592,11 +447,11 @@
         "label": "Offre commerciale & contrat",
         "type": "pipeline",
         "evolution": 0.466,
-        "visibility": 0.48,
+        "visibility": 0.52,
         "evoStart": 0.466,
         "evoEnd": 0.56,
-        "visStart": 0.361,
-        "visEnd": 0.48,
+        "visStart": 0.52,
+        "visEnd": 0.639,
         "handleEvolution": 0.501
       },
       {
@@ -604,11 +459,11 @@
         "label": "Instrument & marché financier",
         "type": "pipeline",
         "evolution": 0.627,
-        "visibility": 0.215,
+        "visibility": 0.785,
         "evoStart": 0.627,
         "evoEnd": 0.763,
-        "visStart": 0.121,
-        "visEnd": 0.215,
+        "visStart": 0.785,
+        "visEnd": 0.879,
         "handleEvolution": 0.663
       },
       {
@@ -616,11 +471,11 @@
         "label": "Conformité",
         "type": "pipeline",
         "evolution": 0.156,
-        "visibility": 0.367,
+        "visibility": 0.633,
         "evoStart": 0.156,
         "evoEnd": 0.291,
-        "visStart": 0.257,
-        "visEnd": 0.367,
+        "visStart": 0.633,
+        "visEnd": 0.743,
         "handleEvolution": 0.187
       },
       {
@@ -628,35 +483,35 @@
         "label": "Valeur liquidative",
         "type": "user-need",
         "evolution": 0.597,
-        "visibility": 0.097
+        "visibility": 0.903
       },
       {
         "id": "n-01KJWR85V4QH2QJJZZKQ1YTRJX",
         "label": "Calculer la valeur liquidative",
         "type": "user-need",
         "evolution": 0.551,
-        "visibility": 0.055
+        "visibility": 0.945
       },
       {
         "id": "n-01KJWR85V5TC8GBTEXQYGD9FSD",
         "label": "Tenir la comptabilité\ndu fonds",
         "type": "user-need",
         "evolution": 0.597,
-        "visibility": 0.332
+        "visibility": 0.668
       },
       {
         "id": "n-01KJWR85V3489QSG3MTB1TY9BS",
         "label": "Valorisateur",
         "type": "anchor",
         "evolution": 0.52,
-        "visibility": 0.18
+        "visibility": 0.82
       },
       {
         "id": "n-01KJWR85V8ER1BMBBZ45ECWJ85",
         "label": "Caisse des dépots\net des consignations",
         "type": "anchor",
         "evolution": 0.895,
-        "visibility": 0.72
+        "visibility": 0.28
       },
       {
         "id": "n-01KJWR85V7M31TS1DEV9VXMXCA",
@@ -670,284 +525,284 @@
         "label": "Gèrer le FCPE",
         "type": "user-need",
         "evolution": 0.369,
-        "visibility": 0.096
+        "visibility": 0.904
       },
       {
         "id": "n-01KJWR85V5PEJ7GDD6Y9DVN4D2",
         "label": "Contrôler la régularité",
         "type": "user-need",
         "evolution": 0.388,
-        "visibility": 0.18
+        "visibility": 0.82
       },
       {
         "id": "n-01KJWR85V5RHFYRFG2BYN967KK",
         "label": "Conserver les actifs\ndu FCPE",
         "type": "user-need",
         "evolution": 0.337,
-        "visibility": 0.165
+        "visibility": 0.835
       },
       {
         "id": "n-01KJWR85V5YD9XMYS9BAGH2YQ0",
         "label": "Dépositaire",
         "type": "anchor",
         "evolution": 0.361,
-        "visibility": 0.216
+        "visibility": 0.784
       },
       {
         "id": "n-01KJWR85TK6N4YA9WHQG228V0V",
         "label": "Commercialiser des fonds\nqui sont intégrer dans les offres\nd'épargne salariale",
         "type": "user-need",
         "evolution": 0.627,
-        "visibility": 0.451
+        "visibility": 0.549
       },
       {
         "id": "n-01KJWR85TK3XNE04WHSHMDRG87",
         "label": "Société\nde gestion",
         "type": "anchor",
         "evolution": 0.622,
-        "visibility": 0.503
+        "visibility": 0.497
       },
       {
         "id": "n-01KJWR85TKZ0J0CYFGDFB52NMS",
         "label": "Fournir une prestation\nde tenue de registre d'épargne\nsalariale / entreprise",
         "type": "user-need",
         "evolution": 0.405,
-        "visibility": 0.38
+        "visibility": 0.62
       },
       {
         "id": "n-01KJWR85TKMA64N2EKVHDET4Q7",
         "label": "Construire des\noffres attractives",
         "type": "user-need",
         "evolution": 0.479,
-        "visibility": 0.537
+        "visibility": 0.463
       },
       {
         "id": "n-01KJWR85TGNY3HQZ9383PAKRS8",
         "label": "TCC",
         "type": "anchor",
         "evolution": 0.499,
-        "visibility": 0.697
+        "visibility": 0.303
       },
       {
         "id": "n-01KJWR85TJXH6NCQ34R96RBAX4",
         "label": "Gérer les comptes\ndes épargnants",
         "type": "user-need",
         "evolution": 0.404,
-        "visibility": 0.443
+        "visibility": 0.557
       },
       {
         "id": "n-01KJWR85TMPBKZ5BQYHVC82VBX",
         "label": "Conservation de la trace\ndes avoirs",
         "type": "user-need",
         "evolution": 0.414,
-        "visibility": 0.29
+        "visibility": 0.71
       },
       {
         "id": "n-01KJWR85TM4X9DCCRJPS71YZEM",
         "label": "Informer les\nbénéficiaires",
         "type": "user-need",
         "evolution": 0.135,
-        "visibility": 0.522
+        "visibility": 0.478
       },
       {
         "id": "n-01KJWR85V66CF356925J5E4F11",
         "label": "Rattachement des fonds\nau dispositif",
         "type": "component",
         "evolution": 0.271,
-        "visibility": 0.479
+        "visibility": 0.521
       },
       {
         "id": "n-01KJWR85V06WK7FEA346WC1MX4",
         "label": "Gérer ses clients",
         "type": "user-need",
         "evolution": 0.576,
-        "visibility": 0.602
+        "visibility": 0.398
       },
       {
         "id": "n-01KJWR85V69M7CS4T65TYP18Z1",
         "label": "Enregistrement\ndes prestations\net des tarifs associés",
         "type": "component",
         "evolution": 0.473,
-        "visibility": 0.461
+        "visibility": 0.539
       },
       {
         "id": "n-01KJWR85V71D71T503XG9AP196",
         "label": "Historique de la valorisation",
         "type": "component",
         "evolution": 0.639,
-        "visibility": 0.189
+        "visibility": 0.811
       },
       {
         "id": "n-01KJWR85V7ZKNM5G5418XJCE5J",
         "label": "Informations FCPE et CCB",
         "type": "component",
         "evolution": 0.639,
-        "visibility": 0.148
+        "visibility": 0.852
       },
       {
         "id": "n-01KJWR85V8SSN4M73QK6R1AMN3",
         "label": "Déléguer une partie de\nses obligations de conformité",
         "type": "user-need",
         "evolution": 0.267,
-        "visibility": 0.347
+        "visibility": 0.653
       },
       {
         "id": "n-01KJWR85THK6FF84Z5F0E54P37",
         "label": "Commercialiser une\noffre d'épargne salariale",
         "type": "user-need",
         "evolution": 0.529,
-        "visibility": 0.585
+        "visibility": 0.415
       },
       {
         "id": "n-01KJWR85TG01GN18PS6C88D5TB",
         "label": "Distributeur",
         "type": "anchor",
         "evolution": 0.456,
-        "visibility": 0.696
+        "visibility": 0.304
       },
       {
         "id": "n-01KJWR85TGTSX8X1D26PWY0FR4",
         "label": "Entreprise",
         "type": "anchor",
         "evolution": 0.579,
-        "visibility": 0.886
+        "visibility": 0.114
       },
       {
         "id": "n-01KJWR85TN3DKTYT7HQFMGHJWM",
         "label": "Gérer les opérations",
         "type": "user-need",
         "evolution": 0.869,
-        "visibility": 0.593
+        "visibility": 0.407
       },
       {
         "id": "n-01KJWR85V7RTHMRT4J2PSQ7QWR",
         "label": "Gérer la signalétique\ndes salariés",
         "type": "component",
         "evolution": 0.871,
-        "visibility": 0.541
+        "visibility": 0.459
       },
       {
         "id": "n-01KJWR85V0Y1PNK3QFK07QF9C9",
         "label": "Gestion des salariés",
         "type": "user-need",
         "evolution": 0.138,
-        "visibility": 0.457
+        "visibility": 0.543
       },
       {
         "id": "n-01KJWR85TM3PDY6ZH7QSYCY6BN",
         "label": "Proposer un avantage\naux salariés",
         "type": "user-need",
         "evolution": 0.272,
-        "visibility": 0.624
+        "visibility": 0.376
       },
       {
         "id": "n-01KJWR85TN64V02ZXNEX21X27P",
         "label": "Répondre à ses\nobligations légales",
         "type": "user-need",
         "evolution": 0.271,
-        "visibility": 0.544
+        "visibility": 0.456
       },
       {
         "id": "n-01KJWR85TH0Y3FZV631Y2W2XG8",
         "label": "Agir sur mon épargne",
         "type": "user-need",
         "evolution": 0.57,
-        "visibility": 0.806
+        "visibility": 0.194
       },
       {
         "id": "n-01KJWR85TH28HJ12EWR6KEKH90",
         "label": "Consulter mon épargne",
         "type": "user-need",
         "evolution": 0.363,
-        "visibility": 0.813
+        "visibility": 0.187
       },
       {
         "id": "n-01KJWR85TJ82V5P4FC44NVVTTQ",
         "label": "Information sur les\nmodalités d'épargne\nsalariale",
         "type": "user-need",
         "evolution": 0.271,
-        "visibility": 0.746
+        "visibility": 0.254
       },
       {
         "id": "n-01KJWR85W9B9WGD02ESE65ME5F",
         "label": "Arbitrage\n(transfert\nde fonds)",
         "type": "user-need",
         "evolution": 0.744,
-        "visibility": 0.411
+        "visibility": 0.589
       },
       {
         "id": "n-01KJWR85TFF98MSZEM7SS9Y4GQ",
         "label": "Epargnant",
         "type": "anchor",
         "evolution": 0.38,
-        "visibility": 0.868
+        "visibility": 0.132
       },
       {
         "id": "n-01KJWR85TH5G3YYGBCR39DF7PR",
         "label": "Racheter/débloquer\nson épargne",
         "type": "user-need",
         "evolution": 0.775,
-        "visibility": 0.513
+        "visibility": 0.487
       },
       {
         "id": "n-01KJWR85TJA683H3HSSPP9MPQW",
         "label": "Investir/Placer",
         "type": "user-need",
         "evolution": 0.786,
-        "visibility": 0.464
+        "visibility": 0.536
       },
       {
         "id": "n-01KJWR85V5321F7WTNJ0RCFCAH",
         "label": "Consulter\nles opérations",
         "type": "user-need",
         "evolution": 0.776,
-        "visibility": 0.568
+        "visibility": 0.432
       },
       {
         "id": "n-01KJWR85V6NMTKJH4SH6MK0W39",
         "label": "Consulter\nmes avoirs\n(compte titre)",
         "type": "user-need",
         "evolution": 0.404,
-        "visibility": 0.517
+        "visibility": 0.483
       },
       {
         "id": "n-01KJWR85TJQC9NJD42N7CW0VXM",
         "label": "Etre contactable\net identifiable",
         "type": "user-need",
         "evolution": 0.136,
-        "visibility": 0.7
+        "visibility": 0.3
       },
       {
         "id": "n-01KJWR85V6CPPCFFFCE16ZFXP4",
         "label": "Informations sur les\nmodalités d'épargne\nsalariale",
         "type": "component",
         "evolution": 0.277,
-        "visibility": 0.556
+        "visibility": 0.444
       },
       {
         "id": "n-01KJWR85V6SE6CJ42B0Y4NFV2V",
         "label": "Envoyer des ordres\nde souscription",
         "type": "user-need",
         "evolution": 0.716,
-        "visibility": 0.342
+        "visibility": 0.658
       },
       {
         "id": "n-01KJWR85VPGCJQQF7AYS4K3WEB",
         "label": "Envoyer des ordres\nde rachat",
         "type": "user-need",
         "evolution": 0.653,
-        "visibility": 0.333
+        "visibility": 0.667
       },
       {
         "id": "n-01KJWR85T9TENN264K2XAH6QQ7",
         "label": "Légende",
         "type": "pipeline",
         "evolution": 0.018,
-        "visibility": 0.179,
+        "visibility": 0.821,
         "evoStart": 0.018,
         "evoEnd": 0.246,
-        "visStart": 0.014,
-        "visEnd": 0.179,
+        "visStart": 0.821,
+        "visEnd": 0.986,
         "handleEvolution": 0.018
       },
       {
@@ -955,32 +810,32 @@
         "label": "Besoin des parties prenantes",
         "type": "user-need",
         "evolution": 0.029,
-        "visibility": 0.128
+        "visibility": 0.872
       },
       {
         "id": "n-01KJWR85TAXMKX86W3BHBTRK8V",
         "label": "Composant, capacité",
         "type": "component",
         "evolution": 0.029,
-        "visibility": 0.102
+        "visibility": 0.898
       },
       {
         "id": "n-01KJWR85TANK23EJN0Q8AJXM9S",
         "label": "Repère, partie prenante, bénéficiaire",
         "type": "anchor",
         "evolution": 0.029,
-        "visibility": 0.156
+        "visibility": 0.844
       },
       {
         "id": "n-01KJWR85TBCG5PNVDB9GJ1B3B4",
         "label": "Domaines métiers de S2E",
         "type": "pipeline",
         "evolution": 0.029,
-        "visibility": 0.075,
+        "visibility": 0.925,
         "evoStart": 0.029,
         "evoEnd": 0.06,
-        "visStart": 0.03,
-        "visEnd": 0.075,
+        "visStart": 0.925,
+        "visEnd": 0.97,
         "handleEvolution": 0.04
       }
     ],
@@ -1305,340 +1160,434 @@
     }
   },
   {
-    "mapId": "01KKHQH2DW0SFE9NH8E0P5XDGB",
+    "mapId": "01JAT0NX0NBHPMQQHD0T7B2MJ8",
     "title": "Untitled",
-    "url": "https://mapkeep.com/MathieuJolly/.wmp/01KKHQH2DW0SFE9NH8E0P5XDGB",
-    "extractedAt": "2026-03-14T12:09:37.175Z",
+    "url": "https://mapkeep.com/MathieuJolly/.wmp/01JAT0NX0NBHPMQQHD0T7B2MJ8",
+    "extractedAt": "2026-03-16T18:17:48.309Z",
     "gridSize": {
       "width": 1600,
-      "height": 369
+      "height": 736
     },
     "components": [
       {
-        "id": "n-01KKNTJ5BEYNR72KW7SHKFA4QF",
-        "label": "Component\ninside",
-        "type": "component",
-        "evolution": 0.272,
-        "visibility": 0.638
-      },
-      {
-        "id": "n-01KKNTN1SDWA0GXP1TB627VBP5",
-        "label": "component",
-        "type": "component",
-        "evolution": 0.389,
-        "visibility": 0.251,
-        "evolvesTo": [
-          {
-            "evolution": 0.268,
-            "visibility": 0.275,
-            "evolveType": "natural"
-          },
-          {
-            "evolution": 0.424,
-            "visibility": 0.488,
-            "evolveType": "natural"
-          }
-        ]
-      },
-      {
-        "id": "n-01KKNTKVWY3ADBVFQKSKMN6B93",
-        "label": "pipeline",
-        "type": "pipeline",
-        "evolution": 0.506,
-        "visibility": 0.506,
-        "evoStart": 0.506,
-        "evoEnd": 0.626,
-        "visStart": 0.42,
-        "visEnd": 0.506,
-        "handleEvolution": 0.551
-      }
-    ],
-    "edges": [],
-    "meta": {
-      "name": "Test component inside map"
-    },
-    "axes": {
-      "valueChain": false,
-      "evolution": true
-    }
-  },
-  {
-    "mapId": "01JM9J3MZFCX1MS9P30P5VPHMJ",
-    "title": "Untitled",
-    "url": "https://mapkeep.com/MathieuJolly/.wmp/01JM9J3MZFCX1MS9P30P5VPHMJ",
-    "extractedAt": "2026-03-14T12:09:42.427Z",
-    "gridSize": {
-      "width": 1600,
-      "height": 800
-    },
-    "components": [
-      {
-        "id": "n-01JM9JCPYMAY1110N1V05EB3QJ",
-        "label": "Multitasking AI Model",
+        "id": "n-01JAT2E2506C2PGZAKR1QTY9R4",
+        "label": "Trajet occasionnel en soirée",
         "type": "user-need",
-        "evolution": 0.291,
-        "visibility": 0.906
+        "evolution": 0.662,
+        "visibility": 0.166
       },
       {
-        "id": "n-01JM9JY7AGG6TSW0QY8FTRHY8C",
-        "label": "Blank page syndrom",
-        "type": "user-need",
-        "evolution": 0.553,
-        "visibility": 0.908
-      },
-      {
-        "id": "n-01JM9JZ0EXZM9A25DKW4FEV040",
-        "label": "Prevent energy-intensive task",
-        "type": "user-need",
-        "evolution": 0.925,
-        "visibility": 0.89
-      },
-      {
-        "id": "n-01JM9J3Y87R3CQH4YFG1K3JVKB",
-        "label": "Data",
-        "type": "component",
-        "evolution": 0.894,
-        "visibility": 0.151
-      },
-      {
-        "id": "n-01JM9J49PCSSFFA98VNXRC9VNC",
-        "label": "Reinforcement Learning\nwith human feedback Service",
-        "type": "component",
-        "evolution": 0.611,
-        "visibility": 0.334
-      },
-      {
-        "id": "n-01JM9J5PB0FW61VB0JZ7S182NH",
-        "label": "Annotator",
-        "type": "component",
-        "evolution": 0.573,
-        "visibility": 0.193
-      },
-      {
-        "id": "n-01JM9JC39V37CAFSTQ4EC7DK5F",
-        "label": "Orchestrator Model",
-        "type": "component",
-        "evolution": 0.293,
-        "visibility": 0.807
-      },
-      {
-        "id": "n-01JM9JTP3EXNN0370ZNTRJFNAY",
-        "label": "Universal multi-feedback\nannotation platform",
-        "type": "component",
-        "evolution": 0.557,
-        "visibility": 0.428
-      },
-      {
-        "id": "n-01JM9JW6M4VAC4HEWXQV3ENDF3",
-        "label": "Large-scale crowdsourced\nfeedback datasets",
-        "type": "component",
-        "evolution": 0.623,
-        "visibility": 0.517
-      },
-      {
-        "id": "n-01JM9JWQXHNXS7GT2CFRYKMSWX",
-        "label": "Modular offline RLHF\nbaseline implementations",
-        "type": "component",
-        "evolution": 0.727,
-        "visibility": 0.53
-      },
-      {
-        "id": "n-01JM9KAAWGHKBF5JN1S3PT0JQ6",
-        "label": "Other model",
-        "type": "component",
-        "evolution": 0.468,
-        "visibility": 0.056
-      },
-      {
-        "id": "n-01JM9KDKVVX22PHZK9P971H2SG",
-        "label": "Distillation practice",
-        "type": "component",
-        "evolution": 0.498,
-        "visibility": 0.103
-      },
-      {
-        "id": "n-01JM9KDZJ3HBKDDJN9RXZBY2EM",
-        "label": "Web",
-        "type": "component",
-        "evolution": 0.932,
-        "visibility": 0.08
-      },
-      {
-        "id": "n-01JM9JFFBBMGJNSH301FS6DX23",
-        "label": "User",
+        "id": "n-01JAT2DK8E5R9HMTPG4FVF7G3S",
+        "label": "Usager",
         "type": "anchor",
-        "evolution": 0.553,
-        "visibility": 0.979
+        "evolution": 0.724,
+        "visibility": 0.052
       },
       {
-        "id": "n-01JM9JGGMP2FWQBEHFG6RFT6XZ",
-        "label": "The model",
-        "type": "anchor",
-        "evolution": 0.821,
-        "visibility": 0.969
-      },
-      {
-        "id": "n-01JM9JE42TWDA1SX319J5PYDCP",
-        "label": "App Interface design",
+        "id": "n-01JAT2ENE68KT1697G37DHMZT1",
+        "label": "Se déplacer",
         "type": "pipeline",
-        "evolution": 0.196,
-        "visibility": 0.704,
-        "evoStart": 0.196,
-        "evoEnd": 0.735,
-        "visStart": 0.664,
-        "visEnd": 0.704,
-        "handleEvolution": 0.245
+        "evolution": 0.346,
+        "visibility": 0.487,
+        "evoStart": 0.346,
+        "evoEnd": 0.926,
+        "visStart": 0.487,
+        "visEnd": 0.531,
+        "handleEvolution": 0.903
       },
       {
-        "id": "n-01JM9VNK9PR3WKDTRTAN5F65S1",
-        "label": "Saas interface",
+        "id": "n-01JAT2T5QYV5ZPER63EP96F0TV",
+        "label": "À Vélo",
         "type": "component",
-        "evolution": 0.721,
-        "visibility": 0.688
+        "evolution": 0.913,
+        "visibility": 0.505
       },
       {
-        "id": "n-01JM9VP4PDX8B4JCSH25RHJ2GZ",
-        "label": "Contextual Adaptative interface",
+        "id": "n-01JAT2TFVPJXZBS474WVZY80MS",
+        "label": "En Voiture",
         "type": "component",
-        "evolution": 0.2,
-        "visibility": 0.687,
+        "evolution": 0.855,
+        "visibility": 0.502
+      },
+      {
+        "id": "n-01JAT2WP5RM8PM12WEC6E02VJ5",
+        "label": "En Train",
+        "type": "component",
+        "evolution": 0.786,
+        "visibility": 0.503
+      },
+      {
+        "id": "n-01JAT2WX32RDVJJB4M1FESKKZA",
+        "label": "À Moto",
+        "type": "component",
+        "evolution": 0.743,
+        "visibility": 0.503
+      },
+      {
+        "id": "n-01JAT318NQXX7G6XYB8ZK32HQ1",
+        "label": "En bus",
+        "type": "component",
+        "evolution": 0.707,
+        "visibility": 0.505
+      },
+      {
+        "id": "n-01JAT4DV73V8KEFYM4D5G6TP46",
+        "label": "À Vélo cargo",
+        "type": "component",
+        "evolution": 0.348,
+        "visibility": 0.504
+      },
+      {
+        "id": "n-01JAT2EY0G8HRAM7KH5CHXHZ4K",
+        "label": "Pratique de pilotage des véhicules\npour le rendre autonome",
+        "type": "pipeline",
+        "evolution": 0.128,
+        "visibility": 0.262,
+        "evoStart": 0.128,
+        "evoEnd": 0.854,
+        "visStart": 0.262,
+        "visEnd": 0.305,
+        "handleEvolution": 0.751
+      },
+      {
+        "id": "n-01JAT2PXJGVKZ2X9NSN5M8Y621",
+        "label": "Taxi",
+        "type": "component",
+        "evolution": 0.469,
+        "visibility": 0.28
+      },
+      {
+        "id": "n-01JAT2Q6WVWA8PVT79CYN0124N",
+        "label": "VTC",
+        "type": "component",
+        "evolution": 0.514,
+        "visibility": 0.28
+      },
+      {
+        "id": "n-01JAT2R9K1GKEYD20Z4E4GZDPE",
+        "label": "Conduite de poid lourd",
+        "type": "component",
+        "evolution": 0.411,
+        "visibility": 0.278
+      },
+      {
+        "id": "n-01JAT43GBT667WVB4A464HNQ7N",
+        "label": "VTC Uberisé",
+        "type": "component",
+        "evolution": 0.748,
+        "visibility": 0.278
+      },
+      {
+        "id": "n-01JAT4FW8XN0TZRNC8905ZJ1XV",
+        "label": "Nouvelle pratique du transport\nde personne",
+        "type": "component",
+        "evolution": 0.131,
+        "visibility": 0.278,
         "color": "red-600",
         "evolvesTo": [
           {
-            "evolution": 0.294,
-            "visibility": 0.687,
+            "evolution": 0.202,
+            "visibility": 0.28,
             "evolveType": "natural"
           }
         ]
       },
       {
-        "id": "n-01JM9JEPJMA3DATYQWVKWY0EBW",
-        "label": "Feedback for the model",
+        "id": "n-01JATBQ9A9NF96HKJWK39DSNX0",
+        "label": "Conduite automatisé",
+        "type": "component",
+        "evolution": 0.842,
+        "visibility": 0.277,
+        "color": "red-600"
+      },
+      {
+        "id": "n-01JAT2FK7Q08QBMZ5MDXH986GV",
+        "label": "Voiture",
         "type": "pipeline",
         "evolution": 0.279,
-        "visibility": 0.605,
+        "visibility": 0.846,
         "evoStart": 0.279,
-        "evoEnd": 0.627,
-        "visStart": 0.565,
-        "visEnd": 0.605,
-        "handleEvolution": 0.591
+        "evoEnd": 0.814,
+        "visStart": 0.846,
+        "visEnd": 0.89,
+        "handleEvolution": 0.799
       },
       {
-        "id": "n-01JM9K5W3S0FRD7XZKJ4Z79A23",
-        "label": "RLHF",
+        "id": "n-01JAT3DCYQ3SJQTQ6F1HHRC45T",
+        "label": "Autolib",
         "type": "component",
-        "evolution": 0.606,
-        "visibility": 0.589
+        "evolution": 0.749,
+        "visibility": 0.862
       },
       {
-        "id": "n-01JM9K728B83R84CRAHVV5TKP5",
-        "label": "Users feedback",
+        "id": "n-01JAT3DSWMTP1F39MKHX39K24D",
+        "label": "Citiz",
         "type": "component",
-        "evolution": 0.281,
-        "visibility": 0.591
+        "evolution": 0.793,
+        "visibility": 0.862
       },
       {
-        "id": "n-01JM9K7M63WMZSHJDQKZ15M4FV",
-        "label": "Distillation",
+        "id": "n-01JAT3JAC64Y0Y65MGNM328V27",
+        "label": "R5",
         "type": "component",
-        "evolution": 0.454,
-        "visibility": 0.59
+        "evolution": 0.479,
+        "visibility": 0.864
+      },
+      {
+        "id": "n-01JAT3JKBHCA2GWD4Y412NT9HS",
+        "label": "Fiat multipla",
+        "type": "component",
+        "evolution": 0.418,
+        "visibility": 0.864
+      },
+      {
+        "id": "n-01JAT3JXFEJZ4EXPKD2GZX2J4Z",
+        "label": "Robin",
+        "type": "component",
+        "evolution": 0.35,
+        "visibility": 0.864
+      },
+      {
+        "id": "n-01JAT3K4PRR566Y81MDJ4N2BX5",
+        "label": "Koeninsegg",
+        "type": "component",
+        "evolution": 0.285,
+        "visibility": 0.862
+      },
+      {
+        "id": "n-01JAT3KRKTZB4GESR7J3S4APEX",
+        "label": "Renault",
+        "type": "component",
+        "evolution": 0.506,
+        "visibility": 0.862
+      },
+      {
+        "id": "n-01JAT3VH1588YX1T6NRV36EBGQ",
+        "label": "Toyota",
+        "type": "component",
+        "evolution": 0.682,
+        "visibility": 0.862
+      },
+      {
+        "id": "n-01JAT5RYVTV9SP01VWBBH2Q229",
+        "label": "Toyota\nAutonome",
+        "type": "component",
+        "evolution": 0.723,
+        "visibility": 0.862,
+        "color": "red-600"
+      },
+      {
+        "id": "n-01JAT4JM9CPM6HBSVA2AGQ10WS",
+        "label": "Vélo cargo",
+        "type": "pipeline",
+        "evolution": 0.242,
+        "visibility": 0.69,
+        "evoStart": 0.242,
+        "evoEnd": 0.355,
+        "visStart": 0.69,
+        "visEnd": 0.733,
+        "handleEvolution": 0.334
+      },
+      {
+        "id": "n-01JAT4N7GCY2TQ9FD13YGHD1QJ",
+        "label": "Triporteur",
+        "type": "component",
+        "evolution": 0.245,
+        "visibility": 0.706
+      },
+      {
+        "id": "n-01JAT4P3TYS2JZN4ZNWVKJ8VP4",
+        "label": "Biporteur",
+        "type": "component",
+        "evolution": 0.342,
+        "visibility": 0.706
+      },
+      {
+        "id": "n-01JAW2Y5WSRXEPD3PJYSE4QJ73",
+        "label": "Légende",
+        "type": "pipeline",
+        "evolution": 0.016,
+        "visibility": 0.467,
+        "evoStart": 0.016,
+        "evoEnd": 0.188,
+        "visStart": 0.467,
+        "visEnd": 0.952,
+        "handleEvolution": 0.015
+      },
+      {
+        "id": "n-01JAW2ZPMT29DWE4364PB96969",
+        "label": "Besoin de la partie prenante",
+        "type": "user-need",
+        "evolution": 0.025,
+        "visibility": 0.555
+      },
+      {
+        "id": "n-01JAW306716C9FCTSDXE71PZMV",
+        "label": "Capacité",
+        "type": "component",
+        "evolution": 0.025,
+        "visibility": 0.61
+      },
+      {
+        "id": "n-01JAW32BT40H0ETPPRSWSSQFSS",
+        "label": "​",
+        "type": "component",
+        "evolution": 0.026,
+        "visibility": 0.782
+      },
+      {
+        "id": "n-01JAW32GS3MY39QYRC3J507BG6",
+        "label": "Changement en cours",
+        "type": "component",
+        "evolution": 0.055,
+        "visibility": 0.782,
+        "color": "red-600"
+      },
+      {
+        "id": "n-01JAW33T9GN14EWVB3BYJB9GH2",
+        "label": "​",
+        "type": "component",
+        "evolution": 0.026,
+        "visibility": 0.842
+      },
+      {
+        "id": "n-01JAW33ZNVNE1XTBAFRQ91ASP1",
+        "label": "Changement historique",
+        "type": "component",
+        "evolution": 0.053,
+        "visibility": 0.842
+      },
+      {
+        "id": "n-01JAW3EA4Z1KPMG9T11BZPQPXK",
+        "label": "​",
+        "type": "component",
+        "evolution": 0.026,
+        "visibility": 0.906
+      },
+      {
+        "id": "n-01JAW3EFYSW9X26433N1R0VJ5S",
+        "label": "Rouge = Futur",
+        "type": "component",
+        "evolution": 0.053,
+        "visibility": 0.905,
+        "color": "red-600"
+      },
+      {
+        "id": "n-01JAW2Z4W7VE2KZ3KBN1KT85CK",
+        "label": "Repère : partie prenante",
+        "type": "anchor",
+        "evolution": 0.024,
+        "visibility": 0.501
+      },
+      {
+        "id": "n-01JAW310YA62K58Z7DT8ZHQRQF",
+        "label": "Pipeline : choix possibles",
+        "type": "pipeline",
+        "evolution": 0.022,
+        "visibility": 0.705,
+        "evoStart": 0.022,
+        "evoEnd": 0.056,
+        "visStart": 0.705,
+        "visEnd": 0.748,
+        "handleEvolution": 0.031
+      },
+      {
+        "id": "n-01JAW35KQGKVV7HQTXE0Q1HTAM",
+        "label": "Pipeline fermé = capacité",
+        "type": "pipeline",
+        "evolution": 0.022,
+        "visibility": 0.659,
+        "evoStart": 0.022,
+        "evoEnd": 0.037,
+        "visStart": 0.659,
+        "visEnd": 0.681,
+        "handleEvolution": 0.03
       }
     ],
     "edges": [
       {
-        "source": "n-01JM9J49PCSSFFA98VNXRC9VNC",
-        "target": "n-01JM9J3Y87R3CQH4YFG1K3JVKB",
+        "source": "n-01JAT2DK8E5R9HMTPG4FVF7G3S",
+        "target": "n-01JAT2E2506C2PGZAKR1QTY9R4",
         "type": "DependsOn"
       },
       {
-        "source": "n-01JM9J49PCSSFFA98VNXRC9VNC",
-        "target": "n-01JM9J5PB0FW61VB0JZ7S182NH",
+        "source": "n-01JAT2E2506C2PGZAKR1QTY9R4",
+        "target": "n-01JAT2ENE68KT1697G37DHMZT1",
         "type": "DependsOn"
       },
       {
-        "source": "n-01JM9JCPYMAY1110N1V05EB3QJ",
-        "target": "n-01JM9JC39V37CAFSTQ4EC7DK5F",
+        "source": "n-01JAT2PXJGVKZ2X9NSN5M8Y621",
+        "target": "n-01JAT2TFVPJXZBS474WVZY80MS",
         "type": "DependsOn"
       },
       {
-        "source": "n-01JM9JTP3EXNN0370ZNTRJFNAY",
-        "target": "n-01JM9J49PCSSFFA98VNXRC9VNC",
+        "source": "n-01JAT2Q6WVWA8PVT79CYN0124N",
+        "target": "n-01JAT2TFVPJXZBS474WVZY80MS",
         "type": "DependsOn"
       },
       {
-        "source": "n-01JM9JW6M4VAC4HEWXQV3ENDF3",
-        "target": "n-01JM9J49PCSSFFA98VNXRC9VNC",
+        "source": "n-01JAT2R9K1GKEYD20Z4E4GZDPE",
+        "target": "n-01JAT318NQXX7G6XYB8ZK32HQ1",
         "type": "DependsOn"
       },
       {
-        "source": "n-01JM9JWQXHNXS7GT2CFRYKMSWX",
-        "target": "n-01JM9J49PCSSFFA98VNXRC9VNC",
+        "source": "n-01JAT2Q6WVWA8PVT79CYN0124N",
+        "target": "n-01JAT43GBT667WVB4A464HNQ7N",
+        "type": "EvolveTo"
+      },
+      {
+        "source": "n-01JAT4FW8XN0TZRNC8905ZJ1XV",
+        "target": "n-01JAT4DV73V8KEFYM4D5G6TP46",
         "type": "DependsOn"
       },
       {
-        "source": "n-01JM9J3Y87R3CQH4YFG1K3JVKB",
-        "target": "n-01JM9KDKVVX22PHZK9P971H2SG",
+        "source": "n-01JAT43GBT667WVB4A464HNQ7N",
+        "target": "n-01JATBQ9A9NF96HKJWK39DSNX0",
+        "type": "EvolveTo"
+      },
+      {
+        "source": "n-01JATBQ9A9NF96HKJWK39DSNX0",
+        "target": "n-01JAT2TFVPJXZBS474WVZY80MS",
         "type": "DependsOn"
       },
       {
-        "source": "n-01JM9KDKVVX22PHZK9P971H2SG",
-        "target": "n-01JM9KAAWGHKBF5JN1S3PT0JQ6",
+        "source": "n-01JAT2TFVPJXZBS474WVZY80MS",
+        "target": "n-01JAT2FK7Q08QBMZ5MDXH986GV",
         "type": "DependsOn"
       },
       {
-        "source": "n-01JM9J3Y87R3CQH4YFG1K3JVKB",
-        "target": "n-01JM9KDZJ3HBKDDJN9RXZBY2EM",
+        "source": "n-01JAT3VH1588YX1T6NRV36EBGQ",
+        "target": "n-01JAT5RYVTV9SP01VWBBH2Q229",
+        "type": "EvolveTo"
+      },
+      {
+        "source": "n-01JAT4DV73V8KEFYM4D5G6TP46",
+        "target": "n-01JAT4JM9CPM6HBSVA2AGQ10WS",
         "type": "DependsOn"
       },
       {
-        "source": "n-01JM9JFFBBMGJNSH301FS6DX23",
-        "target": "n-01JM9JZ0EXZM9A25DKW4FEV040",
-        "type": "DependsOn"
+        "source": "n-01JAT4N7GCY2TQ9FD13YGHD1QJ",
+        "target": "n-01JAT4P3TYS2JZN4ZNWVKJ8VP4",
+        "type": "EvolveTo"
       },
       {
-        "source": "n-01JM9JFFBBMGJNSH301FS6DX23",
-        "target": "n-01JM9JY7AGG6TSW0QY8FTRHY8C",
-        "type": "DependsOn"
+        "source": "n-01JAW32BT40H0ETPPRSWSSQFSS",
+        "target": "n-01JAW32GS3MY39QYRC3J507BG6",
+        "type": "EvolveTo"
       },
       {
-        "source": "n-01JM9JFFBBMGJNSH301FS6DX23",
-        "target": "n-01JM9JCPYMAY1110N1V05EB3QJ",
-        "type": "DependsOn"
+        "source": "n-01JAW33T9GN14EWVB3BYJB9GH2",
+        "target": "n-01JAW33ZNVNE1XTBAFRQ91ASP1",
+        "type": "EvolveTo"
       },
       {
-        "source": "n-01JM9JC39V37CAFSTQ4EC7DK5F",
-        "target": "n-01JM9JE42TWDA1SX319J5PYDCP",
-        "type": "DependsOn"
-      },
-      {
-        "source": "n-01JM9JGGMP2FWQBEHFG6RFT6XZ",
-        "target": "n-01JM9JEPJMA3DATYQWVKWY0EBW",
-        "type": "DependsOn"
-      },
-      {
-        "source": "n-01JM9K5W3S0FRD7XZKJ4Z79A23",
-        "target": "n-01JM9JTP3EXNN0370ZNTRJFNAY",
-        "type": "DependsOn"
-      },
-      {
-        "source": "n-01JM9K5W3S0FRD7XZKJ4Z79A23",
-        "target": "n-01JM9JW6M4VAC4HEWXQV3ENDF3",
-        "type": "DependsOn"
-      },
-      {
-        "source": "n-01JM9K5W3S0FRD7XZKJ4Z79A23",
-        "target": "n-01JM9JWQXHNXS7GT2CFRYKMSWX",
-        "type": "DependsOn"
-      },
-      {
-        "source": "n-01JM9JE42TWDA1SX319J5PYDCP",
-        "target": "n-01JM9K728B83R84CRAHVV5TKP5",
+        "source": "n-01JAW3EFYSW9X26433N1R0VJ5S",
+        "target": "n-01JAW3EA4Z1KPMG9T11BZPQPXK",
         "type": "DependsOn"
       }
     ],
     "meta": {
-      "name": "Text generative AI value chain"
+      "name": "Meilleur usage des pipelines"
     },
     "axes": {
       "valueChain": true,

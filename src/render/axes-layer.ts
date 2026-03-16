@@ -62,22 +62,7 @@ export const renderAxesLayer: LayerRenderer = (
   } : undefined;
   const labels = resolveAxisLabels(mergedLabels);
 
-  // ── Plot area border rectangle (always rendered) ─────────
-  parts.push(
-    `<rect x="${plot.left}" y="${plot.top}" width="${plot.width}" height="${plot.height}" ` +
-      `fill="none" stroke="${BORDER_COLOR}" stroke-width="1" />`
-  );
-
-  // ── Horizontal grid lines (value chain axis) ────────────
-  if (axes.valueChain) {
-    for (let i = 1; i < GRID_LINE_COUNT; i++) {
-      const y = plot.top + (plot.height * i) / GRID_LINE_COUNT;
-      parts.push(
-        `<line x1="${plot.left}" y1="${y}" x2="${plot.right}" y2="${y}" ` +
-          `stroke="${GRID_COLOR}" stroke-width="0.5" />`
-      );
-    }
-  }
+  // Horizontal grid lines removed — cleaner visual per Wardley convention
 
   // ── Arrowhead marker definition ──────────────────────────
   parts.push(

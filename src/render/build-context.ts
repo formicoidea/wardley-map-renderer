@@ -47,9 +47,9 @@ function makeEvoToX(plot: PlotArea): (evolution: number) => number {
 }
 
 function makeVisToY(plot: PlotArea): (visibility: number) => number {
-  // MapKeep convention: visibility 1 = top (visible to user), 0 = bottom (invisible)
-  // SVG convention: y increases downward → invert
-  return (visibility: number) => plot.top + (1 - visibility) * plot.height;
+  // OWM convention: visibility 0 = top (visible), 1 = bottom (invisible)
+  // Matches SVG y-axis direction — no inversion needed
+  return (visibility: number) => plot.top + visibility * plot.height;
 }
 
 // ── Context builder ───────────────────────────────────────────────────

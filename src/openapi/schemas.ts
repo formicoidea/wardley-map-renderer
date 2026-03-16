@@ -105,7 +105,7 @@ export function registerSchemas(): void {
       label: "Platform",
       type: "component",
       evolution: 0.65,
-      visibility: 0.7,
+      visibility: 0.3,
     },
   }));
 
@@ -153,9 +153,9 @@ export function registerSchemas(): void {
     example: {
       title: "Example Map",
       components: [
-        { id: "user", label: "User", type: "user-need", evolution: 0.95, visibility: 0.95 },
-        { id: "web-app", label: "Web App", type: "component", evolution: 0.65, visibility: 0.7 },
-        { id: "platform", label: "Platform", type: "component", evolution: 0.45, visibility: 0.4 },
+        { id: "user", label: "User", type: "user-need", evolution: 0.95, visibility: 0.05 },
+        { id: "web-app", label: "Web App", type: "component", evolution: 0.65, visibility: 0.3 },
+        { id: "platform", label: "Platform", type: "component", evolution: 0.45, visibility: 0.6 },
       ],
       relations: [
         { source: "user", target: "web-app", type: "DependsOn" },
