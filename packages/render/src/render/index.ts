@@ -47,6 +47,10 @@ export {
   registrySize,
 } from "./registry.js";
 
+// ── Layer dependency DAG ─────────────────────────────────────────────
+export type { LayerDAG } from "./layer-dag.js";
+export { LAYER_DAG } from "./layer-dag.js";
+
 // ── Context builder (Phase 1) ───────────────────────────────────────
 export { buildRenderContext } from "./build-context.js";
 

@@ -156,7 +156,7 @@ export function registerSchemas(): void {
   }));
 
   registry.register("AxisLabels", AxisLabelsSchema.openapi({
-    description: "i18n axis labels with locale-aware defaults and per-field overrides.",
+    description: "i18n axis label overrides (per-field). Locale preset selected via renderConfig.locale.",
   }));
 
   registry.register("Legend", LegendSchema.openapi({

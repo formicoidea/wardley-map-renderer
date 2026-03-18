@@ -178,7 +178,8 @@ describe("OpenAPI schema registrations", () => {
     const rc = schemas?.RenderConfig;
     expect(rc).toBeDefined();
     expect(rc.properties.width).toBeDefined();
-    expect(rc.properties.backgroundColor).toBeDefined();
+    // backgroundColor moved to background.color in nested structure
+    expect(rc.properties.background).toBeDefined();
     expect(rc.properties.fontFamily).toBeDefined();
   });
 });

@@ -1,0 +1,887 @@
+/**
+ * config-constraint-graph.test.ts — Tests for Sub-AC 2 executable constraint implementations
+ *
+ * Verifies all three concrete constraints:
+ *
+ * 1. legendBoundsValidation — coordinateSpace→legend XY anchor bounds check
+ * 2. layerDependenciesConstraint — DAG-based layerToggles reachability
+ * 3. phaseStyleAlignmentConstraint — phaseLabels.length↔evolveStyles key parity
+ *
+ * Also tests:
+ * 4. CONFIG_CONSTRAINT_GRAPH — populated declarative graph
+ * 5. EXECUTABLE_CONSTRAINT_GRAPH — flat list of executable constraints
+ * 6. checkConstraints — utility function that runs the full graph
+ */
+
+import { describe, expect, it } from "vitest";
+import {
+  legendBoundsValidation,
+  layerDependenciesConstraint,
+  phaseStyleAlignmentConstraint,
+  CONFIG_CONSTRAINT_GRAPH,
+  EXECUTABLE_CONSTRAINT_GRAPH,
+  checkConstraints,
+  EMPTY_CONFIG_CONSTRAINT_GRAPH,
+  type ConstraintCheckInput,
+  type ConstraintResult,
+} from "./config-constraint-graph.js";
+
+// ── helpers ───────────────────────────────────────────────────────────────────
+
+/** Assert the result is completely valid (no violations of any severity) */
+function expectValid(result: ConstraintResult) {
+  expect(result.valid, "expected valid=true but got violations").toBe(true);
+  expect(result.ok, "expected ok=true").toBe(true);
+  expect(result.violations).toHaveLength(0);
+}
+
+/** Assert the result has exactly one error violation on the given path */
+function expectError(result: ConstraintResult, path: string) {
+  expect(result.valid, "expected valid=false").toBe(false);
+  expect(result.ok, "expected ok=false for error severity").toBe(false);
+  const errViolations = result.violations.filter((v) => v.severity === "error");
+  expect(errViolations.length).toBeGreaterThanOrEqual(1);
+  const match = errViolations.find((v) => v.path === path);
+  expect(match, `expected error violation at path "${path}"`).toBeDefined();
+}
+
+/** Assert the result has exactly one warning violation on the given path */
+function expectWarning(result: ConstraintResult, path: string) {
+  expect(result.valid, "expected valid=false for warning").toBe(false);
+  expect(result.ok, "expected ok=true for warning-only result").toBe(true);
+  const warnViolations = result.violations.filter((v) => v.severity === "warning");
+  expect(warnViolations.length).toBeGreaterThanOrEqual(1);
+  const match = warnViolations.find((v) => v.path === path);
+  expect(match, `expected warning violation at path "${path}"`).toBeDefined();
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// 1. legendBoundsValidation
+// ════════════════════════════════════════════════════════════════════════════
+
+describe("legendBoundsValidation", () => {
+  it("has id 'legendBoundsValidation'", () => {
+    expect(legendBoundsValidation.id).toBe("legendBoundsValidation");
+  });
+
+  it("has declarative metadata with source='coordinateSpace' and target='legend'", () => {
+    expect(legendBoundsValidation.metadata.source).toBe("coordinateSpace");
+    expect(legendBoundsValidation.metadata.target).toBe("legend");
+    expect(legendBoundsValidation.metadata.violationPolicy).toBe("error");
+    expect(legendBoundsValidation.metadata.rule).toBeTruthy();
+  });
+
+  // ── Absent / named position — always valid ──────────────────────────────
+
+  it("returns valid when legend is absent", () => {
+    expectValid(legendBoundsValidation.check({}));
+  });
+
+  it("returns valid when legend.position is absent", () => {
+    expectValid(legendBoundsValidation.check({ legend: {} }));
+  });
+
+  it("returns valid for named position 'top-left'", () => {
+    expectValid(legendBoundsValidation.check({ legend: { position: "top-left" } }));
+  });
+
+  it("returns valid for named position 'bottom-right'", () => {
+    expectValid(legendBoundsValidation.check({ legend: { position: "bottom-right" } }));
+  });
+
+  it("returns valid for named position 'auto'", () => {
+    expectValid(legendBoundsValidation.check({ legend: { position: "auto" } }));
+  });
+
+  it("returns valid for named position 'top-right'", () => {
+    expectValid(legendBoundsValidation.check({ legend: { position: "top-right" } }));
+  });
+
+  it("returns valid for named position 'bottom-left'", () => {
+    expectValid(legendBoundsValidation.check({ legend: { position: "bottom-left" } }));
+  });
+
+  // ── XY position within default canvas bounds (1600×800) ─────────────────
+
+  it("returns valid for XY position at origin (0, 0)", () => {
+    expectValid(legendBoundsValidation.check({ legend: { position: { x: 0, y: 0 } } }));
+  });
+
+  it("returns valid for XY position at top-right corner of default canvas (1600, 0)", () => {
+    expectValid(legendBoundsValidation.check({ legend: { position: { x: 1600, y: 0 } } }));
+  });
+
+  it("returns valid for XY position at bottom-left corner of default canvas (0, 800)", () => {
+    expectValid(legendBoundsValidation.check({ legend: { position: { x: 0, y: 800 } } }));
+  });
+
+  it("returns valid for XY position at bottom-right corner of default canvas (1600, 800)", () => {
+    expectValid(legendBoundsValidation.check({ legend: { position: { x: 1600, y: 800 } } }));
+  });
+
+  it("returns valid for interior XY position (100, 600)", () => {
+    expectValid(legendBoundsValidation.check({ legend: { position: { x: 100, y: 600 } } }));
+  });
+
+  it("returns valid for XY position at canvas center (800, 400)", () => {
+    expectValid(
+      legendBoundsValidation.check({ legend: { position: { x: 800, y: 400 } } }),
+    );
+  });
+
+  // ── XY position outside default canvas bounds ───────────────────────────
+
+  it("returns error when legend.position.x > canvas width (default 1600)", () => {
+    expectError(
+      legendBoundsValidation.check({ legend: { position: { x: 1601, y: 0 } } }),
+      "legend.position.x",
+    );
+  });
+
+  it("returns error when legend.position.x is negative", () => {
+    expectError(
+      legendBoundsValidation.check({ legend: { position: { x: -1, y: 0 } } }),
+      "legend.position.x",
+    );
+  });
+
+  it("returns error when legend.position.y > canvas height (default 800)", () => {
+    expectError(
+      legendBoundsValidation.check({ legend: { position: { x: 0, y: 801 } } }),
+      "legend.position.y",
+    );
+  });
+
+  it("returns error when legend.position.y is negative", () => {
+    expectError(
+      legendBoundsValidation.check({ legend: { position: { x: 0, y: -1 } } }),
+      "legend.position.y",
+    );
+  });
+
+  it("returns two errors when both x and y are out of bounds", () => {
+    const result = legendBoundsValidation.check({
+      legend: { position: { x: 9999, y: 9999 } },
+    });
+    expect(result.valid).toBe(false);
+    expect(result.ok).toBe(false);
+    expect(result.violations).toHaveLength(2);
+    expect(result.violations.map((v) => v.path)).toContain("legend.position.x");
+    expect(result.violations.map((v) => v.path)).toContain("legend.position.y");
+    expect(result.violations.every((v) => v.severity === "error")).toBe(true);
+  });
+
+  // ── XY position relative to explicit coordinateSpace dimensions ──────────
+
+  it("uses coordinateSpace.width for x-bounds check", () => {
+    // Custom 800×600 canvas
+    const config: ConstraintCheckInput = {
+      coordinateSpace: { width: 800, height: 600 },
+      legend: { position: { x: 801, y: 0 } }, // x just past 800 boundary
+    };
+    expectError(legendBoundsValidation.check(config), "legend.position.x");
+  });
+
+  it("returns valid for XY within custom coordinateSpace dimensions", () => {
+    const config: ConstraintCheckInput = {
+      coordinateSpace: { width: 800, height: 600 },
+      legend: { position: { x: 800, y: 600 } }, // exactly at boundary
+    };
+    expectValid(legendBoundsValidation.check(config));
+  });
+
+  it("uses coordinateSpace.height for y-bounds check", () => {
+    const config: ConstraintCheckInput = {
+      coordinateSpace: { width: 800, height: 600 },
+      legend: { position: { x: 0, y: 601 } }, // y just past 600 boundary
+    };
+    expectError(legendBoundsValidation.check(config), "legend.position.y");
+  });
+
+  it("falls back to default width=1600 when coordinateSpace.width is absent", () => {
+    // Only height specified — width defaults to 1600
+    const config: ConstraintCheckInput = {
+      coordinateSpace: { height: 600 },
+      legend: { position: { x: 1599, y: 0 } }, // within default width 1600
+    };
+    expectValid(legendBoundsValidation.check(config));
+  });
+
+  it("falls back to default height=800 when coordinateSpace.height is absent", () => {
+    // Only width specified — height defaults to 800
+    const config: ConstraintCheckInput = {
+      coordinateSpace: { width: 1600 },
+      legend: { position: { x: 0, y: 799 } }, // within default height 800
+    };
+    expectValid(legendBoundsValidation.check(config));
+  });
+
+  it("uses default bounds (1600×800) when coordinateSpace is entirely absent", () => {
+    expectValid(legendBoundsValidation.check({ legend: { position: { x: 1600, y: 800 } } }));
+  });
+
+  // ── Error message quality ─────────────────────────────────────────────────
+
+  it("error message for x violation includes actual value and canvas width", () => {
+    const result = legendBoundsValidation.check({
+      coordinateSpace: { width: 800 },
+      legend: { position: { x: 1000, y: 0 } },
+    });
+    const violation = result.violations[0];
+    expect(violation.message).toContain("1000");
+    expect(violation.message).toContain("800");
+    expect(violation.severity).toBe("error");
+  });
+
+  it("error message for y violation includes actual value and canvas height", () => {
+    const result = legendBoundsValidation.check({
+      coordinateSpace: { height: 600 },
+      legend: { position: { x: 0, y: 700 } },
+    });
+    const violation = result.violations[0];
+    expect(violation.message).toContain("700");
+    expect(violation.message).toContain("600");
+    expect(violation.severity).toBe("error");
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// 2. layerDependenciesConstraint
+// ════════════════════════════════════════════════════════════════════════════
+
+describe("layerDependenciesConstraint", () => {
+  it("has id 'layerDependencies'", () => {
+    expect(layerDependenciesConstraint.id).toBe("layerDependencies");
+  });
+
+  it("has declarative metadata with source and target both 'filters.layers'", () => {
+    expect(layerDependenciesConstraint.metadata.source).toBe("filters.layers");
+    expect(layerDependenciesConstraint.metadata.target).toBe("filters.layers");
+    expect(layerDependenciesConstraint.metadata.violationPolicy).toBe("error");
+  });
+
+  // ── Default config (all absent toggles default to true) ──────────────────
+
+  it("returns valid when no config is provided (all layers default to visible)", () => {
+    expectValid(layerDependenciesConstraint.check({}));
+  });
+
+  it("returns valid when filters is absent", () => {
+    expectValid(layerDependenciesConstraint.check({}));
+  });
+
+  it("returns valid when filters.layers is absent", () => {
+    expectValid(layerDependenciesConstraint.check({ filters: {} }));
+  });
+
+  it("returns valid when all layers are explicitly true", () => {
+    expectValid(
+      layerDependenciesConstraint.check({
+        filters: {
+          layers: {
+            nodes: true,
+            evolvesTo: true,
+            labels: true,
+          },
+        },
+      }),
+    );
+  });
+
+  // ── evolvesTo → nodes dependency ─────────────────────────────────────────
+
+  it("returns error when nodes=false and evolvesTo defaults to true (absent)", () => {
+    // evolvesTo is absent (defaults to visible=true) but nodes is off
+    expectError(
+      layerDependenciesConstraint.check({
+        filters: { layers: { nodes: false } },
+      }),
+      "filters.layers.evolvesTo",
+    );
+  });
+
+  it("returns error when nodes=false and evolvesTo=true (explicit)", () => {
+    expectError(
+      layerDependenciesConstraint.check({
+        filters: { layers: { nodes: false, evolvesTo: true } },
+      }),
+      "filters.layers.evolvesTo",
+    );
+  });
+
+  it("returns valid when nodes=false AND evolvesTo=false (labels also off)", () => {
+    // When nodes=false, both evolvesTo AND labels must be off to avoid violations.
+    // This test confirms the evolvesTo edge is satisfied; labels must also be false.
+    expectValid(
+      layerDependenciesConstraint.check({
+        filters: { layers: { nodes: false, evolvesTo: false, labels: false } },
+      }),
+    );
+  });
+
+  it("returns valid when nodes=true and evolvesTo=true", () => {
+    expectValid(
+      layerDependenciesConstraint.check({
+        filters: { layers: { nodes: true, evolvesTo: true } },
+      }),
+    );
+  });
+
+  it("returns valid when nodes=true and evolvesTo=false", () => {
+    // nodes is on, evolvesTo is off → fine (no violation)
+    expectValid(
+      layerDependenciesConstraint.check({
+        filters: { layers: { nodes: true, evolvesTo: false } },
+      }),
+    );
+  });
+
+  // ── labels → nodes dependency ─────────────────────────────────────────────
+
+  it("returns error when nodes=false and labels defaults to true (absent)", () => {
+    // nodes off, labels absent → defaults to visible → violation
+    expectError(
+      layerDependenciesConstraint.check({
+        filters: { layers: { nodes: false } },
+      }),
+      "filters.layers.labels",
+    );
+  });
+
+  it("returns error when nodes=false and labels=true (explicit)", () => {
+    expectError(
+      layerDependenciesConstraint.check({
+        filters: { layers: { nodes: false, labels: true } },
+      }),
+      "filters.layers.labels",
+    );
+  });
+
+  it("returns valid when nodes=false AND labels=false (evolvesTo also off)", () => {
+    // When nodes=false, both labels AND evolvesTo must be off to avoid violations.
+    // This test confirms the labels edge is satisfied; evolvesTo must also be false.
+    expectValid(
+      layerDependenciesConstraint.check({
+        filters: { layers: { nodes: false, labels: false, evolvesTo: false } },
+      }),
+    );
+  });
+
+  it("returns valid when nodes=true and labels=false", () => {
+    expectValid(
+      layerDependenciesConstraint.check({
+        filters: { layers: { nodes: true, labels: false } },
+      }),
+    );
+  });
+
+  // ── Both evolvesTo and labels violations at once ──────────────────────────
+
+  it("returns two errors when nodes=false with both evolvesTo and labels on", () => {
+    const result = layerDependenciesConstraint.check({
+      filters: { layers: { nodes: false, evolvesTo: true, labels: true } },
+    });
+    expect(result.valid).toBe(false);
+    expect(result.ok).toBe(false);
+    expect(result.violations).toHaveLength(2);
+    const paths = result.violations.map((v) => v.path);
+    expect(paths).toContain("filters.layers.evolvesTo");
+    expect(paths).toContain("filters.layers.labels");
+  });
+
+  it("returns two errors when nodes=false and neither dependent is explicitly set", () => {
+    // Both evolvesTo and labels absent → default to visible → two violations
+    const result = layerDependenciesConstraint.check({
+      filters: { layers: { nodes: false } },
+    });
+    expect(result.violations).toHaveLength(2);
+    const paths = result.violations.map((v) => v.path);
+    expect(paths).toContain("filters.layers.evolvesTo");
+    expect(paths).toContain("filters.layers.labels");
+  });
+
+  it("returns valid when nodes=false, evolvesTo=false, labels=false — all off", () => {
+    expectValid(
+      layerDependenciesConstraint.check({
+        filters: {
+          layers: { nodes: false, evolvesTo: false, labels: false },
+        },
+      }),
+    );
+  });
+
+  // ── Other layers are orthogonal ──────────────────────────────────────────
+
+  it("returns valid when only title=false (no dependency constraint)", () => {
+    expectValid(
+      layerDependenciesConstraint.check({
+        filters: { layers: { title: false } },
+      }),
+    );
+  });
+
+  it("returns valid when only edges=false (no dependency constraint)", () => {
+    expectValid(
+      layerDependenciesConstraint.check({
+        filters: { layers: { edges: false } },
+      }),
+    );
+  });
+
+  it("returns valid when only pipelines=false (no dependency constraint)", () => {
+    expectValid(
+      layerDependenciesConstraint.check({
+        filters: { layers: { pipelines: false } },
+      }),
+    );
+  });
+
+  it("returns valid when only notes=false (no dependency constraint)", () => {
+    expectValid(
+      layerDependenciesConstraint.check({
+        filters: { layers: { notes: false } },
+      }),
+    );
+  });
+
+  // ── Error message quality ─────────────────────────────────────────────────
+
+  it("error message mentions the dependent and required layer names", () => {
+    const result = layerDependenciesConstraint.check({
+      filters: { layers: { nodes: false, evolvesTo: true } },
+    });
+    const violation = result.violations.find((v) => v.path.includes("evolvesTo"));
+    expect(violation).toBeDefined();
+    expect(violation!.message).toContain("evolvesTo");
+    expect(violation!.message).toContain("nodes");
+    expect(violation!.severity).toBe("error");
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// 3. phaseStyleAlignmentConstraint
+// ════════════════════════════════════════════════════════════════════════════
+
+describe("phaseStyleAlignmentConstraint", () => {
+  it("has id 'phaseStyleAlignment'", () => {
+    expect(phaseStyleAlignmentConstraint.id).toBe("phaseStyleAlignment");
+  });
+
+  it("has declarative metadata with violationPolicy='warn'", () => {
+    expect(phaseStyleAlignmentConstraint.metadata.source).toBe(
+      "background.evolutionPhases.phases",
+    );
+    expect(phaseStyleAlignmentConstraint.metadata.target).toBe("evolveStyles");
+    expect(phaseStyleAlignmentConstraint.metadata.violationPolicy).toBe("warn");
+  });
+
+  // ── Cases where check is skipped ─────────────────────────────────────────
+
+  it("returns valid when neither phases nor evolveStyles are present", () => {
+    expectValid(phaseStyleAlignmentConstraint.check({}));
+  });
+
+  it("returns valid when only phases is provided (no evolveStyles)", () => {
+    expectValid(
+      phaseStyleAlignmentConstraint.check({
+        background: { evolutionPhases: { phases: ["A", "B", "C"] } },
+      }),
+    );
+  });
+
+  it("returns valid when only evolveStyles is provided (no phases)", () => {
+    expectValid(
+      phaseStyleAlignmentConstraint.check({
+        evolveStyles: { natural: { stroke: "#f00" } },
+      }),
+    );
+  });
+
+  it("returns valid when evolveStyles has only _default (no per-type keys)", () => {
+    // _default applies to all phases regardless of count — skip parity check
+    expectValid(
+      phaseStyleAlignmentConstraint.check({
+        background: { evolutionPhases: { phases: ["A", "B", "C"] } },
+        evolveStyles: { _default: { stroke: "#888" } },
+      }),
+    );
+  });
+
+  it("returns valid when evolveStyles is empty object (no keys at all)", () => {
+    expectValid(
+      phaseStyleAlignmentConstraint.check({
+        background: { evolutionPhases: { phases: ["A", "B", "C"] } },
+        evolveStyles: {},
+      }),
+    );
+  });
+
+  // ── Matching parity — valid ────────────────────────────────────────────────
+
+  it("returns valid when phase count matches explicit evolveStyles key count (4 = 4)", () => {
+    expectValid(
+      phaseStyleAlignmentConstraint.check({
+        background: {
+          evolutionPhases: {
+            phases: ["Genesis", "Custom-Built", "Product", "Commodity"],
+          },
+        },
+        evolveStyles: {
+          natural: { stroke: "#f00" },
+          ecosystem: { stroke: "#0f0" },
+          forced: { stroke: "#00f" },
+          late: { stroke: "#888" },
+        },
+      }),
+    );
+  });
+
+  it("returns valid when phase count matches explicit evolveStyles key count (2 = 2)", () => {
+    expectValid(
+      phaseStyleAlignmentConstraint.check({
+        background: { evolutionPhases: { phases: ["Early", "Late"] } },
+        evolveStyles: {
+          natural: { stroke: "#f00" },
+          ecosystem: { stroke: "#0f0" },
+        },
+      }),
+    );
+  });
+
+  it("returns valid when phase count matches explicit key count (1 = 1)", () => {
+    expectValid(
+      phaseStyleAlignmentConstraint.check({
+        background: { evolutionPhases: { phases: ["All"] } },
+        evolveStyles: { natural: { stroke: "#f00" } },
+      }),
+    );
+  });
+
+  // ── Mismatching parity — warning (not error) ──────────────────────────────
+
+  it("returns warning (not error) when phase count ≠ evolveStyles key count (3 ≠ 2)", () => {
+    const result = phaseStyleAlignmentConstraint.check({
+      background: { evolutionPhases: { phases: ["A", "B", "C"] } },
+      evolveStyles: {
+        natural: { stroke: "#f00" },
+        ecosystem: { stroke: "#0f0" },
+      },
+    });
+    expect(result.valid).toBe(false);
+    expect(result.ok).toBe(true); // warning only — ok is still true
+    expect(result.violations).toHaveLength(1);
+    expect(result.violations[0].severity).toBe("warning");
+    expect(result.violations[0].path).toBe("background.evolutionPhases.phases");
+  });
+
+  it("returns warning when phase count > evolveStyles key count (5 ≠ 4)", () => {
+    expectWarning(
+      phaseStyleAlignmentConstraint.check({
+        background: {
+          evolutionPhases: { phases: ["A", "B", "C", "D", "E"] },
+        },
+        evolveStyles: {
+          natural: {},
+          ecosystem: {},
+          forced: {},
+          late: {},
+        },
+      }),
+      "background.evolutionPhases.phases",
+    );
+  });
+
+  it("returns warning when phase count < evolveStyles key count (2 ≠ 4)", () => {
+    expectWarning(
+      phaseStyleAlignmentConstraint.check({
+        background: { evolutionPhases: { phases: ["Early", "Late"] } },
+        evolveStyles: {
+          natural: {},
+          ecosystem: {},
+          forced: {},
+          late: {},
+        },
+      }),
+      "background.evolutionPhases.phases",
+    );
+  });
+
+  it("returns warning when phase count = 1 and evolveStyles has 3 explicit keys", () => {
+    expectWarning(
+      phaseStyleAlignmentConstraint.check({
+        background: { evolutionPhases: { phases: ["All"] } },
+        evolveStyles: {
+          natural: {},
+          ecosystem: {},
+          forced: {},
+        },
+      }),
+      "background.evolutionPhases.phases",
+    );
+  });
+
+  // ── Warning message quality ───────────────────────────────────────────────
+
+  it("warning message includes actual phase count and explicit key count", () => {
+    const result = phaseStyleAlignmentConstraint.check({
+      background: { evolutionPhases: { phases: ["A", "B", "C"] } },
+      evolveStyles: { natural: {}, ecosystem: {} },
+    });
+    const violation = result.violations[0];
+    expect(violation.message).toContain("3"); // phaseCount
+    expect(violation.message).toContain("2"); // styleKeyCount
+    expect(violation.severity).toBe("warning");
+  });
+
+  it("warning message names the explicit evolveStyles keys", () => {
+    const result = phaseStyleAlignmentConstraint.check({
+      background: { evolutionPhases: { phases: ["A", "B", "C"] } },
+      evolveStyles: { natural: {}, ecosystem: {} },
+    });
+    const msg = result.violations[0].message;
+    expect(msg).toContain("natural");
+    expect(msg).toContain("ecosystem");
+  });
+
+  // ── _default combined with per-type keys ─────────────────────────────────
+
+  it("counts only explicit EvolveTypeEnum keys, excluding _default", () => {
+    // 2 per-type keys + _default → count is 2, not 3
+    expectWarning(
+      phaseStyleAlignmentConstraint.check({
+        background: { evolutionPhases: { phases: ["A", "B", "C"] } }, // 3 phases
+        evolveStyles: {
+          _default: { stroke: "#888" }, // not counted
+          natural: {},                  // counted
+          ecosystem: {},                // counted
+        },
+      }),
+      "background.evolutionPhases.phases",
+    );
+  });
+
+  it("is valid when _default + 3 explicit keys match 3 phase labels", () => {
+    expectValid(
+      phaseStyleAlignmentConstraint.check({
+        background: { evolutionPhases: { phases: ["A", "B", "C"] } }, // 3 phases
+        evolveStyles: {
+          _default: { stroke: "#888" },
+          natural: {},   // counted (3)
+          ecosystem: {}, // counted
+          forced: {},    // counted
+        },
+      }),
+    );
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// 4. CONFIG_CONSTRAINT_GRAPH — populated declarative graph
+// ════════════════════════════════════════════════════════════════════════════
+
+describe("CONFIG_CONSTRAINT_GRAPH", () => {
+  it("has exactly the three required named slots", () => {
+    const keys = Object.keys(CONFIG_CONSTRAINT_GRAPH);
+    expect(keys).toContain("legendBoundsValidation");
+    expect(keys).toContain("layerDependencies");
+    expect(keys).toContain("phaseStyleAlignment");
+    expect(keys).toHaveLength(3);
+  });
+
+  it("legendBoundsValidation slot has a non-empty constraints array", () => {
+    expect(CONFIG_CONSTRAINT_GRAPH.legendBoundsValidation.constraints).toHaveLength(
+      1,
+    );
+  });
+
+  it("legendBoundsValidation slot constraint has correct source/target", () => {
+    const constraint = CONFIG_CONSTRAINT_GRAPH.legendBoundsValidation.constraints[0];
+    expect(constraint.source).toBe("coordinateSpace");
+    expect(constraint.target).toBe("legend");
+    expect(constraint.violationPolicy).toBe("error");
+  });
+
+  it("layerDependencies slot has a non-empty constraints array", () => {
+    expect(CONFIG_CONSTRAINT_GRAPH.layerDependencies.constraints).toHaveLength(1);
+  });
+
+  it("layerDependencies slot constraint mirrors LAYER_TOGGLE_DAG semantics", () => {
+    const constraint = CONFIG_CONSTRAINT_GRAPH.layerDependencies.constraints[0];
+    expect(constraint.source).toBe("filters.layers");
+    expect(constraint.target).toBe("filters.layers");
+    expect(constraint.violationPolicy).toBe("error");
+    expect(constraint.rule).toContain("nodes");
+  });
+
+  it("phaseStyleAlignment slot has a non-empty constraints array", () => {
+    expect(CONFIG_CONSTRAINT_GRAPH.phaseStyleAlignment.constraints).toHaveLength(1);
+  });
+
+  it("phaseStyleAlignment slot constraint has warn policy", () => {
+    const constraint = CONFIG_CONSTRAINT_GRAPH.phaseStyleAlignment.constraints[0];
+    expect(constraint.source).toBe("background.evolutionPhases.phases");
+    expect(constraint.target).toBe("evolveStyles");
+    expect(constraint.violationPolicy).toBe("warn");
+  });
+
+  it("all slot names match their .name field", () => {
+    expect(CONFIG_CONSTRAINT_GRAPH.legendBoundsValidation.name).toBe(
+      "legendBoundsValidation",
+    );
+    expect(CONFIG_CONSTRAINT_GRAPH.layerDependencies.name).toBe("layerDependencies");
+    expect(CONFIG_CONSTRAINT_GRAPH.phaseStyleAlignment.name).toBe("phaseStyleAlignment");
+  });
+
+  it("all slots have non-empty description strings", () => {
+    expect(CONFIG_CONSTRAINT_GRAPH.legendBoundsValidation.description.length).toBeGreaterThan(10);
+    expect(CONFIG_CONSTRAINT_GRAPH.layerDependencies.description.length).toBeGreaterThan(10);
+    expect(CONFIG_CONSTRAINT_GRAPH.phaseStyleAlignment.description.length).toBeGreaterThan(10);
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// 5. EXECUTABLE_CONSTRAINT_GRAPH — flat list introspection
+// ════════════════════════════════════════════════════════════════════════════
+
+describe("EXECUTABLE_CONSTRAINT_GRAPH", () => {
+  it("contains exactly three constraints", () => {
+    expect(EXECUTABLE_CONSTRAINT_GRAPH).toHaveLength(3);
+  });
+
+  it("constraint IDs are the three expected values", () => {
+    const ids = EXECUTABLE_CONSTRAINT_GRAPH.map((c) => c.id);
+    expect(ids).toContain("legendBoundsValidation");
+    expect(ids).toContain("layerDependencies");
+    expect(ids).toContain("phaseStyleAlignment");
+  });
+
+  it("each constraint has an id, metadata, and check function", () => {
+    for (const c of EXECUTABLE_CONSTRAINT_GRAPH) {
+      expect(c.id).toBeTruthy();
+      expect(c.metadata).toBeTruthy();
+      expect(c.metadata.source).toBeTruthy();
+      expect(c.metadata.target).toBeTruthy();
+      expect(c.metadata.rule).toBeTruthy();
+      expect(c.metadata.violationPolicy).toBeTruthy();
+      expect(typeof c.check).toBe("function");
+    }
+  });
+
+  it("constraints are ordered: legendBoundsValidation, layerDependencies, phaseStyleAlignment", () => {
+    expect(EXECUTABLE_CONSTRAINT_GRAPH[0].id).toBe("legendBoundsValidation");
+    expect(EXECUTABLE_CONSTRAINT_GRAPH[1].id).toBe("layerDependencies");
+    expect(EXECUTABLE_CONSTRAINT_GRAPH[2].id).toBe("phaseStyleAlignment");
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// 6. checkConstraints — utility function
+// ════════════════════════════════════════════════════════════════════════════
+
+describe("checkConstraints", () => {
+  it("returns valid=true and ok=true for an empty config", () => {
+    const { valid, ok, results } = checkConstraints({});
+    expect(valid).toBe(true);
+    expect(ok).toBe(true);
+    expect(results.size).toBe(3);
+  });
+
+  it("results map has keys matching all three constraint IDs", () => {
+    const { results } = checkConstraints({});
+    expect(results.has("legendBoundsValidation")).toBe(true);
+    expect(results.has("layerDependencies")).toBe(true);
+    expect(results.has("phaseStyleAlignment")).toBe(true);
+  });
+
+  it("returns valid=false and ok=false when legend XY anchor is out of bounds", () => {
+    const { valid, ok, results } = checkConstraints({
+      legend: { position: { x: 9999, y: 0 } },
+    });
+    expect(valid).toBe(false);
+    expect(ok).toBe(false);
+    expect(results.get("legendBoundsValidation")!.valid).toBe(false);
+    expect(results.get("layerDependencies")!.valid).toBe(true);
+    expect(results.get("phaseStyleAlignment")!.valid).toBe(true);
+  });
+
+  it("returns valid=false and ok=false when layer dependency is violated", () => {
+    const { valid, ok, results } = checkConstraints({
+      filters: { layers: { nodes: false, evolvesTo: true } },
+    });
+    expect(valid).toBe(false);
+    expect(ok).toBe(false);
+    expect(results.get("layerDependencies")!.valid).toBe(false);
+    expect(results.get("legendBoundsValidation")!.valid).toBe(true);
+  });
+
+  it("returns valid=false but ok=true when only a phase alignment warning is present", () => {
+    const { valid, ok, results } = checkConstraints({
+      background: { evolutionPhases: { phases: ["A", "B", "C"] } },
+      evolveStyles: { natural: {}, ecosystem: {} }, // 2 vs 3 → warning
+    });
+    expect(valid).toBe(false);
+    expect(ok).toBe(true); // warning doesn't fail ok
+    expect(results.get("phaseStyleAlignment")!.valid).toBe(false);
+    expect(results.get("phaseStyleAlignment")!.ok).toBe(true);
+    expect(results.get("legendBoundsValidation")!.valid).toBe(true);
+    expect(results.get("layerDependencies")!.valid).toBe(true);
+  });
+
+  it("works with a custom graph containing only a subset of constraints", () => {
+    const { results } = checkConstraints({}, [legendBoundsValidation]);
+    expect(results.size).toBe(1);
+    expect(results.has("legendBoundsValidation")).toBe(true);
+    expect(results.has("layerDependencies")).toBe(false);
+    expect(results.has("phaseStyleAlignment")).toBe(false);
+  });
+
+  it("returns valid=false when multiple violations exist from different constraints", () => {
+    // Both errors in one config — legend AND layer deps
+    const { valid, ok, results } = checkConstraints({
+      legend: { position: { x: 9999, y: 0 } },
+      filters: { layers: { nodes: false, evolvesTo: true } },
+    });
+    expect(valid).toBe(false);
+    expect(ok).toBe(false);
+    expect(results.get("legendBoundsValidation")!.valid).toBe(false);
+    expect(results.get("layerDependencies")!.valid).toBe(false);
+  });
+
+  it("valid=true for a fully correct config with all fields present", () => {
+    const { valid, ok } = checkConstraints({
+      coordinateSpace: { width: 1600, height: 800 },
+      legend: { position: { x: 100, y: 600 } }, // within bounds
+      filters: {
+        layers: { nodes: true, evolvesTo: true, labels: true },
+      },
+      background: {
+        evolutionPhases: { phases: ["Genesis", "Custom", "Product", "Commodity"] },
+      },
+      evolveStyles: {
+        natural: {},
+        ecosystem: {},
+        forced: {},
+        late: {},
+      },
+    });
+    expect(valid).toBe(true);
+    expect(ok).toBe(true);
+  });
+});
+
+// ════════════════════════════════════════════════════════════════════════════
+// 7. EMPTY_CONFIG_CONSTRAINT_GRAPH — backward compat (Sub-AC 1 skeleton)
+// ════════════════════════════════════════════════════════════════════════════
+
+describe("EMPTY_CONFIG_CONSTRAINT_GRAPH (Sub-AC 1 skeleton)", () => {
+  it("still exists and has three empty constraints slots", () => {
+    expect(EMPTY_CONFIG_CONSTRAINT_GRAPH.legendBoundsValidation.constraints).toHaveLength(0);
+    expect(EMPTY_CONFIG_CONSTRAINT_GRAPH.layerDependencies.constraints).toHaveLength(0);
+    expect(EMPTY_CONFIG_CONSTRAINT_GRAPH.phaseStyleAlignment.constraints).toHaveLength(0);
+  });
+
+  it("CONFIG_CONSTRAINT_GRAPH is a different value from EMPTY_CONFIG_CONSTRAINT_GRAPH", () => {
+    expect(CONFIG_CONSTRAINT_GRAPH).not.toBe(EMPTY_CONFIG_CONSTRAINT_GRAPH);
+    expect(CONFIG_CONSTRAINT_GRAPH.legendBoundsValidation.constraints).not.toHaveLength(0);
+  });
+});

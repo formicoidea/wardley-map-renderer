@@ -28,7 +28,6 @@ const EVOLVE_STYLES: Record<
   late: { stroke: "#999999", dasharray: "6,3" },
 };
 
-const ARROW_STROKE_WIDTH = 1.5;
 const ARROWHEAD_SIZE = 8;
 
 // ── Helpers ──────────────────────────────────────────────────────────
@@ -85,15 +84,25 @@ export const renderEvolvesToLayer: LayerRenderer = (
   if (ctx.evolves.length === 0) return [];
 
   const parts: string[] = [];
+  const configEvolveStyles = ctx.resolvedConfig.evolveStyles;
+  const arrowStrokeWidth = ctx.resolvedConfig.strokeWidth;
 
   for (const evolve of ctx.evolves) {
-    const style = EVOLVE_STYLES[evolve.evolveType] ?? EVOLVE_STYLES.natural;
+    const defaults = EVOLVE_STYLES[evolve.evolveType] ?? EVOLVE_STYLES.natural;
+    // _default provides a mid-level fallback between per-type override and hardcoded defaults.
+    // Resolution order (highest wins): per-type override → _default → hardcoded renderer defaults
+    const configDefault = configEvolveStyles._default;
+    const override = configEvolveStyles[evolve.evolveType as keyof typeof configEvolveStyles];
+    const style = {
+      stroke: override?.stroke ?? configDefault?.stroke ?? defaults.stroke,
+      dasharray: override?.strokeDasharray ?? configDefault?.strokeDasharray ?? defaults.dasharray,
+    };
 
     // Dashed line from source to target
     parts.push(
       `<line x1="${evolve.fromX}" y1="${evolve.fromY}" ` +
         `x2="${evolve.toX}" y2="${evolve.toY}" ` +
-        `stroke="${style.stroke}" stroke-width="${ARROW_STROKE_WIDTH}" ` +
+        `stroke="${style.stroke}" stroke-width="${arrowStrokeWidth}" ` +
         `stroke-dasharray="${style.dasharray}" />`
     );
 

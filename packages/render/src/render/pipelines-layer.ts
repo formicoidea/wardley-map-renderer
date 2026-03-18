@@ -45,6 +45,9 @@ export const renderPipelinesLayer: LayerRenderer = (
 ): string[] => {
   if (ctx.pipelines.length === 0) return [];
 
+  // Skip entire layer if "pipeline" type is excluded
+  if (ctx.resolvedConfig.excludeComponentTypes.includes("pipeline")) return [];
+
   const parts: string[] = [];
 
   for (const p of ctx.pipelines) {

@@ -22,7 +22,8 @@ import { avoidLabelCollisions } from "./label-placement.js";
 // ── Visual constants ─────────────────────────────────────────────────
 
 const NODE_RADIUS = 5;
-const COMPONENT_LABEL_FONT_SIZE = 12;
+/** Base font size for component labels — scaled by resolvedConfig.labelScale */
+const COMPONENT_LABEL_BASE_FONT_SIZE = 12;
 const COMPONENT_LABEL_COLOR = "#333333";
 
 /** Component types that get a text label on the map */
@@ -56,12 +57,18 @@ export const renderLabelsLayer: LayerRenderer = (
   ctx: RenderContext
 ): string[] => {
   const labelPlacements: LabelPlacement[] = [];
+  const excluded = new Set(ctx.resolvedConfig.excludeComponentTypes);
+  const fontFamily = ctx.resolvedConfig.fontFamily;
+  const fontSize = Math.round(COMPONENT_LABEL_BASE_FONT_SIZE * ctx.resolvedConfig.labelScale);
 
   for (const node of ctx.nodes) {
     const comp = node.component;
 
     // Skip notes (rendered by notes-layer)
     if (!LABEL_TYPES.has(comp.type)) continue;
+
+    // Skip excluded component types
+    if (excluded.has(comp.type)) continue;
 
     const cx = node.cx;
     const cy = node.cy;
@@ -120,11 +127,14 @@ export const renderLabelsLayer: LayerRenderer = (
   }
 
   // Apply label collision avoidance (label-label + edge-crossing scoring)
-  const adjusted = avoidLabelCollisions(
-    labelPlacements, edgeSegments,
-    7, 16,
-    { top: ctx.plot.top, bottom: ctx.plot.bottom }
-  );
+  // Respects resolvedConfig.avoidCollisions — if false, use placements as-is
+  const adjusted = ctx.resolvedConfig.avoidCollisions
+    ? avoidLabelCollisions(
+        labelPlacements, edgeSegments,
+        7, 16,
+        { top: ctx.plot.top, bottom: ctx.plot.bottom }
+      )
+    : labelPlacements;
 
   // Generate SVG text elements
   const parts: string[] = [];
@@ -139,13 +149,13 @@ export const renderLabelsLayer: LayerRenderer = (
         .join("");
       parts.push(
         `<text x="${lbl.x}" y="${lbl.y}" text-anchor="${lbl.anchor}" ` +
-          `font-family="Inter, sans-serif" font-size="${COMPONENT_LABEL_FONT_SIZE}" ` +
+          `font-family="${fontFamily}" font-size="${fontSize}" ` +
           `fill="${COMPONENT_LABEL_COLOR}">${firstLine}${restLines}</text>`
       );
     } else {
       parts.push(
         `<text x="${lbl.x}" y="${lbl.y}" text-anchor="${lbl.anchor}" ` +
-          `font-family="Inter, sans-serif" font-size="${COMPONENT_LABEL_FONT_SIZE}" ` +
+          `font-family="${fontFamily}" font-size="${fontSize}" ` +
           `fill="${COMPONENT_LABEL_COLOR}">${esc(lbl.text)}</text>`
       );
     }

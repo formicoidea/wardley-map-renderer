@@ -10,7 +10,8 @@
  * @module render/types
  */
 
-import type { WardleyMap, Component, Relation } from "../schema.js";
+import type { WardleyMap, Component, Relation, ResolvedRenderConfig } from "../schema.js";
+import type { KnownRenderableType } from "../renderable-type.js";
 
 /** Component type extracted from schema Component */
 type ComponentType = Component["type"];
@@ -157,8 +158,12 @@ export interface RenderOptions {
   /** Override canvas height (defaults to map.renderConfig.height or 800) */
   readonly height?: number;
 
-  /** Background color (defaults to "#ffffff") */
-  readonly backgroundColor?: string;
+  /**
+   * Background sub-object — moved from top-level `backgroundColor`.
+   * Use `background.color` for the canvas fill color (CSS hex, e.g. "#ffffff").
+   * @deprecated top-level `backgroundColor` is removed; use `background.color` instead
+   */
+  readonly background?: { color?: string };
 
   /** Whether to render axes (border, grid, phase labels). Defaults to true. */
   readonly showAxes?: boolean;
@@ -175,20 +180,42 @@ export interface RenderOptions {
   /** Scale factor for component label font size (1.0 = default 12px) */
   readonly labelScale?: number;
 
-  /** Node circle radius in pixels (defaults to 5) */
-  readonly nodeRadius?: number;
+  /**
+   * Per-type node circle radii in pixels.
+   * `_default` is required when provided and serves as catch-all fallback.
+   * Lookup precedence: `nodeRadii[type]` → `nodeRadii._default`
+   */
+  readonly nodeRadii?: { _default: number } & Record<string, number>;
 
   /** Enable/disable label collision avoidance (defaults to true) */
   readonly avoidCollisions?: boolean;
 
-  /** Component types to exclude from rendering (e.g. ["note"] to hide notes) */
-  readonly excludeTypes?: ReadonlyArray<ComponentType>;
+  /**
+   * **Data filter (pre-render):** Component types to exclude from rendering.
+   * Filtered components are removed before geometry is computed, affecting ALL layers.
+   * @see FiltersSchema.excludeComponentTypes for full distinction vs filters.layers
+   */
+  readonly excludeComponentTypes?: ReadonlyArray<ComponentType>;
 
-  /** Custom color overrides by component type */
-  readonly typeColors?: Partial<Record<ComponentType, string>>;
+  /**
+   * Custom color overrides by component type using the TypeStyleMap pattern.
+   * `_default` is required when provided (serves as catch-all fallback).
+   * @see TypeColorsSchema in schema.ts
+   */
+  readonly typeColors?: { readonly _default: string } & { readonly [K in KnownRenderableType]?: string } & { readonly [key: string]: string | undefined };
 
-  /** evolveType → stroke style mapping for evolution arrows */
-  readonly evolveStyles?: Partial<Record<"natural" | "ecosystem" | "forced", {
+  /**
+   * evolveType → stroke style mapping for evolution arrows.
+   * Accepts the closed set of EvolveType keys plus the special `_default` catch-all.
+   *
+   * Resolution order per style property (highest wins):
+   *   1. Explicit per-type key (e.g. `natural.stroke`)
+   *   2. `_default.stroke` (when present — mid-level fallback)
+   *   3. Hardcoded renderer defaults in evolvesto-layer.ts
+   */
+  readonly evolveStyles?: {
+    readonly _default?: { readonly stroke?: string; readonly strokeDasharray?: string };
+  } & Partial<Record<"natural" | "ecosystem" | "forced" | "late", {
     readonly stroke?: string;
     readonly strokeDasharray?: string;
   }>>;
@@ -243,6 +270,10 @@ export interface RenderContext {
 
   /** Rendering options (user overrides merged with defaults) */
   readonly options: RenderOptions;
+
+  /** Fully-resolved render config with all defaults applied (from resolveTheme).
+   *  Use this instead of ctx.map.renderConfig to avoid manual null-coalescing. */
+  readonly resolvedConfig: ResolvedRenderConfig;
 }
 
 // ── Layer renderer function type ─────────────────────────────────

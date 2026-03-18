@@ -10,7 +10,7 @@
  */
 
 import type { WardleyMap, Component } from "../schema.js";
-import { evo, vis, evoTarget, visTarget } from "../schema.js";
+import { evo, vis, evoTarget, visTarget, resolveTheme, resolveTypeStyle } from "../schema.js";
 import type {
   RenderContext,
   RenderGeometry,
@@ -31,6 +31,7 @@ import {
   EVOLUTION_PHASES,
 } from "../blocks/wardley-map/wardley-map-consts.js";
 import { applyPipelineContainment, resolvePipelines, pipelineToRect } from "../pipeline-geometry.js";
+import { computeScaleFactor } from "../coordinate-space.js";
 
 // ── Fixed margins (pixels, identical regardless of canvas size or axes) ──
 
@@ -43,14 +44,53 @@ const FIXED_MARGINS: Margins = {
 
 // ── Coordinate conversion helpers ─────────────────────────────────────
 
-function makeEvoToX(plot: PlotArea): (evolution: number) => number {
-  return (evolution: number) => plot.left + evolution * plot.width;
+/**
+ * Create evoToX converter using coordinateSpace evolution range.
+ *
+ * Maps a normalized [0, 1] evolution value to an x pixel coordinate within
+ * the plot area, respecting the [evolutionStart, evolutionEnd] display range.
+ *
+ * With DEFAULT_COORDINATE_SPACE (evolutionStart=0, evolutionEnd=1) the formula
+ * simplifies to: plot.left + evolution * plot.width  (same as the previous impl).
+ *
+ * @param plot - Plot area dimensions
+ * @param evolutionStart - Start of evolution display range [0, 1] (default 0)
+ * @param evolutionEnd   - End of evolution display range [0, 1] (default 1)
+ */
+function makeEvoToX(
+  plot: PlotArea,
+  evolutionStart: number,
+  evolutionEnd: number
+): (evolution: number) => number {
+  const range = evolutionEnd - evolutionStart;
+  return (evolution: number) =>
+    plot.left + ((evolution - evolutionStart) / range) * plot.width;
 }
 
-function makeVisToY(plot: PlotArea): (visibility: number) => number {
-  // OWM convention: visibility 0 = top (visible), 1 = bottom (invisible)
-  // Matches SVG y-axis direction — no inversion needed
-  return (visibility: number) => plot.top + visibility * plot.height;
+/**
+ * Create visToY converter using coordinateSpace visibilityRange.
+ *
+ * Maps a normalized [0, 1] visibility value to a y pixel coordinate within
+ * the plot area, respecting the [high, low] display range from visibilityRange.
+ *
+ * OWM convention: visibility 0 = top (visible/high), 1 = bottom (invisible/low).
+ * Matches SVG y-axis direction — no inversion needed.
+ *
+ * With DEFAULT_COORDINATE_SPACE (visibilityRange=[0, 1]) the formula
+ * simplifies to: plot.top + visibility * plot.height  (same as the previous impl).
+ *
+ * @param plot             - Plot area dimensions
+ * @param visibilityHigh   - High/top end of visibility display range [0, 1] (default 0)
+ * @param visibilityLow    - Low/bottom end of visibility display range [0, 1] (default 1)
+ */
+function makeVisToY(
+  plot: PlotArea,
+  visibilityHigh: number,
+  visibilityLow: number
+): (visibility: number) => number {
+  const range = visibilityLow - visibilityHigh;
+  return (visibility: number) =>
+    plot.top + ((visibility - visibilityHigh) / range) * plot.height;
 }
 
 // ── Context builder ───────────────────────────────────────────────────
@@ -62,9 +102,41 @@ export function buildRenderContext(map: WardleyMap, options: RenderOptions = DEF
   // Apply pipeline containment (clamps sub-component positions)
   const adjustedMap = applyPipelineContainment(map);
 
-  // Canvas dimensions from renderConfig (or options overrides)
-  const canvasWidth = options.width ?? adjustedMap.renderConfig?.width ?? 1600;
-  const canvasHeight = options.height ?? adjustedMap.renderConfig?.height ?? 800;
+  // Resolve theme defaults — single source of truth for all config values
+  const resolvedConfig = resolveTheme(adjustedMap.renderConfig);
+
+  // ── Resolution-independence: compute scale factor from outputHint ──────────
+  //
+  // When coordinateSpace.outputHint.targetWidth / targetHeight are provided,
+  // the output canvas is sized to those target dimensions and all px-space
+  // values (nodeRadii, strokeWidth) are scaled proportionally.
+  //
+  // labelScale is a unitless multiplier — it is NEVER scaled.
+  //
+  // Priority for canvas dimensions (highest wins):
+  //   1. options.width / options.height  (runtime override)
+  //   2. outputHint.targetWidth / targetHeight  (resolution-independence hint)
+  //   3. resolvedConfig.width / height  (renderConfig default)
+  const scaleFactor = computeScaleFactor(resolvedConfig.coordinateSpace);
+  const hintWidth = resolvedConfig.coordinateSpace.outputHint?.targetWidth;
+  const hintHeight = resolvedConfig.coordinateSpace.outputHint?.targetHeight;
+
+  // Canvas dimensions: options override takes precedence, then outputHint target, then resolved config defaults
+  const canvasWidth = options.width ?? hintWidth ?? resolvedConfig.width;
+  const canvasHeight = options.height ?? hintHeight ?? resolvedConfig.height;
+
+  // When a scale factor is active, apply it to px-space values in the resolved config.
+  // nodeRadii and strokeWidth are in canvas px-space — they must scale with the canvas.
+  // labelScale is a unitless multiplier — it must NOT change.
+  const scaledResolvedConfig = scaleFactor.uniform !== 1
+    ? {
+        ...resolvedConfig,
+        nodeRadii: Object.fromEntries(
+          Object.entries(resolvedConfig.nodeRadii).map(([k, v]) => [k, v * scaleFactor.uniform])
+        ) as typeof resolvedConfig.nodeRadii,
+        strokeWidth: resolvedConfig.strokeWidth * scaleFactor.uniform,
+      }
+    : resolvedConfig;
 
   // Compute plot area (drawable region inside margins)
   const plot: PlotArea = {
@@ -76,9 +148,10 @@ export function buildRenderContext(map: WardleyMap, options: RenderOptions = DEF
     height: canvasHeight - FIXED_MARGINS.top - FIXED_MARGINS.bottom,
   };
 
-  // Coordinate converters
-  const evoToX = makeEvoToX(plot);
-  const visToY = makeVisToY(plot);
+  // Coordinate converters — read from coordinateSpace with DEFAULT_COORDINATE_SPACE fallback
+  const cs = resolvedConfig.coordinateSpace;
+  const evoToX = makeEvoToX(plot, cs.evolutionRange[0], cs.evolutionRange[1]);
+  const visToY = makeVisToY(plot, cs.visibilityRange[0], cs.visibilityRange[1]);
 
   // Component lookup
   const componentById = new Map<string, Component>(
@@ -170,17 +243,35 @@ export function buildRenderContext(map: WardleyMap, options: RenderOptions = DEF
   }));
 
   // Component bounding boxes (node radius for circle components, rect for pipelines)
-  const nodeRadius = options.nodeRadius ?? 5;
+  // Effective nodeRadii: caller options override (spread) the scaled resolved baseline.
+  // scaledResolvedConfig.nodeRadii already has the outputHint scale applied — options.nodeRadii
+  // (runtime override) is spread on top as highest priority.
+  const effectiveNodeRadii: { _default: number } & Record<string, number> = options.nodeRadii
+    ? { ...scaledResolvedConfig.nodeRadii, ...options.nodeRadii }
+    : scaledResolvedConfig.nodeRadii;
+
+  /**
+   * Resolve per-type radius for bounding box computation.
+   * Delegates to `resolveTypeStyle` — the canonical TypeStyleMap per-type-with-fallback lookup.
+   * Precedence: nodeRadii[type] → nodeRadii._default
+   */
+  function resolveNodeRadius(type: string): number {
+    // resolveTypeStyle returns T | undefined; effectiveNodeRadii guarantees _default is present,
+    // so the result is always a number.  The non-null assertion is safe here.
+    return resolveTypeStyle<number>(effectiveNodeRadii, type) as number;
+  }
+
   const boundingBoxes: ComponentBoundingBox[] = [];
 
   for (const node of nodes) {
     if (node.component.type === "pipeline") continue;
+    const r = resolveNodeRadius(node.component.type);
     boundingBoxes.push({
       id: node.id,
-      left: node.cx - nodeRadius,
-      top: node.cy - nodeRadius,
-      right: node.cx + nodeRadius,
-      bottom: node.cy + nodeRadius,
+      left: node.cx - r,
+      top: node.cy - r,
+      right: node.cx + r,
+      bottom: node.cy + r,
       component: node.component,
     });
   }
@@ -221,5 +312,6 @@ export function buildRenderContext(map: WardleyMap, options: RenderOptions = DEF
     evoToX,
     visToY,
     options,
+    resolvedConfig: scaledResolvedConfig,
   };
 }

@@ -20,6 +20,7 @@
 import {
   sanitizeMap,
   type WardleyMap,
+  type LayerToggles,
 } from "./schema.js";
 import {
   buildRenderContext,
@@ -55,6 +56,31 @@ const LAYERS: readonly LayerRegistration[] = [
   { name: "notes", order: LAYER_ORDER.notes, render: renderNotesLayer },
   { name: "legend", order: LAYER_ORDER.legend, render: renderLegendLayer },
 ];
+
+/**
+ * Apply renderConfig.filters.layers to filter the layer list.
+ *
+ * Rules:
+ *  - 'axes' and 'legend' layers are NOT in layerToggles — always included.
+ *    Their own dedicated controls (background.* and legend.show) govern visibility.
+ *  - The 7 content layers (title, pipelines, edges, evolvesTo, nodes, labels, notes)
+ *    are included unless their toggle is explicitly set to false.
+ *  - undefined toggle → defaults to visible (true).
+ */
+function applyLayerToggles(
+  layers: readonly LayerRegistration[],
+  toggles: LayerToggles | undefined
+): readonly LayerRegistration[] {
+  if (!toggles) return layers;
+  return layers.filter((layer) => {
+    // axes and legend have separate controls — always pass through
+    if (layer.name === "axes" || layer.name === "legend") return true;
+    const key = layer.name as keyof LayerToggles;
+    const toggle = toggles[key];
+    // Default to visible (true) when toggle is undefined
+    return toggle !== false;
+  });
+}
 
 // ── Public types ────────────────────────────────────────────────────
 
@@ -103,12 +129,13 @@ export async function render(
   // Step 2: Phase 1 — Geometry computation
   const ctx = buildRenderContext(map, renderOptions);
 
-  // Step 3: Phase 2 — SVG generation via 9 layers
-  const svg = composeSVG(ctx, LAYERS);
+  // Step 3: Phase 2 — SVG generation via layers (filtered by filters.layers)
+  const activeLayers = applyLayerToggles(LAYERS, map.renderConfig?.filters?.layers);
+  const svg = composeSVG(ctx, activeLayers);
 
   // Step 4: Optional PNG rasterisation
   if (format === "png") {
-    const pngBuffer = await rasterizeSVG(svg, ctx.canvasWidth);
+    const pngBuffer = await rasterizeSVG(svg, ctx.canvasWidth, ctx.resolvedConfig.background.color);
     return {
       data: pngBuffer,
       contentType: "image/png",
@@ -136,7 +163,8 @@ export function renderToSVG(
 ): string {
   const map = sanitizeMap(inputMap);
   const ctx = buildRenderContext(map, renderOptions);
-  return composeSVG(ctx, LAYERS);
+  const activeLayers = applyLayerToggles(LAYERS, map.renderConfig?.filters?.layers);
+  return composeSVG(ctx, activeLayers);
 }
 
 /**
@@ -148,8 +176,9 @@ export async function renderToPNG(
 ): Promise<Buffer> {
   const map = sanitizeMap(inputMap);
   const ctx = buildRenderContext(map, renderOptions);
-  const svg = composeSVG(ctx, LAYERS);
-  return rasterizeSVG(svg, ctx.canvasWidth);
+  const activeLayers = applyLayerToggles(LAYERS, map.renderConfig?.filters?.layers);
+  const svg = composeSVG(ctx, activeLayers);
+  return rasterizeSVG(svg, ctx.canvasWidth, ctx.resolvedConfig.background.color);
 }
 
 /**
@@ -191,12 +220,12 @@ async function loadInterFont(): Promise<Uint8Array> {
   return interFontData;
 }
 
-async function rasterizeSVG(svg: string, width: number): Promise<Buffer> {
+async function rasterizeSVG(svg: string, width: number, backgroundColor?: string): Promise<Buffer> {
   const { Resvg } = await import("@resvg/resvg-js");
   const fontData = await loadInterFont();
 
   const opts: any = {
-    background: "#ffffff",
+    background: backgroundColor ?? "#ffffff",
     fitTo: { mode: "width" as const, value: width },
   };
 

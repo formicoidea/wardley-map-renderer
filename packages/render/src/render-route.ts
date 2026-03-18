@@ -112,12 +112,15 @@ export async function renderRoute(c: Context): Promise<Response> {
   const renderOptions = rc ? {
     width: rc.width,
     height: rc.height,
-    backgroundColor: rc.backgroundColor,
+    background: { color: rc.background?.color },
+    // Map new nested background toggles → RenderOptions flags
+    showAxes: rc.background?.evolutionXAxis?.show,
+    showValueChain: rc.background?.valueChainYAxis?.show,
+    showPhaseLabels: rc.background?.evolutionPhases?.showPhaseDividerAndLabel,
     fontFamily: rc.fontFamily,
     labelScale: rc.labelScale,
-    nodeRadius: rc.nodeRadius,
     avoidCollisions: rc.avoidCollisions,
-    excludeTypes: rc.excludeTypes,
+    excludeComponentTypes: rc.filters?.excludeComponentTypes,
     typeColors: rc.typeColors,
     evolveStyles: rc.evolveStyles,
   } : undefined;

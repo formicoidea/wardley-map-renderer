@@ -19,7 +19,6 @@ import {
   AXIS_LABEL_FONT_SIZE,
   PHASE_LABEL_FONT_SIZE,
   DIRECTION_LABEL_FONT_SIZE,
-  resolveAxisLabels,
 } from "../blocks/wardley-map/wardley-map-consts.js";
 
 /** Grid line color */
@@ -44,14 +43,16 @@ export const renderAxesLayer: LayerRenderer = (
   ctx: RenderContext
 ): string[] => {
   const parts: string[] = [];
-  const { plot, map } = ctx;
-  const rc = map.renderConfig;
+  const { plot } = ctx;
+  // Use resolvedConfig — all fields guaranteed present, no null-coalescing needed
+  const rc = ctx.resolvedConfig;
 
-  // renderConfig is now the single source of truth for all visual config
-  const showEvolution = rc?.showAxes ?? true;
-  const showValueChain = rc?.showValueChain ?? true;
-  const showPhaseLabels = rc?.showPhaseLabels ?? true;
-  const labels = resolveAxisLabels(rc?.axisLabels);
+  const showEvolution = rc.showEvolutionXAxis;
+  const showValueChain = rc.showValueChainYAxis;
+  // showPhaseDividerAndLabel controls BOTH phase dividers AND phase labels together,
+  // independently of whether the evolution axis itself is shown.
+  const showPhaseDividerAndLabel = rc.showPhaseDividerAndLabel;
+  const labels = rc.axisLabels;
 
   // Horizontal grid lines removed — cleaner visual per Wardley convention
 
@@ -78,7 +79,8 @@ export const renderAxesLayer: LayerRenderer = (
   }
 
   // ── Evolution phase dividers (vertical dashed lines) ───
-  if (showEvolution) {
+  // Controlled independently by showPhaseDividerAndLabel, not by showEvolution.
+  if (showPhaseDividerAndLabel) {
     for (const ratio of EVOLUTION_BOUNDARIES) {
       const x = ctx.evoToX(ratio);
       parts.push(
@@ -89,7 +91,8 @@ export const renderAxesLayer: LayerRenderer = (
   }
 
   // ── Phase labels (left-aligned, close to x-axis) ───
-  if (showEvolution && showPhaseLabels) {
+  // Controlled by same showPhaseDividerAndLabel toggle as dividers.
+  if (showPhaseDividerAndLabel) {
     for (let i = 0; i < EVOLUTION_PHASES.length; i++) {
       const phase = EVOLUTION_PHASES[i];
       const phaseLabel = labels.phases[i] ?? phase.label;

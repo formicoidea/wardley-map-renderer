@@ -47,9 +47,11 @@ export const renderTitleLayer: LayerRenderer = (
   const textX = ctx.canvasWidth / 2;
   const textY = ctx.plot.top - 6;
 
+  const fontFamily = ctx.resolvedConfig.fontFamily;
+
   return [
     `<text x="${textX}" y="${textY}" text-anchor="middle" ` +
-      `font-family="Inter, sans-serif" font-size="${TITLE_FONT_SIZE}" ` +
+      `font-family="${fontFamily}" font-size="${TITLE_FONT_SIZE}" ` +
       `font-weight="600" fill="#333333">${esc(trimmed)}</text>`,
   ];
 };

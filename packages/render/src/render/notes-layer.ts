@@ -47,6 +47,10 @@ function esc(s: string): string {
 export const renderNotesLayer: LayerRenderer = (
   ctx: RenderContext
 ): string[] => {
+  // Skip entire notes layer if "note" type is excluded
+  if (ctx.resolvedConfig.excludeComponentTypes.includes("note")) return [];
+
+  const fontFamily = ctx.resolvedConfig.fontFamily;
   const parts: string[] = [];
 
   for (const node of ctx.nodes) {
@@ -63,7 +67,7 @@ export const renderNotesLayer: LayerRenderer = (
       // Single-line note: simple text element
       parts.push(
         `<text x="${node.cx}" y="${node.cy}" text-anchor="start" ` +
-          `font-family="Inter, sans-serif" font-size="${NOTE_FONT_SIZE}" ` +
+          `font-family="${fontFamily}" font-size="${NOTE_FONT_SIZE}" ` +
           `font-style="${NOTE_FONT_STYLE}" fill="${NOTE_COLOR}">${esc(lines[0])}</text>`
       );
     } else {
@@ -77,7 +81,7 @@ export const renderNotesLayer: LayerRenderer = (
 
       parts.push(
         `<text x="${node.cx}" y="${node.cy}" text-anchor="start" ` +
-          `font-family="Inter, sans-serif" font-size="${NOTE_FONT_SIZE}" ` +
+          `font-family="${fontFamily}" font-size="${NOTE_FONT_SIZE}" ` +
           `font-style="${NOTE_FONT_STYLE}" fill="${NOTE_COLOR}">${tspans}</text>`
       );
     }

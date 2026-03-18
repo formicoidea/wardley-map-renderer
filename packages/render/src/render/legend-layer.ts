@@ -353,9 +353,9 @@ function cornerToPosition(
 export const renderLegendLayer: LayerRenderer = (
   ctx: RenderContext
 ): string[] => {
-  // Check if legend is disabled (now sourced from renderConfig)
-  const legend = ctx.map.renderConfig?.legend;
-  if (legend && !legend.show) return [];
+  // Check if legend is disabled — read from resolvedConfig (always has defaults applied)
+  const legend = ctx.resolvedConfig.legend;
+  if (!legend.show) return [];
 
   // Collect data-driven items
   const items = collectLegendItems(ctx);
@@ -368,8 +368,8 @@ export const renderLegendLayer: LayerRenderer = (
   const legendW = Math.max(MIN_WIDTH, LEGEND_PADDING * 2 + SWATCH_WIDTH + SWATCH_GAP + textWidth);
   const legendH = LEGEND_PADDING * 2 + TITLE_HEIGHT + items.length * LINE_HEIGHT;
 
-  // Determine position
-  const position = legend?.position ?? "bottom-right";
+  // Determine position — read from resolvedConfig (baseline default: "bottom-right")
+  const position = legend.position;
   let legendX: number;
   let legendY: number;
 

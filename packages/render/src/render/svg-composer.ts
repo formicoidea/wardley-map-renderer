@@ -11,7 +11,7 @@
  * Each layer is a pure function: (ctx: RenderContext) → string[]
  * Layers are called in ascending order; output fragments are concatenated.
  *
- * The 8 canonical layers (in z-order, back to front):
+ * The 9 canonical layers (in z-order, back to front):
  *   1. title       — map title text above plot area
  *   2. axes        — plot border, grid lines, axis labels, direction indicators
  *   3. pipelines   — pipeline background rectangles (visual container, no label impact)
@@ -20,6 +20,7 @@
  *   6. nodes       — component circles/markers
  *   7. labels      — component text labels (with collision avoidance)
  *   8. notes       — note annotations
+ *   9. legend      — legend overlay (visibility controlled by legend.show)
  *
  * Two usage modes:
  *   a) Global registry — uses registerLayer/getOrderedLayers from registry.ts
@@ -50,9 +51,11 @@ export function esc(s: string): string {
 /**
  * Render the SVG background rect.
  * Always rendered first (z-order 0), before the 8 named layers.
+ * Uses ctx.resolvedConfig.background.color (from resolveTheme, defaults to "#ffffff").
  */
 function renderBackground(ctx: RenderContext): string {
-  return `<rect width="${ctx.canvasWidth}" height="${ctx.canvasHeight}" fill="#ffffff" />`;
+  const bgColor = ctx.resolvedConfig.background.color;
+  return `<rect width="${ctx.canvasWidth}" height="${ctx.canvasHeight}" fill="${bgColor}" />`;
 }
 
 // ── SVG document structure ───────────────────────────────────────────

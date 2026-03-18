@@ -83,7 +83,25 @@ export const DEFAULT_Y_AXIS_LABEL = 'Value Chain';
 export interface ResolvedAxisLabels {
   readonly xAxis: string;
   readonly yAxis: string;
-  readonly phases: readonly [string, string, string, string];
+  /**
+   * Ordered list of evolution phase labels.
+   *
+   * Arbitrarily sized — not locked to 4. The default presets use 4 labels
+   * (Genesis / Custom-Built / Product / Commodity), but callers may supply any
+   * number ≥ 1 to match a map with a different number of evolution zones.
+   *
+   * ## Known tension with evolveStyles
+   * `evolveStyles` keys are a **closed enum** derived from the four named
+   * evolution types (natural / ecosystem / forced / late).  `phases` (this field)
+   * is now an open-length array.  There is therefore a deliberate mismatch:
+   * the *display vocabulary* (how many labelled columns the map shows) is
+   * decoupled from the *style vocabulary* (which named arrow types exist).
+   *
+   * Migration path (future): evolveStyles will be replaced by position-range-based
+   * styles that map `[evolutionStart, evolutionEnd]` intervals to arrow styles,
+   * removing the hard dependency on named zone labels entirely.
+   */
+  readonly phases: readonly string[];
   readonly evolutionStart: string;
   readonly evolutionEnd: string;
   readonly visibilityHigh: string;
@@ -119,15 +137,58 @@ export const AXIS_LABELS_BY_LOCALE: Record<string, ResolvedAxisLabels> = {
 };
 
 /**
- * Resolve axis labels: start from locale preset, then apply individual overrides.
- * @param labels - Optional axis labels from the map schema (locale + overrides)
- * @returns Fully resolved labels ready for rendering
+ * Resolve axis labels according to the i18n precedence chain:
+ *
+ * Priority (highest wins):
+ *   3. Explicit label strings   — per-field overrides supplied by the caller (always win)
+ *   2. Locale preset            — `AXIS_LABELS_EN` or `AXIS_LABELS_FR` selected by `locale`
+ *   1. English fallback         — `AXIS_LABELS_EN` used when `locale` is absent or unknown
+ *
+ * In other words: locale only provides **fallback defaults**; any explicit string supplied
+ * for a field replaces the locale-resolved value for that field, regardless of which locale
+ * is active.  A caller can therefore pass `locale: "fr"` and `xAxis: "My Label"` to get
+ * French labels everywhere except the X-axis title.
+ *
+ * ## Explicit-empty vs. absent distinction
+ *
+ * For individual string fields (`xAxis`, `yAxis`, `evolutionStart`, etc.) and for
+ * per-element entries of the `phases` array, there is a semantic difference between
+ * an **explicit empty string** and an **absent / undefined value**:
+ *
+ *   - `undefined` (or field omitted)  → use the locale-resolved default for that field
+ *   - `''` (empty string)             → render **no label** for that field (explicit suppression)
+ *   - `'non-empty string'`            → use exactly that string, overriding the locale preset
+ *
+ * This distinction is preserved by using the nullish-coalescing operator (`??`) rather
+ * than the logical-OR operator (`||`):
+ *   `'' ?? preset.xAxis`  →  `''`            (empty string wins — not replaced by preset)
+ *   `undefined ?? preset.xAxis`  →  `preset.xAxis`  (absent → locale default)
+ *
+ * ## Per-element phase label merging
+ *
+ * When `phases` is provided, **each element** is resolved independently:
+ *   - `phases[i] === undefined`  → use the locale preset's `phases[i]` (or `''` if out of range)
+ *   - `phases[i] === ''`         → rendered as empty (no label for that phase column)
+ *   - `phases[i] === 'Custom'`   → `'Custom'` wins over locale preset for that index only
+ *
+ * If `phases` is omitted entirely (`undefined`), the full locale preset array is used as-is.
+ *
+ * @param labels - Optional axis labels from the map schema (locale + per-field overrides)
+ * @returns Fully resolved labels ready for rendering (all 7 fields guaranteed non-null)
  */
 export function resolveAxisLabels(labels?: {
   locale?: string;
   xAxis?: string;
   yAxis?: string;
-  phases?: [string, string, string, string];
+  /**
+   * Arbitrarily-sized ordered list of phase labels; not locked to 4.
+   *
+   * Each entry is `string | undefined`:
+   *   - `undefined` → use the locale-preset label for that index
+   *   - `''`        → suppress the label for that phase column (explicit empty)
+   *   - `'text'`    → use exactly `'text'` regardless of locale
+   */
+  phases?: (string | undefined)[];
   evolutionStart?: string;
   evolutionEnd?: string;
   visibilityHigh?: string;
@@ -136,10 +197,19 @@ export function resolveAxisLabels(labels?: {
   const locale = labels?.locale ?? 'en';
   const preset = AXIS_LABELS_BY_LOCALE[locale] ?? AXIS_LABELS_EN;
 
+  // Per-element phase resolution: undefined → locale default; '' → explicit suppression; string → wins
+  const resolvedPhases: string[] = labels?.phases
+    ? labels.phases.map((p, i) =>
+        p === undefined
+          ? (preset.phases[i] ?? '') // undefined → use locale default for this index
+          : p                        // '' or non-empty: use as-is (preserves explicit suppression)
+      )
+    : [...preset.phases]; // no override → use full locale preset
+
   return {
     xAxis: labels?.xAxis ?? preset.xAxis,
     yAxis: labels?.yAxis ?? preset.yAxis,
-    phases: labels?.phases ?? preset.phases,
+    phases: resolvedPhases,
     evolutionStart: labels?.evolutionStart ?? preset.evolutionStart,
     evolutionEnd: labels?.evolutionEnd ?? preset.evolutionEnd,
     visibilityHigh: labels?.visibilityHigh ?? preset.visibilityHigh,

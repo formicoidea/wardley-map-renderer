@@ -104,16 +104,58 @@ const RelationSchema = z.object({
 
 const LocaleEnum = z.enum(["en", "fr"]).openapi("Locale");
 
-const AxisLabelsSchema = z.object({
-  locale: LocaleEnum.default("en"),
+const ThemeEnum = z.enum(["default", "dark", "highContrast"]).openapi("Theme");
+
+const EvolutionXAxisSchema = z.object({
+  /** Show evolution (X) axis arrow and main label (default: true) */
+  show: z.boolean().optional(),
+  /** i18n override for the x-axis main label (e.g. "Evolution") */
   xAxis: z.string().optional(),
+}).openapi("EvolutionXAxis");
+
+const ValueChainYAxisSchema = z.object({
+  /** Show value chain (Y) axis arrow and main label (default: true) */
+  show: z.boolean().optional(),
+  /** i18n override for the y-axis main label (e.g. "Value Chain") */
   yAxis: z.string().optional(),
+}).openapi("ValueChainYAxis");
+
+const EvolutionPhasesSchema = z.object({
+  /** Show evolution phase dividers AND phase labels together (default: true) */
+  showPhaseDividerAndLabel: z.boolean().default(true),
+  /** i18n overrides for the 4 evolution phase labels */
   phases: z.tuple([z.string(), z.string(), z.string(), z.string()]).optional(),
-  evolutionStart: z.string().optional(),
-  evolutionEnd: z.string().optional(),
-  visibilityHigh: z.string().optional(),
-  visibilityLow: z.string().optional(),
-}).openapi("AxisLabels");
+}).openapi("EvolutionPhases");
+
+/** Background layer: canvas color + axis/phase display controls */
+const BackgroundSchema = z.object({
+  /** Canvas background color (CSS hex, 3–8 digit, defaults to "#ffffff") */
+  color: z.string().regex(/^#[0-9a-fA-F]{3,8}$/).optional(),
+  /** Evolution (X) axis show toggle and main label override */
+  evolutionXAxis: EvolutionXAxisSchema.optional(),
+  /** Value Chain (Y) axis show toggle and main label override */
+  valueChainYAxis: ValueChainYAxisSchema.optional(),
+  /** Phase divider/label show toggle and phase label overrides */
+  evolutionPhases: EvolutionPhasesSchema.optional(),
+}).openapi("Background");
+
+const LayerTogglesSchema = z.object({
+  title: z.boolean().optional(),
+  pipelines: z.boolean().optional(),
+  edges: z.boolean().optional(),
+  evolvesTo: z.boolean().optional(),
+  nodes: z.boolean().optional(),
+  labels: z.boolean().optional(),
+  notes: z.boolean().optional(),
+}).openapi("LayerToggles");
+
+/** Unified visibility filters — consolidates layer toggles and data-level type exclusions */
+const FiltersSchema = z.object({
+  /** Visual layer toggles (post-render): enable/disable entire SVG layer renderers */
+  layers: LayerTogglesSchema.optional(),
+  /** Data filter (pre-render): component types to exclude from all layers */
+  excludeComponentTypes: z.array(ComponentTypeEnum).optional(),
+}).openapi("Filters");
 
 const LegendSchema = z.object({
   show: z.boolean().default(true),
@@ -129,31 +171,38 @@ const EvolveStyleSchema = z.object({
 }).openapi("EvolveStyle");
 
 const RenderConfigSchema = z.object({
+  /** Override canvas width (defaults to 1600) */
   width: z.number().positive().optional(),
+  /** Override canvas height (defaults to 800) */
   height: z.number().positive().optional(),
-  backgroundColor: z.string().optional(),
-  showAxes: z.boolean().optional(),
-  showValueChain: z.boolean().optional(),
-  showPhaseLabels: z.boolean().optional(),
+  /** Named visual theme preset (default: "default") */
+  theme: ThemeEnum.optional(),
+  /** Locale preset for axis labels (default: "en") */
+  locale: LocaleEnum.optional(),
+  /** Background canvas color and axis/phase display controls.
+   *  backgroundColor is now background.color — no top-level backgroundColor field. */
+  background: BackgroundSchema.optional(),
   fontFamily: z.string().optional(),
   labelScale: z.number().positive().max(5).optional(),
-  nodeRadius: z.number().positive().max(50).optional(),
+  nodeRadii: z.object({ _default: z.number().positive().max(50) })
+    .catchall(z.number().positive().max(50))
+    .optional(),
   avoidCollisions: z.boolean().optional(),
-  excludeTypes: z.array(ComponentTypeEnum).optional(),
-  typeColors: z.object({
-    "component": z.string().optional(),
-    "user-need": z.string().optional(),
-    "pipeline": z.string().optional(),
-    "note": z.string().optional(),
-    "anchor": z.string().optional(),
-  }).partial().optional(),
+  /** Per-component-type color overrides. `_default` is required when provided (TypeStyleMap pattern). */
+  typeColors: z.object({ _default: z.string() })
+    .catchall(z.string())
+    .optional(),
   evolveStyles: z.object({
     natural: EvolveStyleSchema.optional(),
     ecosystem: EvolveStyleSchema.optional(),
     forced: EvolveStyleSchema.optional(),
+    late: EvolveStyleSchema.optional(),
   }).optional(),
-  axisLabels: AxisLabelsSchema.optional(),
   legend: LegendSchema.optional(),
+  /** Unified visibility filters: layer toggles (post-render) + data exclusions (pre-render) */
+  filters: FiltersSchema.optional(),
+  /** Stroke width in pixels for edges and node outlines (defaults to 1) */
+  strokeWidth: z.number().min(0.25).max(8).default(1),
 }).openapi("RenderConfig");
 
 const WardleyMapSchema = z.object({

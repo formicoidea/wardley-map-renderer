@@ -24,9 +24,6 @@ import type { RelationType } from "../schema.js";
 
 // ── Visual constants ────────────────────────────────────────────────
 
-/** Default edge stroke width */
-const EDGE_STROKE_WIDTH = 1.5;
-
 /** Default visual style per relation type */
 interface RelationVisualStyle {
   readonly color: string;
@@ -57,16 +54,26 @@ export const renderEdgesLayer: LayerRenderer = (
   if (ctx.edges.length === 0) return [];
 
   const parts: string[] = [];
+  const excluded = new Set(ctx.resolvedConfig.excludeComponentTypes);
+  const baseStrokeWidth = ctx.resolvedConfig.strokeWidth;
 
   for (const edge of ctx.edges) {
     const { x1, y1, x2, y2, relation } = edge;
+
+    // Skip edges where source or target component type is excluded
+    if (excluded.size > 0) {
+      const srcComp = ctx.componentById.get(relation.source);
+      const tgtComp = ctx.componentById.get(relation.target);
+      if (srcComp && excluded.has(srcComp.type)) continue;
+      if (tgtComp && excluded.has(tgtComp.type)) continue;
+    }
 
     // Resolve base visual style from relation type
     const relType = relation.type ?? "DependsOn";
     const typeStyle = RELATION_TYPE_STYLES[relType] ?? RELATION_TYPE_STYLES.DependsOn;
 
     let strokeColor = typeStyle.color;
-    let strokeWidth = EDGE_STROKE_WIDTH;
+    let strokeWidth = baseStrokeWidth;
     let dashArray = typeStyle.dashArray;
 
     // Flow metadata can override line style (solid/dashed/bold)
@@ -76,7 +83,7 @@ export const renderEdgesLayer: LayerRenderer = (
         dashArray = "6,4";
         break;
       case "bold":
-        strokeWidth = EDGE_STROKE_WIDTH * 2;
+        strokeWidth = baseStrokeWidth * 2;
         break;
       // "solid" keeps the type's default dash pattern
     }
