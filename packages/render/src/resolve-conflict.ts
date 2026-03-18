@@ -27,14 +27,12 @@
  * |                       |               | nodeRadii, avoidCollisions, typeColors, evolveStyles, legend, |
  * |                       |               | filters, strokeWidth                                         |
  * | `viewer-preference`   | `viewerConfig`| theme, locale, labelScale                                    |
- * | `system-metadata`     | constant      | _scope (always RENDER_SCOPE)                                 |
  *
  * ## Precedence chain
  *
  * ```
  * For author-intent fields:    authorConfig.field  →  schema default
  * For viewer-preference fields: viewerConfig.field →  schema default
- * For system-metadata fields:  RENDER_SCOPE       (never overridable)
  * ```
  *
  * Fields that are `undefined` on the winning side fall through to the Zod
@@ -49,7 +47,6 @@
 import { z } from "zod";
 import {
   RenderConfigSchema,
-  RENDER_SCOPE,
   TIERED_RENDER_CONFIG_TAXONOMY,
   type RenderConfig,
   type RenderConfigInput,
@@ -210,9 +207,6 @@ export type ViewerPreferenceField = typeof VIEWER_PREFERENCE_FIELDS[number];
  *   value from `viewerConfig` is used when present; the value from
  *   `authorConfig` for the same field is **discarded**.
  *
- * - **System metadata** (`_scope`): always set to {@link RENDER_SCOPE} —
- *   neither config can override this.
- *
  * - **Unset fields** (the winning side did not supply a value): the field is
  *   omitted from the merged output, allowing {@link resolveTheme} to apply the
  *   theme baseline and schema defaults when the merged config is later
@@ -242,8 +236,6 @@ export type ViewerPreferenceField = typeof VIEWER_PREFERENCE_FIELDS[number];
  * // merged.typeColors  === { _default: … }   (from author)
  * // merged.theme       === "dark"             (from viewer)
  * // merged.locale      === "fr"              (from viewer)
- * // merged._scope      === RENDER_SCOPE       (system constant)
- *
  * const resolved = resolveTheme(merged);
  * ```
  *
@@ -252,7 +244,7 @@ export type ViewerPreferenceField = typeof VIEWER_PREFERENCE_FIELDS[number];
  * @param authorConfig - Partial config from the author side.
  *   Author-intent fields win; all other fields are ignored.
  * @returns A merged, Zod-validated {@link RenderConfig} ready to pass to
- *   {@link resolveTheme}.  `_scope` is always set to {@link RENDER_SCOPE}.
+ *   {@link resolveTheme}.
  *
  * @throws {ZodError} If the merged config fails Zod validation (e.g.
  *   legend position out of canvas bounds). This should not happen if both
@@ -294,9 +286,6 @@ export function resolveConflict(
   if (viewerConfig.locale !== undefined) merged.locale = viewerConfig.locale;
   if (viewerConfig.labelScale !== undefined)
     merged.labelScale = viewerConfig.labelScale;
-
-  // ── System metadata (always RENDER_SCOPE) ─────────────────────────────────
-  merged._scope = RENDER_SCOPE;
 
   // Parse through Zod to apply defaults (e.g. strokeWidth=1) and validate.
   return RenderConfigSchema.parse(merged as RenderConfigInput);
@@ -356,13 +345,10 @@ export const LAYOUT_STRUCTURAL_FIELDS: ReadonlyArray<
  *
  * | Tier                  | Source        | Fields                                           |
  * |-----------------------|---------------|--------------------------------------------------|
- * | `platform-constraint` | authorConfig  | width, height, coordinateSpace, _scope, configIntent |
+ * | `platform-constraint` | authorConfig  | width, height, coordinateSpace, configIntent |
  * | `layout-structural`   | authorConfig  | background, legend, filters                      |
  * | `author-intent`       | authorConfig  | fontFamily, nodeRadii, avoidCollisions, typeColors, evolveStyles, strokeWidth |
  * | `viewer-preference`   | viewerConfig  | theme, locale, labelScale                        |
- *
- * `_scope` is always overridden by the system constant {@link RENDER_SCOPE}
- * regardless of what either config supplies.
  *
  * ## Difference from resolveConflict()
  *
@@ -387,8 +373,7 @@ export const LAYOUT_STRUCTURAL_FIELDS: ReadonlyArray<
  * @returns An object `{ config, diagnostics }` where `config` is the merged,
  *   Zod-validated RenderConfig ready for rendering, and `diagnostics` contains
  *   structured advisory/error information collected during resolution.
- *   `config._scope` is always set to {@link RENDER_SCOPE}.  Constraints are
- *   evaluated after the Zod parse step and before the value is returned.
+ *   Constraints are evaluated after the Zod parse step and before the value is returned.
  *
  * @throws {ZodError} If the merged config fails Zod validation.
  * @throws {ConstraintViolationError} If `options.violationPolicy === 'throw'` and
@@ -422,11 +407,6 @@ export function resolveConfig(
       if (authorConfig[key] !== undefined) merged[key] = authorConfig[key];
     }
   }
-
-  // ── System metadata: always injected by the system ────────────────────────
-  // _scope is platform-constraint and would be picked up from authorConfig
-  // above if defined, but we always override it with the canonical constant.
-  merged._scope = RENDER_SCOPE;
 
   // Parse through Zod to apply schema defaults and validate.
   const parsed = RenderConfigSchema.parse(merged as RenderConfigInput);

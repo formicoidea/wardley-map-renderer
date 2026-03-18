@@ -15,11 +15,8 @@ import {
   validateLayerToggles,
   makeTypeStyleMapSchema,
   typeStyleMapSchema,
-  RENDER_SCOPE,
-  RenderScopeSchema,
   type TypeStyleMap,
   type LayerToggleDAG,
-  type RenderScope,
 } from "./schema";
 import {
   AXIS_LABELS_EN,
@@ -3820,159 +3817,6 @@ describe("TypeStyleMap generics", () => {
   });
 });
 
-// ── RENDER_SCOPE — ontological scope boundary (AC 3) ────────────────────────
-
-describe("RENDER_SCOPE constant", () => {
-  it("has mode 'static-export'", () => {
-    expect(RENDER_SCOPE.mode).toBe("static-export");
-  });
-
-  it("has temporal=false (no temporal diffing)", () => {
-    expect(RENDER_SCOPE.temporal).toBe(false);
-  });
-
-  it("has interactive=false (no interaction handlers)", () => {
-    expect(RENDER_SCOPE.interactive).toBe(false);
-  });
-
-  it("has a non-empty description string documenting out-of-scope concerns", () => {
-    expect(typeof RENDER_SCOPE.description).toBe("string");
-    expect(RENDER_SCOPE.description.length).toBeGreaterThan(0);
-    // Description must mention all three out-of-scope categories
-    expect(RENDER_SCOPE.description.toLowerCase()).toContain("temporal");
-    expect(RENDER_SCOPE.description.toLowerCase()).toContain("interact");
-    expect(RENDER_SCOPE.description.toLowerCase()).toContain("animation");
-  });
-
-  it("satisfies RenderScopeSchema (Zod parse succeeds)", () => {
-    const result = RenderScopeSchema.safeParse(RENDER_SCOPE);
-    expect(result.success).toBe(true);
-  });
-
-  it("is type-compatible with RenderScope (TypeScript compile-time check)", () => {
-    // This is a compile-time check via satisfies — if it compiles, the types match
-    const scope: RenderScope = RENDER_SCOPE;
-    expect(scope).toBeDefined();
-  });
-});
-
-describe("RenderScopeSchema", () => {
-  it("accepts a valid scope object", () => {
-    const result = RenderScopeSchema.safeParse({
-      mode: "static-export",
-      temporal: false,
-      interactive: false,
-      description: "test",
-    });
-    expect(result.success).toBe(true);
-  });
-
-  it("rejects mode other than 'static-export'", () => {
-    const result = RenderScopeSchema.safeParse({
-      mode: "interactive",
-      temporal: false,
-      interactive: false,
-      description: "test",
-    });
-    expect(result.success).toBe(false);
-  });
-
-  it("rejects temporal=true", () => {
-    const result = RenderScopeSchema.safeParse({
-      mode: "static-export",
-      temporal: true,
-      interactive: false,
-      description: "test",
-    });
-    expect(result.success).toBe(false);
-  });
-
-  it("rejects interactive=true", () => {
-    const result = RenderScopeSchema.safeParse({
-      mode: "static-export",
-      temporal: false,
-      interactive: true,
-      description: "test",
-    });
-    expect(result.success).toBe(false);
-  });
-
-  it("rejects missing description", () => {
-    const result = RenderScopeSchema.safeParse({
-      mode: "static-export",
-      temporal: false,
-      interactive: false,
-    });
-    expect(result.success).toBe(false);
-  });
-});
-
-describe("RenderConfigSchema._scope field", () => {
-  it("is optional — RenderConfig parses successfully without _scope", () => {
-    const result = RenderConfigSchema.safeParse({});
-    expect(result.success).toBe(true);
-    // _scope is undefined when not provided (no Zod .default() applied)
-  });
-
-  it("accepts a valid _scope when provided", () => {
-    const result = RenderConfigSchema.safeParse({
-      _scope: {
-        mode: "static-export",
-        temporal: false,
-        interactive: false,
-        description: "custom scope",
-      },
-    });
-    expect(result.success).toBe(true);
-    if (result.success) {
-      expect(result.data._scope?.mode).toBe("static-export");
-      expect(result.data._scope?.temporal).toBe(false);
-      expect(result.data._scope?.interactive).toBe(false);
-    }
-  });
-
-  it("rejects an invalid _scope (mode !== 'static-export')", () => {
-    const result = RenderConfigSchema.safeParse({
-      _scope: {
-        mode: "animated",
-        temporal: false,
-        interactive: true,
-        description: "bad scope",
-      },
-    });
-    expect(result.success).toBe(false);
-  });
-});
-
-describe("resolveTheme always injects RENDER_SCOPE", () => {
-  it("resolved config with no renderConfig includes _scope === RENDER_SCOPE", () => {
-    const resolved = resolveTheme(undefined);
-    expect(resolved._scope).toBe(RENDER_SCOPE);
-    expect(resolved._scope.mode).toBe("static-export");
-    expect(resolved._scope.temporal).toBe(false);
-    expect(resolved._scope.interactive).toBe(false);
-  });
-
-  it("resolved config with explicit renderConfig still includes _scope === RENDER_SCOPE", () => {
-    const resolved = resolveTheme({ theme: "dark" });
-    expect(resolved._scope).toBe(RENDER_SCOPE);
-  });
-
-  it("resolved config with _scope set still returns RENDER_SCOPE (always overrides)", () => {
-    // resolveTheme always returns RENDER_SCOPE — the renderer does not allow scope mutation
-    const resolved = resolveTheme({
-      _scope: {
-        mode: "static-export",
-        temporal: false,
-        interactive: false,
-        description: "custom",
-      },
-    });
-    // _scope in resolved config is always the singleton RENDER_SCOPE
-    expect(resolved._scope).toBe(RENDER_SCOPE);
-  });
-});
-
 // ── Cross-category conflict resolution (precedence rules) ────────────────────
 //
 // "resolveConflict" is the conceptual name for what resolveTheme() does when
@@ -4306,7 +4150,6 @@ describe("RENDER_CONFIG_FIELD_TAXONOMY — author-intent fields", () => {
     "legend",
     "filters",
     "strokeWidth",
-    "_scope",
   ] as const;
 
   for (const field of authorIntentFields) {
@@ -4344,10 +4187,6 @@ describe("RENDER_CONFIG_FIELD_TAXONOMY — coordinate-system fields are non-over
     expect(RENDER_CONFIG_FIELD_TAXONOMY.coordinateSpace.overridable).toBe(false);
   });
 
-  it("_scope is author-intent and non-overridable (singleton metadata)", () => {
-    expect(RENDER_CONFIG_FIELD_TAXONOMY._scope.category).toBe("author-intent");
-    expect(RENDER_CONFIG_FIELD_TAXONOMY._scope.overridable).toBe(false);
-  });
 });
 
 // ── COORDINATE_SPACE_FIELD_TAXONOMY ─────────────────────────
@@ -4467,10 +4306,6 @@ describe("getRenderConfigFieldCategory", () => {
     expect(getRenderConfigFieldCategory("coordinateSpace")).toBe("author-intent");
   });
 
-  it("returns 'author-intent' for _scope", () => {
-    expect(getRenderConfigFieldCategory("_scope")).toBe("author-intent");
-  });
-
   it("returns 'author-intent' for background (compound field)", () => {
     expect(getRenderConfigFieldCategory("background")).toBe("author-intent");
   });
@@ -4501,10 +4336,6 @@ describe("isViewerOverridable", () => {
 
   it("returns false for coordinateSpace", () => {
     expect(isViewerOverridable("coordinateSpace")).toBe(false);
-  });
-
-  it("returns false for _scope", () => {
-    expect(isViewerOverridable("_scope")).toBe(false);
   });
 
   it("returns false for fontFamily (author brand decision)", () => {
@@ -4539,7 +4370,7 @@ describe("getViewerOverridableFields", () => {
     const authorIntentFields = [
       "width", "height", "coordinateSpace", "background",
       "fontFamily", "nodeRadii", "avoidCollisions", "typeColors",
-      "evolveStyles", "legend", "filters", "strokeWidth", "_scope",
+      "evolveStyles", "legend", "filters", "strokeWidth",
     ];
     for (const field of authorIntentFields) {
       expect(fields).not.toContain(field);

@@ -70,9 +70,6 @@ export {
   LegendPositionEnum,
   LegendPositionXYSchema,
   RenderConfigSchema,
-  RenderScopeSchema,
-  RENDER_SCOPE,
-  RENDER_SCOPE_FIELD_BLOCKLIST,
   ConfigIntentSchema,
   DEFAULT_CONFIG_INTENT,
   resolveConfigIntent,
@@ -113,8 +110,6 @@ export {
   type RenderConfig,
   type RenderConfigInput,
   type ResolvedRenderConfig,
-  type RenderScope,
-  type RenderScopeFieldBlocklist,
   type EvolveStyle,
   type WardleyMap,
 } from "./schema.js";

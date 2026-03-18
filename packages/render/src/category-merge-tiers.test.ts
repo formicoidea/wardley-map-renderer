@@ -8,11 +8,7 @@
  * ## 3-Tier Precedence Chain
  *
  * ```
- * Tier 3 (highest): System-metadata constants
- *                   _scope = RENDER_SCOPE — always injected by resolveConflict,
- *                   never overridable by author or viewer config.
- *
- * Tier 2 (middle):  Category-winner explicit values
+ * Tier 2 (highest): Category-winner explicit values
  *                   Author-intent fields  → authorConfig value wins
  *                   Viewer-preference fields → viewerConfig value wins
  *                   (Losing side's value is silently discarded)
@@ -35,10 +31,7 @@
  *  1. **Tier 2 (author-intent category) > Tier 1 (theme baseline)**:
  *     Author-set `strokeWidth` explicitly wins over the dark theme's baseline value.
  *
- *  2. **Tier 3 (system-metadata) > Tier 2 (explicit config attempt)**:
- *     `_scope` is always `RENDER_SCOPE` — neither author nor viewer can override it.
- *
- *  3. **Tier 3 (explicit label string) > Tier 2 (locale preset) > Tier 1 (English fallback)**:
+ *  2. **Tier 3 (explicit label string) > Tier 2 (locale preset) > Tier 1 (English fallback)**:
  *     Axis label precedence chain — locale overrides fallback, explicit string overrides locale.
  *
  *  4. **Edge case — same-tier fields apply field-level rules independently**:
@@ -46,7 +39,7 @@
  *     compete with each other (same category, same winning source).
  *
  * @see resolve-conflict.ts  — resolveConflict() + taxonomy constants
- * @see schema.ts            — resolveTheme() + RENDER_SCOPE + THEME_BASELINES
+ * @see schema.ts            — resolveTheme() + THEME_BASELINES
  * @see wardley-map-consts.ts — resolveAxisLabels() + AXIS_LABELS_EN/FR
  */
 
@@ -58,7 +51,6 @@ import {
 } from "./resolve-conflict.js";
 import {
   resolveTheme,
-  RENDER_SCOPE,
   type RenderConfig,
 } from "./schema.js";
 import {
@@ -135,76 +127,7 @@ describe("category-merge tier precedence — Tier 2 > Tier 1", () => {
   );
 });
 
-// ── Test 2: Tier 3 (system-metadata) wins over Tier 2 (explicit config attempt) ─────
-
-describe("category-merge tier precedence — Tier 3 > Tier 2", () => {
-  it(
-    "system-metadata _scope (Tier 3) is always RENDER_SCOPE — cannot be overridden by any config",
-    () => {
-      // Tier 3 (system-metadata): _scope is always RENDER_SCOPE, injected by resolveConflict
-      // Tier 2: even if the author or viewer sets _scope, it is silently replaced
-      //
-      // This is the highest-priority tier: system constants win over all explicit values.
-
-      const authorConfig: Partial<RenderConfig> = {
-        width: 1920,
-        strokeWidth: 2,
-        // Note: even if _scope were somehow in authorConfig, it would be discarded
-        // in favor of the system constant. The taxonomy categorizes _scope as
-        // author-intent BUT non-overridable (overridable: false).
-      };
-      const viewerConfig: Partial<RenderConfig> = {
-        theme: "dark",
-        locale: "fr",
-      };
-
-      const result = resolveConflict(viewerConfig, authorConfig);
-
-      // Tier-3 system constant always wins
-      expect(result._scope).toEqual(RENDER_SCOPE);
-      expect(result._scope!.mode).toBe("static-export");
-      expect(result._scope!.temporal).toBe(false);
-      expect(result._scope!.interactive).toBe(false);
-
-      // Tier-2 author and viewer values survive (they're not overridden by _scope)
-      expect(result.width).toBe(1920);
-      expect(result.strokeWidth).toBe(2);
-      expect(result.theme).toBe("dark");
-      expect(result.locale).toBe("fr");
-    },
-  );
-
-  it(
-    "_scope is RENDER_SCOPE even when both author and viewer configs are fully populated",
-    () => {
-      // Full realistic scenario: both sides supply many fields.
-      // _scope must still be RENDER_SCOPE (Tier-3 system constant).
-
-      const authorConfig: Partial<RenderConfig> = {
-        width: 3200,
-        height: 1800,
-        fontFamily: "Roboto, sans-serif",
-        strokeWidth: 1.5,
-        avoidCollisions: false,
-      };
-      const viewerConfig: Partial<RenderConfig> = {
-        theme: "highContrast",
-        locale: "fr",
-        labelScale: 1.2,
-      };
-
-      const result = resolveConflict(viewerConfig, authorConfig);
-
-      // Tier-3 always wins regardless of how populated the inputs are
-      expect(result._scope).toEqual(RENDER_SCOPE);
-      // Tier-2 values are unaffected by the _scope injection
-      expect(result.width).toBe(3200);
-      expect(result.theme).toBe("highContrast");
-    },
-  );
-});
-
-// ── Test 3: Tier 3 > Tier 2 > Tier 1 — i18n axis label chain ─────────────────────
+// ── Test 2: Tier 3 > Tier 2 > Tier 1 — i18n axis label chain ─────────────────────
 
 describe("category-merge tier precedence — i18n axis label 3-tier chain", () => {
   it(
@@ -383,9 +306,5 @@ describe("category taxonomy is declarative and introspectable", () => {
       AUTHOR_INTENT_FIELDS.length + VIEWER_PREFERENCE_FIELDS.length,
     );
 
-    // _scope (system-metadata) is separate from both author/viewer — it's injected
-    // by resolveConflict, not listed in either category array
-    expect(AUTHOR_INTENT_FIELDS).not.toContain("_scope");
-    expect(VIEWER_PREFERENCE_FIELDS).not.toContain("_scope");
   });
 });

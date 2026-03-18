@@ -11,7 +11,7 @@ import {
   type AuthorIntentField,
   type ViewerPreferenceField,
 } from "./resolve-conflict.js";
-import { RENDER_SCOPE, RenderConfigSchema, type RenderConfig } from "./schema.js";
+import { RenderConfigSchema, type RenderConfig } from "./schema.js";
 
 // ── Taxonomy registry tests ───────────────────────────────────────────────────
 
@@ -85,23 +85,6 @@ describe("resolveConflict", () => {
     const result = resolveConflict({}, {});
     // Zod applies defaults — strokeWidth must be 1
     expect(result.strokeWidth).toBe(1);
-    // _scope always injected
-    expect(result._scope).toEqual(RENDER_SCOPE);
-  });
-
-  it("always injects RENDER_SCOPE into _scope regardless of inputs", () => {
-    const result1 = resolveConflict({}, {});
-    expect(result1._scope).toEqual(RENDER_SCOPE);
-    // Non-null asserted: resolveConflict always injects _scope
-    expect(result1._scope!.mode).toBe("static-export");
-    expect(result1._scope!.temporal).toBe(false);
-    expect(result1._scope!.interactive).toBe(false);
-
-    const result2 = resolveConflict(
-      { theme: "dark" },
-      { width: 1920, height: 1080 },
-    );
-    expect(result2._scope).toEqual(RENDER_SCOPE);
   });
 
   // ── Author-intent fields: authorConfig wins ────────────────────────────────
@@ -295,9 +278,6 @@ describe("resolveConflict", () => {
     expect(result.theme).toBe("dark");           // viewer wins over author's "default"
     expect(result.locale).toBe("fr");            // viewer wins over author's "en"
     expect(result.labelScale).toBe(1.2);
-
-    // System metadata always RENDER_SCOPE
-    expect(result._scope).toEqual(RENDER_SCOPE);
   });
 
   it("realistic scenario: viewer-only (no author config) returns viewer preferences + defaults", () => {
@@ -305,7 +285,6 @@ describe("resolveConflict", () => {
     expect(result.theme).toBe("highContrast");
     expect(result.locale).toBe("fr");
     expect(result.strokeWidth).toBe(1); // Zod default
-    expect(result._scope).toEqual(RENDER_SCOPE);
   });
 
   it("realistic scenario: author-only (no viewer config) returns author intent + defaults", () => {
@@ -383,9 +362,6 @@ describe("resolveConflict — cross-category conflicts", () => {
     // Author-intent: evolveStyles kept intact (not overridden by viewer's dark theme)
     expect(result.evolveStyles?.natural?.stroke).toBe("#e2e8f0");
     expect(result.evolveStyles?.natural?.strokeDasharray).toBe("4 2");
-
-    // System metadata always present
-    expect(result._scope).toEqual(RENDER_SCOPE);
   });
 
   it("dark theme (viewer) + white typeColors (author) — both survive", () => {

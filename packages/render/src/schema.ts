@@ -1050,198 +1050,12 @@ export const FiltersSchema = z.object({
   excludeComponentTypes: z.array(ComponentTypeEnum).optional(),
 });
 
-// ── Ontological scope boundary ───────────────────────────────────────────────
 
-/**
- * Zod schema for the render scope declaration.
- *
- * All fields are literal-typed so consumers can assert exact values at runtime.
- *
- * @see RENDER_SCOPE — the singleton constant with default values
- * @see RenderConfigSchema._scope — optional field that embeds the scope declaration
- */
-export const RenderScopeSchema = z.object({
-  /**
-   * Rendering mode — always `"static-export"`.
-   *
-   * This renderer produces a one-shot SVG/PNG snapshot. There is no streaming
-   * output, no incremental update, and no mutable state between calls.
-   * @category platform-constraint
-   */
-  mode: z.literal("static-export"),
-  /**
-   * Temporal diffing flag — always `false`.
-   *
-   * **Out of scope:** comparing two map versions (before/after snapshots),
-   * computing deltas between evolution states, or rendering change indicators
-   * (added/removed/moved components). These concerns belong to a separate
-   * diff layer that consumes two `WardleyMap` snapshots externally.
-   * @category platform-constraint
-   */
-  temporal: z.literal(false),
-  /**
-   * Interactivity flag — always `false`.
-   *
-   * **Out of scope:** hover tooltips, click handlers, pan/zoom behaviour,
-   * drag-and-drop, selection state, or any event listener. This renderer
-   * emits inert SVG markup with no embedded JavaScript and no ARIA roles
-   * beyond basic accessibility attributes.
-   * @category platform-constraint
-   */
-  interactive: z.literal(false),
-  /**
-   * Human-readable description of what this scope declaration covers and
-   * what is explicitly excluded. Intended for API consumers verifying
-   * rendering assumptions in documentation tools or assertion guards.
-   * @category platform-constraint
-   */
-  description: z.string(),
-});
-
-/** TypeScript type inferred from {@link RenderScopeSchema}. */
-export type RenderScope = z.infer<typeof RenderScopeSchema>;
-
-/**
- * Singleton scope declaration for the `@wardleyapi/render` package.
- *
- * This constant documents the **ontological boundaries** of the renderer:
- * what it does, and — critically — what it deliberately does **not** do.
- * Consumers can read `renderConfig._scope` (which defaults to this value)
- * to verify assumptions before invoking the renderer.
- *
- * ## Explicitly out of scope
- *
- * | Concern              | Why excluded                                                     |
- * |----------------------|------------------------------------------------------------------|
- * | Temporal diffing     | Comparing map snapshots is a separate concern; the renderer      |
- * |                      | only knows about a single `WardleyMap` at a time.               |
- * | Interaction handlers | SVG output is inert — no JS, no event listeners, no hover state. |
- * | Animation            | No CSS/SMIL transitions, no live updates, no streaming output.   |
- *
- * ## Why a first-class constant?
- *
- * By surfacing the scope as a typed, exported constant the renderer makes an
- * **explicit promise** rather than relying on implicit convention. Future
- * packages that add temporal or interactive capabilities can declare their own
- * `RENDER_SCOPE` variant, making the distinction unambiguous in tooling.
- *
- * @example Verify assumptions before calling the renderer:
- * ```ts
- * import { RENDER_SCOPE } from "@wardleyapi/render";
- * if (RENDER_SCOPE.interactive) throw new Error("Expected a static renderer");
- * ```
- *
- * @example Read from a resolved config (always equals RENDER_SCOPE):
- * ```ts
- * const map: WardleyMap = { ..., renderConfig: {} };
- * const resolved = resolveTheme(map.renderConfig);
- * // resolved._scope.mode === "static-export"
- * // resolved._scope.temporal === false
- * // resolved._scope.interactive === false
- * ```
- */
-export const RENDER_SCOPE: RenderScope = {
-  mode: "static-export",
-  temporal: false,
-  interactive: false,
-  description:
-    "Produces a static SVG/PNG export of a single Wardley Map snapshot. " +
-    "Out of scope: temporal diffing (comparing map versions over time), " +
-    "interaction handlers (hover, click, pan/zoom, drag-and-drop), " +
-    "and animation (CSS/SMIL transitions, live updates, streaming output).",
-};
-
-/**
- * Documentary constant — positive definition of `RenderConfig`'s scope boundary.
- *
- * ## What RenderConfig IS
- *
- * > **RenderConfig describes a single-frame, deterministic, pure visual projection
- * > of map data — no temporal state, no interaction callbacks, no animation parameters.**
- *
- * Every field in `RenderConfigSchema` controls **how** the map looks in a static
- * SVG/PNG export. There is no field for:
- *
- * - Temporal state (timestamps, version refs, delta markers, history cursors)
- * - Interaction callbacks (onClick, onHover, onSelect, onDrag, onZoom)
- * - Animation parameters (transition duration, easing, keyframes, live-update interval)
- *
- * ## Why this is a documentary constant, not a Zod blocklist
- *
- * The Zod enforcement is handled by `RenderConfigSchema.strict()`, which rejects
- * any key **not** declared in the positive schema definition. An explicit blocklist
- * (a list of forbidden key names validated inside `superRefine`) is redundant:
- *
- * - `strict()` is **closed-world**: all unknown keys are rejected, including future
- *   ones not yet imagined.
- * - A blocklist is **open-world**: it only rejects explicitly listed keys, silently
- *   passing any unlisted unknown key.
- *
- * This constant serves as machine-readable documentation — importable by consumers
- * who want to verify the scope boundary without reading source code — and as a
- * canary: if you find yourself wanting to add an interaction or temporal field to
- * `RenderConfig`, read this docstring first.
- *
- * @example Verify the scope boundary in a consumer:
- * ```ts
- * import { RENDER_SCOPE_FIELD_BLOCKLIST } from "@wardleyapi/render";
- * console.log(RENDER_SCOPE_FIELD_BLOCKLIST.positiveDefinition);
- * // "RenderConfig describes a single-frame, deterministic, pure visual projection …"
- * console.log(RENDER_SCOPE_FIELD_BLOCKLIST.outOfScope);
- * // ["temporal-state", "interaction-callbacks", "animation-parameters"]
- * ```
- *
- * @see RENDER_SCOPE — the singleton scope declaration injected into every resolved config
- * @see RenderConfigSchema — the positive Zod schema (`.strict()` enforces the boundary)
- */
-export const RENDER_SCOPE_FIELD_BLOCKLIST = {
-  /**
-   * Positive definition of what `RenderConfig` is.
-   *
-   * This is NOT a list of forbidden fields — it is a statement of purpose.
-   * `RenderConfigSchema.strict()` enforces the boundary by rejecting anything
-   * not in the positive schema definition.
-   */
-  positiveDefinition:
-    "RenderConfig describes a single-frame, deterministic, pure visual projection of map data — " +
-    "no temporal state, no interaction callbacks, no animation parameters.",
-
-  /**
-   * Categories of fields that are explicitly out of scope for `RenderConfig`.
-   *
-   * These categories are rejected at the schema level by `.strict()`.
-   * No explicit field names are listed because `.strict()` rejects ALL unknown
-   * keys — including future field names not yet conceived.
-   */
-  outOfScope: [
-    "temporal-state",
-    "interaction-callbacks",
-    "animation-parameters",
-  ] as const,
-
-  /**
-   * Enforcement mechanism — how the boundary is upheld at the Zod level.
-   *
-   * `RenderConfigSchema` uses `.strict()` (closed-world rejection of unknown keys)
-   * rather than an explicit blocklist (open-world rejection of named keys).
-   * This constant documents that decision; the actual enforcement is in the schema.
-   */
-  enforcement: "zod-strict" as const,
-} as const;
-
-/** TypeScript type for the `RENDER_SCOPE_FIELD_BLOCKLIST` constant. */
-export type RenderScopeFieldBlocklist = typeof RENDER_SCOPE_FIELD_BLOCKLIST;
-
-// ── ConfigIntent (ontological scope boundaries as first-class boolean flags) ──
+// ── ConfigIntent (scope-boundary intent flags as first-class booleans) ──
 //
-// ConfigIntent is the "soft" complement to RenderScopeSchema:
-//
-//   RenderScopeSchema   — uses z.literal() to make scope constraints immutable at the
-//                         type level (cannot create a valid RenderScope with mode != "static-export").
-//
-//   ConfigIntentSchema  — uses z.boolean() with defaults, allowing future renderer variants
-//                         to declare different intent profiles (e.g. an interactive renderer
-//                         that sets noInteraction: false) while sharing the same merge infrastructure.
+// ConfigIntentSchema uses z.boolean() with defaults, allowing future renderer variants
+// to declare different intent profiles (e.g. an interactive HTML/canvas renderer
+// that sets noInteraction: false) while sharing the same schema and merge infrastructure.
 //
 // When a RenderConfig is resolved via resolveTheme(), configIntent is always fully resolved
 // (no undefined) — consumers do not need to null-coalesce.
@@ -1253,8 +1067,7 @@ export type RenderScopeFieldBlocklist = typeof RENDER_SCOPE_FIELD_BLOCKLIST;
  * **what it does NOT do** (`noTemporalDiff: true`, `noInteraction: true`) as
  * first-class, mergeable boolean metadata.
  *
- * Unlike {@link RenderScopeSchema} (which uses `z.literal()` to make constraints
- * unoverridable), `ConfigIntentSchema` uses `z.boolean()` with defaults, making
+ * `ConfigIntentSchema` uses `z.boolean()` with defaults, making
  * the flags configurable for future renderer variants without breaking the schema shape.
  *
  * **Default values** (all `true` for `@wardleyapi/render`):
@@ -1405,7 +1218,7 @@ export function resolveConfigIntent(partial?: Partial<ConfigIntent>): ConfigInte
 //                          They constrain the coordinate system and capability envelope
 //                          that all other fields operate within. Callers MUST NOT assume
 //                          values outside the declared constraint (e.g. units≠"px" would
-//                          break all px-space fields). Examples: coordinateSpace, _scope,
+//                          break all px-space fields). Examples: coordinateSpace,
 //                          configIntent, CoordinateSpaceSchema.units/origin.
 //
 //   author-intent        — Fields that encode the map author's deliberate design choices:
@@ -1457,7 +1270,6 @@ export function resolveConfigIntent(partial?: Partial<ConfigIntent>): ConfigInte
  *
  * @see FieldCategory — the canonical runtime type (defined later in this file)
  * @see TIERED_RENDER_CONFIG_TAXONOMY — per-field tier classification
- * @see RENDER_SCOPE — canonical platform-constraint example
  * @see ConfigIntentSchema — platform-constraint flags
  * @see RenderConfigSchema — top-level fields annotated with this vocabulary
  */
@@ -1677,54 +1489,15 @@ export const RenderConfigSchema = z.object({
    */
   strokeWidth: z.number().min(0.25).max(8).default(1),
   /**
-   * Ontological scope declaration for this renderer.
-   *
-   * An optional machine-readable contract stating what this renderer does and
-   * what it explicitly does **not** do. Defaults to {@link RENDER_SCOPE} —
-   * the singleton constant that documents the static-export boundary of
-   * `@wardleyapi/render`.
-   *
-   * **Default value** (always injected when omitted):
-   * ```json
-   * {
-   *   "mode": "static-export",
-   *   "temporal": false,
-   *   "interactive": false,
-   *   "description": "Produces a static SVG/PNG export …"
-   * }
-   * ```
-   *
-   * This field is optional in the schema. When not supplied by the caller,
-   * `_scope` is `undefined` in the parsed `RenderConfig` output. The
-   * canonical resolved value is always injected by {@link resolveTheme}:
-   *
-   * ```ts
-   * // Via resolveTheme — always present in ResolvedRenderConfig:
-   * const resolved = resolveTheme({});
-   * resolved._scope.mode;        // "static-export"
-   * resolved._scope.temporal;    // false
-   * resolved._scope.interactive; // false
-   *
-   * // Via RenderConfigSchema.parse — only present if caller supplied it:
-   * const config = RenderConfigSchema.parse({ _scope: RENDER_SCOPE });
-   * config._scope?.mode;        // "static-export"
-   * ```
-   *
-   * @see RENDER_SCOPE — the exported singleton constant
-   * @see RenderScopeSchema — the Zod schema for this field
-   * @category platform-constraint
-   */
-  _scope: RenderScopeSchema.optional(),
-  /**
    * Configurable scope-boundary intent flags.
    *
    * Declares what this renderer does (`staticExport`) and does NOT do
    * (`noTemporalDiff`, `noInteraction`) as first-class boolean metadata.
    *
-   * Unlike `_scope` (which uses `z.literal()` literals to make constraints
-   * immutable), `configIntent` uses `z.boolean()` with defaults, allowing
-   * future renderer variants to declare different intent profiles while
-   * sharing the same schema and merge infrastructure.
+   * Uses `z.boolean()` with defaults, allowing future renderer variants
+   * to declare different intent profiles (e.g. an interactive HTML/canvas
+   * renderer that sets `noInteraction: false`) while sharing the same
+   * schema and merge infrastructure.
    *
    * All flags default to `true` when this field is omitted. The canonical
    * resolved value is always present in {@link ResolvedRenderConfig}:
@@ -1745,19 +1518,7 @@ export const RenderConfigSchema = z.object({
 })
   /**
    * Strict mode — unknown keys are rejected at parse time.
-   *
-   * This is the Zod-level enforcement of the scope boundary documented by
-   * {@link RENDER_SCOPE_FIELD_BLOCKLIST}. Rather than maintaining an explicit
-   * blocklist inside `superRefine`, we rely on `.strict()` to reject any key
-   * not declared in the schema above.
-   *
-   * Why `.strict()` instead of a blocklist:
-   * - `.strict()` is closed-world: all current AND future unknown keys are rejected.
-   * - A blocklist is open-world: it only rejects explicitly named keys, silently
-   *   passing anything not listed.
-   * - The positive schema definition above IS the blocklist — `.strict()` enforces it.
-   *
-   * @see RENDER_SCOPE_FIELD_BLOCKLIST — documentary constant explaining the positive definition
+   * `.strict()` is closed-world: all unknown keys are rejected.
    */
   .strict()
   .superRefine((data, ctx) => {
@@ -2412,14 +2173,6 @@ export interface ResolvedRenderConfig {
    */
   coordinateSpace: CoordinateSpace;
   /**
-   * Resolved scope declaration — always equals {@link RENDER_SCOPE}.
-   * Present on every resolved config so consumers can verify assumptions
-   * without reading source code.
-   * @see RENDER_SCOPE — the singleton constant
-   * @see RenderScope — the TypeScript type
-   */
-  _scope: RenderScope;
-  /**
    * Resolved configurable scope-boundary intent flags.
    *
    * All three flags are always present as concrete booleans (no `undefined`).
@@ -2460,7 +2213,6 @@ const THEME_BASELINE_DEFAULT: Omit<ResolvedRenderConfig, "theme"> = {
   legend: { show: true, position: "bottom-right" as const, legendOverflow: "allow" as const },
   strokeWidth: 1,
   coordinateSpace: DEFAULT_COORDINATE_SPACE,
-  _scope: RENDER_SCOPE,
   configIntent: DEFAULT_CONFIG_INTENT,
 };
 
@@ -2593,7 +2345,6 @@ export function resolveTheme(renderConfig?: RenderConfigInput): ResolvedRenderCo
     coordinateSpace: renderConfig?.coordinateSpace != null
       ? { ...DEFAULT_COORDINATE_SPACE, ...renderConfig.coordinateSpace }
       : baseline.coordinateSpace,
-    _scope: RENDER_SCOPE,
     // configIntent: merge explicit partial overrides over DEFAULT_CONFIG_INTENT
     configIntent: resolveConfigIntent(renderConfig?.configIntent ?? undefined),
   };
@@ -2619,8 +2370,6 @@ export function resolveTheme(renderConfig?: RenderConfigInput): ResolvedRenderCo
 // 'viewer-preference' as a group; the _default fallback key is also
 // viewer-preference since it is part of the style value system.
 //
-// Scope metadata (_scope) is 'author-intent' / non-overridable: it is a
-// fixed singleton injected by resolveTheme, not a user-settable value.
 
 /**
  * Discriminates between fields set by the map author vs. preferences a
@@ -2632,7 +2381,7 @@ export function resolveTheme(renderConfig?: RenderConfigInput): ResolvedRenderCo
  *                            layout system. Highest authority — authorConfig
  *                            wins; viewer cannot override. Examples: width,
  *                            height, coordinateSpace (constrains legend
- *                            positioning), _scope, configIntent.
+ *                            positioning), configIntent.
  *
  * - `'layout-structural'`    Fields that define structural layout decisions:
  *                            background (axis/phase visibility), legend (show
@@ -2701,7 +2450,6 @@ export interface FieldMetadata {
  * | legend           | author-intent      | legend.show is structural; see LEGEND_FIELD_TAXONOMY |
  * | filters          | author-intent      | excludeComponentTypes is structural data filter |
  * | strokeWidth      | author-intent      | Edge/outline line weight — visual design |
- * | _scope           | author-intent      | Read-only singleton metadata; non-overridable |
  */
 export const RENDER_CONFIG_FIELD_TAXONOMY = {
   width: {
@@ -2798,12 +2546,6 @@ export const RENDER_CONFIG_FIELD_TAXONOMY = {
     category: "author-intent" as const,
     description:
       "Default stroke width in px-space for edges and node outlines — visual design decision",
-    overridable: false,
-  },
-  _scope: {
-    category: "author-intent" as const,
-    description:
-      "Ontological scope boundary — read-only singleton injected by resolveTheme; not a user-settable field",
     overridable: false,
   },
   configIntent: {
@@ -3068,7 +2810,7 @@ export function getViewerOverridableFields(): ReadonlyArray<
 //
 //   'platform-constraint'  — fields whose values constrain the rest of the
 //                            coordinate and layout system (width, height,
-//                            coordinateSpace, _scope, configIntent).  These
+//                            coordinateSpace, configIntent).  These
 //                            take highest precedence: authorConfig wins, and
 //                            any viewer override is rejected.
 //
@@ -3107,7 +2849,6 @@ export const TIER_PRECEDENCE = [
  * |------------------|---------------------|
  * | width / height   | platform-constraint |
  * | coordinateSpace  | platform-constraint |
- * | _scope           | platform-constraint |
  * | configIntent     | platform-constraint |
  * | background       | layout-structural   |
  * | legend           | layout-structural   |
@@ -3137,11 +2878,6 @@ export const TIERED_RENDER_CONFIG_TAXONOMY = {
   coordinateSpace: {
     category: "platform-constraint" as const,
     description: "Full coordinate-space declaration — constrains legend and all layer positioning",
-    overridable: false,
-  },
-  _scope: {
-    category: "platform-constraint" as const,
-    description: "Ontological scope boundary — read-only singleton injected by the system",
     overridable: false,
   },
   configIntent: {

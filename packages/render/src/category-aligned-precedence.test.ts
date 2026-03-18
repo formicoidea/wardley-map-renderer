@@ -9,7 +9,7 @@
  * ## Precedence hierarchy (highest → lowest authority):
  *
  * ```
- * Tier 1 (platform-constraint): Hard invariants — configIntent, _scope,
+ * Tier 1 (platform-constraint): Hard invariants — configIntent,
  *   coordinateSpace, width, height. Cannot be overridden by lower-tier config.
  *   TIER_PRECEDENCE index 0 = highest authority.
  *
@@ -126,7 +126,7 @@ describe("category-aligned precedence — configIntent is platform-constraint (T
 
 describe("category-aligned precedence — overridable flag mirrors tier authority", () => {
   it(
-    "platform-constraint fields (configIntent, _scope, coordinateSpace, width, height) are all non-overridable",
+    "platform-constraint fields (configIntent, coordinateSpace, width, height) are all non-overridable",
     () => {
       // The overridable flag is the runtime expression of tier authority.
       // All platform-constraint fields must be non-overridable.

@@ -7,7 +7,7 @@
  * ## 4-Tier Precedence (highest → lowest)
  *
  * ```
- * Tier 1 (highest): platform-constraint — width, height, coordinateSpace, _scope, configIntent
+ * Tier 1 (highest): platform-constraint — width, height, coordinateSpace, configIntent
  * Tier 2:           layout-structural   — background, legend, filters
  * Tier 3:           author-intent       — fontFamily, nodeRadii, avoidCollisions, typeColors, evolveStyles, strokeWidth
  * Tier 4 (lowest):  viewer-preference  — theme, locale, labelScale
@@ -27,7 +27,6 @@ import {
   TIER_PRECEDENCE,
   TIERED_RENDER_CONFIG_TAXONOMY,
   getFieldTierCategory,
-  RENDER_SCOPE,
   type RenderConfig,
 } from "./schema.js";
 
@@ -101,7 +100,7 @@ describe("TIERED_RENDER_CONFIG_TAXONOMY — shape contract", () => {
 // ── TIERED_RENDER_CONFIG_TAXONOMY tier classifications ───────────────────────
 
 describe("TIERED_RENDER_CONFIG_TAXONOMY — platform-constraint fields", () => {
-  const expected = ["width", "height", "coordinateSpace", "_scope", "configIntent"] as const;
+  const expected = ["width", "height", "coordinateSpace", "configIntent"] as const;
   for (const field of expected) {
     it(`${field} is platform-constraint`, () => {
       expect(TIERED_RENDER_CONFIG_TAXONOMY[field].category).toBe("platform-constraint");
@@ -154,10 +153,6 @@ describe("getFieldTierCategory", () => {
     expect(getFieldTierCategory("coordinateSpace")).toBe("platform-constraint");
   });
 
-  it("returns platform-constraint for _scope", () => {
-    expect(getFieldTierCategory("_scope")).toBe("platform-constraint");
-  });
-
   it("returns layout-structural for background", () => {
     expect(getFieldTierCategory("background")).toBe("layout-structural");
   });
@@ -190,7 +185,6 @@ describe("PLATFORM_CONSTRAINT_FIELDS", () => {
     expect(PLATFORM_CONSTRAINT_FIELDS).toContain("width");
     expect(PLATFORM_CONSTRAINT_FIELDS).toContain("height");
     expect(PLATFORM_CONSTRAINT_FIELDS).toContain("coordinateSpace");
-    expect(PLATFORM_CONSTRAINT_FIELDS).toContain("_scope");
     expect(PLATFORM_CONSTRAINT_FIELDS).toContain("configIntent");
   });
 
@@ -250,15 +244,6 @@ describe("resolveConfig — empty inputs", () => {
   it("accepts two empty objects and returns a valid RenderConfig", () => {
     const { config: result } = resolveConfig({}, {});
     expect(result.strokeWidth).toBe(1); // Zod default
-    expect(result._scope).toEqual(RENDER_SCOPE);
-  });
-
-  it("always injects RENDER_SCOPE into _scope", () => {
-    const { config: result } = resolveConfig({}, {});
-    expect(result._scope).toEqual(RENDER_SCOPE);
-    expect(result._scope!.mode).toBe("static-export");
-    expect(result._scope!.temporal).toBe(false);
-    expect(result._scope!.interactive).toBe(false);
   });
 });
 
@@ -383,20 +368,6 @@ describe("resolveConfig — tier 4 (viewer-preference): viewerConfig wins", () =
   });
 });
 
-// ── resolveConfig — system metadata ──────────────────────────────────────────
-
-describe("resolveConfig — _scope always RENDER_SCOPE", () => {
-  it("_scope is always RENDER_SCOPE for empty inputs", () => {
-    const { config: result } = resolveConfig({}, {});
-    expect(result._scope).toEqual(RENDER_SCOPE);
-  });
-
-  it("_scope is always RENDER_SCOPE regardless of what configs supply", () => {
-    const { config: result } = resolveConfig({ theme: "dark" }, { width: 1920, strokeWidth: 2 });
-    expect(result._scope).toEqual(RENDER_SCOPE);
-  });
-});
-
 // ── resolveConfig — realistic scenario ───────────────────────────────────────
 
 describe("resolveConfig — realistic scenario", () => {
@@ -440,9 +411,6 @@ describe("resolveConfig — realistic scenario", () => {
     expect(result.theme).toBe("dark");   // viewer wins over author's "default"
     expect(result.locale).toBe("fr");    // viewer wins over author's "en"
     expect(result.labelScale).toBe(1.2);
-
-    // System metadata always RENDER_SCOPE
-    expect(result._scope).toEqual(RENDER_SCOPE);
   });
 
   it("viewer-only (no author) returns viewer preferences + defaults", () => {
@@ -450,7 +418,6 @@ describe("resolveConfig — realistic scenario", () => {
     expect(result.theme).toBe("highContrast");
     expect(result.locale).toBe("fr");
     expect(result.strokeWidth).toBe(1); // Zod default
-    expect(result._scope).toEqual(RENDER_SCOPE);
   });
 
   it("author-only (no viewer) returns author fields + defaults", () => {
