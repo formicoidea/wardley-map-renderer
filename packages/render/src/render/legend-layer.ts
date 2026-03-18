@@ -15,6 +15,7 @@
 
 import type { RenderContext, LayerRenderer } from "./types.js";
 import { esc } from "./svg-composer.js";
+import { resolveTypeStyle } from "../schema.js";
 
 // ── Visual constants ──────────────────────────────────────────────────
 
@@ -41,6 +42,23 @@ const EVOLVE_COLORS: Record<string, string> = {
   late: "#999999",
 };
 
+// ── i18n labels ───────────────────────────────────────────────────────
+
+const TITLE_LABELS: Record<string, string> = { en: "Legend", fr: "Légende" };
+
+const TYPE_LABELS: Record<string, Record<string, string>> = {
+  en: { component: "Component", "user-need": "User Need", pipeline: "Pipeline", anchor: "User / Stakeholder", note: "Note" },
+  fr: { component: "Composant", "user-need": "Besoin utilisateur", pipeline: "Pipeline", anchor: "Utilisateur / Partie prenante", note: "Note" },
+};
+
+const EVOLVE_LABELS: Record<string, Record<string, string>> = {
+  en: { natural: "Future change", ecosystem: "Change push by ecosystem", forced: "Forced change", late: "Change that's already happening" },
+  fr: { natural: "Changement futur", ecosystem: "Poussée par l'écosystème", forced: "Changement forcé", late: "Changement déjà en cours" },
+};
+
+/** Canonical display order for component types in the legend */
+const TYPE_ORDER = ["component", "user-need", "pipeline", "anchor", "note"];
+
 // ── Legend item definition ─────────────────────────────────────────────
 
 interface LegendItem {
@@ -53,66 +71,74 @@ interface LegendItem {
 /**
  * Inspect the RenderContext to collect only the legend items
  * that correspond to elements actually present on the map.
+ *
+ * Order: type entries (canonical) → edge styles → evolution arrows.
  */
 function collectLegendItems(ctx: RenderContext): LegendItem[] {
   const items: LegendItem[] = [];
+  const { typeColors, excludeComponentTypes, locale } = ctx.resolvedConfig;
+  const excluded = new Set(excludeComponentTypes);
+  const labels = TYPE_LABELS[locale] ?? TYPE_LABELS.en;
+  const evolveLabels = EVOLVE_LABELS[locale] ?? EVOLVE_LABELS.en;
 
-  // Component (type === "component" or "user-need")
-  const hasComponent = ctx.nodes.some(
-    (n) => n.component.type === "component" || n.component.type === "user-need"
-  );
-  if (hasComponent) {
-    items.push({
-      label: "Component",
-      renderSwatch: (x, y) =>
-        `<circle cx="${x + 12}" cy="${y + 10}" r="5" ` +
-        `fill="#ffffff" stroke="#000000" stroke-width="1.5" />`,
-    });
+  // ── Type entries ──────────────────────────────────────────────────
+  // Collect distinct types present on the map (nodes + pipelines)
+  const presentTypes = new Set(ctx.nodes.map((n) => n.component.type));
+  // Pipelines may exist even without a "pipeline"-typed node
+  if (ctx.pipelines.length > 0) presentTypes.add("pipeline");
+
+  for (const type of TYPE_ORDER) {
+    if (!presentTypes.has(type) || excluded.has(type)) continue;
+    const color = resolveTypeStyle<string>(typeColors, type) ?? "#000000";
+    const label = labels[type] ?? type;
+
+    if (type === "anchor") {
+      items.push({
+        label,
+        renderSwatch: (x, y) => {
+          const cx = x + 12;
+          const cy = y + 10;
+          return (
+            `<circle cx="${cx}" cy="${cy}" r="5" ` +
+            `fill="#ffffff" stroke="${color}" stroke-width="1.5" />` +
+            `<circle cx="${cx}" cy="${cy - 2}" r="1.5" ` +
+            `fill="none" stroke="${color}" stroke-width="1" />` +
+            `<polyline points="${cx},${cy - 0.5} ${cx - 2.5},${cy + 3.5} ${cx + 2.5},${cy + 3.5} ${cx},${cy - 0.5}" ` +
+            `fill="none" stroke="${color}" stroke-width="1" stroke-linejoin="round" />`
+          );
+        },
+      });
+    } else if (type === "pipeline") {
+      items.push({
+        label,
+        renderSwatch: (x, y) => {
+          const rx = x + 4;
+          const ry = y + 4;
+          const rw = 16;
+          const rh = 12;
+          const handleSize = 5;
+          const hx = rx + rw / 2 - handleSize / 2;
+          const hy = ry - handleSize / 2;
+          return (
+            `<rect x="${rx}" y="${ry}" width="${rw}" height="${rh}" ` +
+            `fill="none" stroke="${color}" stroke-width="1" />` +
+            `<rect x="${hx}" y="${hy}" width="${handleSize}" height="${handleSize}" ` +
+            `fill="#ffffff" stroke="${color}" stroke-width="1" />`
+          );
+        },
+      });
+    } else {
+      // component, user-need, note — all use circle swatch
+      items.push({
+        label,
+        renderSwatch: (x, y) =>
+          `<circle cx="${x + 12}" cy="${y + 10}" r="5" ` +
+          `fill="#ffffff" stroke="${color}" stroke-width="1.5" />`,
+      });
+    }
   }
 
-  // Anchor (type === "anchor")
-  const hasAnchor = ctx.nodes.some((n) => n.component.type === "anchor");
-  if (hasAnchor) {
-    items.push({
-      label: "User / Stakeholder",
-      renderSwatch: (x, y) => {
-        const cx = x + 12;
-        const cy = y + 10;
-        return (
-          `<circle cx="${cx}" cy="${cy}" r="5" ` +
-          `fill="#ffffff" stroke="#000000" stroke-width="1.5" />` +
-          `<circle cx="${cx}" cy="${cy - 2}" r="1.5" ` +
-          `fill="none" stroke="#000000" stroke-width="1" />` +
-          `<polyline points="${cx},${cy - 0.5} ${cx - 2.5},${cy + 3.5} ${cx + 2.5},${cy + 3.5} ${cx},${cy - 0.5}" ` +
-          `fill="none" stroke="#000000" stroke-width="1" stroke-linejoin="round" />`
-        );
-      },
-    });
-  }
-
-  // Pipeline
-  if (ctx.pipelines.length > 0) {
-    items.push({
-      label: "Pipeline",
-      renderSwatch: (x, y) => {
-        const rx = x + 4;
-        const ry = y + 4;
-        const rw = 16;
-        const rh = 12;
-        const handleSize = 5;
-        const hx = rx + rw / 2 - handleSize / 2;
-        const hy = ry - handleSize / 2;
-        return (
-          `<rect x="${rx}" y="${ry}" width="${rw}" height="${rh}" ` +
-          `fill="none" stroke="#000000" stroke-width="1" />` +
-          `<rect x="${hx}" y="${hy}" width="${handleSize}" height="${handleSize}" ` +
-          `fill="#ffffff" stroke="#000000" stroke-width="1" />`
-        );
-      },
-    });
-  }
-
-  // Dependency (solid edge)
+  // ── Edge styles ───────────────────────────────────────────────────
   const hasSolidEdge = ctx.edges.some(
     (e) => !e.relation.flow?.style || e.relation.flow.style === "solid"
   );
@@ -125,7 +151,6 @@ function collectLegendItems(ctx: RenderContext): LegendItem[] {
     });
   }
 
-  // Flow (dashed edge)
   const hasDashedEdge = ctx.edges.some(
     (e) => e.relation.flow?.style === "dashed"
   );
@@ -138,7 +163,6 @@ function collectLegendItems(ctx: RenderContext): LegendItem[] {
     });
   }
 
-  // Flow (bold edge)
   const hasBoldEdge = ctx.edges.some(
     (e) => e.relation.flow?.style === "bold"
   );
@@ -151,48 +175,19 @@ function collectLegendItems(ctx: RenderContext): LegendItem[] {
     });
   }
 
-  // Evolution arrows by type
+  // ── Evolution arrows ──────────────────────────────────────────────
   const evolveTypes = new Set(ctx.evolves.map((e) => e.evolveType));
+  const EVOLVE_ORDER = ["natural", "ecosystem", "forced", "late"] as const;
 
-  if (evolveTypes.has("natural")) {
+  for (const etype of EVOLVE_ORDER) {
+    if (!evolveTypes.has(etype)) continue;
+    const color = EVOLVE_COLORS[etype];
     items.push({
-      label: "Future change",
-      renderSwatch: (x, y) => {
-        const color = EVOLVE_COLORS.natural;
-        return (
-          `<line x1="${x + 2}" y1="${y + 10}" x2="${x + 18}" y2="${y + 10}" ` +
-          `stroke="${color}" stroke-width="1.5" stroke-dasharray="6,3" />` +
-          `<polygon points="${x + 22},${y + 10} ${x + 17},${y + 7} ${x + 17},${y + 13}" fill="${color}" />`
-        );
-      },
-    });
-  }
-
-  if (evolveTypes.has("ecosystem")) {
-    items.push({
-      label: "Change push by ecosystem",
-      renderSwatch: (x, y) => {
-        const color = EVOLVE_COLORS.ecosystem;
-        return (
-          `<line x1="${x + 2}" y1="${y + 10}" x2="${x + 18}" y2="${y + 10}" ` +
-          `stroke="${color}" stroke-width="1.5" stroke-dasharray="6,3" />` +
-          `<polygon points="${x + 22},${y + 10} ${x + 17},${y + 7} ${x + 17},${y + 13}" fill="${color}" />`
-        );
-      },
-    });
-  }
-
-  if (evolveTypes.has("late")) {
-    items.push({
-      label: "Change that's already happening",
-      renderSwatch: (x, y) => {
-        const color = EVOLVE_COLORS.late;
-        return (
-          `<line x1="${x + 2}" y1="${y + 10}" x2="${x + 18}" y2="${y + 10}" ` +
-          `stroke="${color}" stroke-width="1.5" stroke-dasharray="6,3" />` +
-          `<polygon points="${x + 22},${y + 10} ${x + 17},${y + 7} ${x + 17},${y + 13}" fill="${color}" />`
-        );
-      },
+      label: evolveLabels[etype] ?? etype,
+      renderSwatch: (x, y) =>
+        `<line x1="${x + 2}" y1="${y + 10}" x2="${x + 18}" y2="${y + 10}" ` +
+        `stroke="${color}" stroke-width="1.5" stroke-dasharray="6,3" />` +
+        `<polygon points="${x + 22},${y + 10} ${x + 17},${y + 7} ${x + 17},${y + 13}" fill="${color}" />`,
     });
   }
 
@@ -396,11 +391,12 @@ export const renderLegendLayer: LayerRenderer = (
     `fill="${BG_FILL}" opacity="0.95" />`
   );
 
-  // Title "Legend"
+  // Title (i18n)
+  const titleText = TITLE_LABELS[ctx.resolvedConfig.locale] ?? TITLE_LABELS.en;
   parts.push(
     `<text x="${cx + LEGEND_PADDING}" y="${cy + LEGEND_PADDING + 12}" ` +
     `font-family="Inter, sans-serif" font-size="${FONT_SIZE}" font-weight="bold" ` +
-    `fill="${FONT_COLOR}">Legend</text>`
+    `fill="${FONT_COLOR}">${esc(titleText)}</text>`
   );
 
   // Legend rows (offset by title height)

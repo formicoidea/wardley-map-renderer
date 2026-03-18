@@ -353,7 +353,7 @@ export const DEFAULT_THEME_BASELINE: ThemeBaseline = {
     labelScale: 1.0,
   },
   strokeWidth: 1,
-  nodeRadii: { _default: 5 },
+  nodeRadii: { _default: 3 },
 };
 
 // ── Dark theme baseline (placeholder — identical to default) ─────────────────
