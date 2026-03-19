@@ -62,11 +62,11 @@ export const SUBTITLE_LINE_HEIGHT = 18;
 
 // ── Layout margins (canvas units) ─────────────────────────────────
 /** Left margin for the Y-axis label area */
-export const AXIS_MARGIN_LEFT = 48;
+export const AXIS_MARGIN_LEFT = 28;
 /** Bottom margin for the X-axis label area */
-export const AXIS_MARGIN_BOTTOM = 48;
+export const AXIS_MARGIN_BOTTOM = 28;
 /** Top padding for "Visible" indicator */
-export const AXIS_MARGIN_TOP = 24;
+export const AXIS_MARGIN_TOP = 28;
 
 // ── Font sizes (base sizes at zoom=1.0, in px) ───────────────────
 export const AXIS_LABEL_FONT_SIZE = 13;

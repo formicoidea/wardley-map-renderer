@@ -21,11 +21,6 @@ import {
   DIRECTION_LABEL_FONT_SIZE,
 } from "../blocks/wardley-map/wardley-map-consts.js";
 
-/** Grid line color */
-const GRID_COLOR = "#e8e8e8";
-/** Number of grid line divisions on the value chain axis */
-const GRID_LINE_COUNT = 8;
-
 // ── Helpers ─────────────────────────────────────────────────────────
 
 function esc(s: string): string {
@@ -115,18 +110,6 @@ export const renderAxesLayer: LayerRenderer = (
     );
   }
 
-  // ── Y-axis label (rotated, close to axis) ─
-  if (showValueChain) {
-    const yCenter = plot.top + plot.height / 2;
-    const labelX = plot.left - 14;
-    parts.push(
-      `<text x="${labelX}" y="${yCenter}" text-anchor="middle" ` +
-        `font-family="Inter, sans-serif" font-size="${AXIS_LABEL_FONT_SIZE}" ` +
-        `fill="${AXIS_LABEL_COLOR}" ` +
-        `transform="rotate(-90, ${labelX}, ${yCenter})">${esc(labels.yAxis)}</text>`
-    );
-  }
-
   // ── Evolution direction indicators (inside plot area, top corners) ────
   if (showEvolution) {
     parts.push(
@@ -136,6 +119,18 @@ export const renderAxesLayer: LayerRenderer = (
     parts.push(
       `<text x="${plot.right - 4}" y="${plot.top + 14}" text-anchor="end" ` +
         `font-family="Inter, sans-serif" font-size="${DIRECTION_LABEL_FONT_SIZE}" fill="${LABEL_COLOR}">${esc(labels.evolutionEnd)}</text>`
+    );
+  }
+
+  // ── Y-axis label (rotated, close to axis) ─
+  if (showValueChain) {
+    const yCenter = plot.top + plot.height / 2;
+    const labelX = plot.left - 8;
+    parts.push(
+      `<text x="${labelX}" y="${yCenter}" text-anchor="middle" ` +
+        `font-family="Inter, sans-serif" font-size="${AXIS_LABEL_FONT_SIZE}" ` +
+        `fill="${AXIS_LABEL_COLOR}" ` +
+        `transform="rotate(-90, ${labelX}, ${yCenter})">${esc(labels.yAxis)}</text>`
     );
   }
 
