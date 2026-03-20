@@ -112,12 +112,12 @@ export const PipelineGeometrySchema = z.object({
 });
 
 // ── Method (Build / Buy / Outsource) ──────────────────────
-/** @deprecated Kept for backward-compatible re-export; prefer MethodSchema. */
-export const MethodEnum = z.object({
+export const MethodSchema = z.object({
   type: z.string(),
   preconisation: z.string(),
 });
-export const MethodSchema = MethodEnum;
+/** @deprecated Use MethodSchema instead. */
+export const MethodEnum = MethodSchema;
 
 // ── Component ──────────────────────────────────────────────
 export const ComponentSchema = z.object({

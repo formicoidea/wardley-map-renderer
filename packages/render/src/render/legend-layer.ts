@@ -16,6 +16,7 @@
 import type { RenderContext, LayerRenderer } from "./types.js";
 import { esc } from "./svg-composer.js";
 import { resolveTypeStyle } from "../schema.js";
+import { SIN60, COS60 } from "./nodes-layer.js";
 
 // ── Visual constants ──────────────────────────────────────────────────
 
@@ -33,6 +34,18 @@ const CORNER_MARGIN = 12;
 
 /** Edge style colors (match edges-layer.ts) */
 const EDGE_COLOR = "#999999";
+
+// ── Swatch geometry constants ────────────────────────────────────────
+
+const SWATCH_CX = 12;
+const SWATCH_CY = 10;
+const MARKET_LEGEND_R = 7;
+const ECO_LEGEND_OUTER_R = 8;
+const ECO_LEGEND_MID_R = 6;
+const ECO_LEGEND_INNER_R = 3;
+const INERTIA_STROKE = "#000000";
+const ARROW_LEGEND_FILL = "#000000";
+const STEP_LEGEND_FILL = "#cc0000";
 
 /** Evolution arrow colors (match evolvesto-layer.ts:24-28) */
 const EVOLVE_COLORS: Record<string, string> = {
@@ -71,6 +84,36 @@ const TYPE_ORDER = ["component", "user-need", "pipeline", "anchor", "market", "e
 interface LegendItem {
   label: string;
   renderSwatch: (x: number, y: number) => string;
+}
+
+// ── Legend item helpers ──────────────────────────────────────────────────
+
+/** Build an edge-style legend item (line swatch). Default: solid 1.5px stroke. */
+function edgeLegendItem(label: string, extra: string = ""): LegendItem {
+  const baseAttrs = extra.includes("stroke-width") ? "" : `stroke-width="1.5" `;
+  return {
+    label,
+    renderSwatch: (x, y) =>
+      `<line x1="${x + 2}" y1="${y + SWATCH_CY}" x2="${x + 22}" y2="${y + SWATCH_CY}" ` +
+      `stroke="${EDGE_COLOR}" ${baseAttrs}${extra} />`,
+  };
+}
+
+/** Build an accelerator/deaccelerator arrow legend item. direction: 1 = right, -1 = left. */
+function arrowLegendItem(label: string, direction: 1 | -1): LegendItem {
+  return {
+    label,
+    renderSwatch: (x, y) => {
+      const cx = x + SWATCH_CX;
+      const cy = y + SWATCH_CY;
+      const d = direction;
+      return (
+        `<path d="M ${cx - d * 7} ${cy - 4} L ${cx} ${cy - 4} L ${cx} ${cy - 7} L ${cx + d * 7} ${cy} ` +
+        `L ${cx} ${cy + 7} L ${cx} ${cy + 4} L ${cx - d * 7} ${cy + 4} Z" ` +
+        `fill="${ARROW_LEGEND_FILL}" stroke="${ARROW_LEGEND_FILL}" stroke-width="1" />`
+      );
+    },
+  };
 }
 
 // ── Data-driven legend item collection ─────────────────────────────────
@@ -139,17 +182,15 @@ function collectLegendItems(ctx: RenderContext): LegendItem[] {
       items.push({
         label,
         renderSwatch: (x, y) => {
-          const cx = x + 12;
-          const cy = y + 10;
-          const r = 7; // scaled-down outer radius for legend
-          const sin60 = Math.sin(Math.PI / 3);
-          const cos60 = Math.cos(Math.PI / 3);
+          const cx = x + SWATCH_CX;
+          const cy = y + SWATCH_CY;
+          const r = MARKET_LEGEND_R;
           const tTopX = cx;
           const tTopY = cy - r;
-          const tBlX = cx - r * sin60;
-          const tBlY = cy + r * cos60;
-          const tBrX = cx + r * sin60;
-          const tBrY = cy + r * cos60;
+          const tBlX = cx - r * SIN60;
+          const tBlY = cy + r * COS60;
+          const tBrX = cx + r * SIN60;
+          const tBrY = cy + r * COS60;
           return (
             `<circle cx="${cx}" cy="${cy}" r="${r}" ` +
             `fill="#ffffff" stroke="${color}" stroke-width="1" />` +
@@ -169,14 +210,14 @@ function collectLegendItems(ctx: RenderContext): LegendItem[] {
       items.push({
         label,
         renderSwatch: (x, y) => {
-          const cx = x + 12;
-          const cy = y + 10;
+          const cx = x + SWATCH_CX;
+          const cy = y + SWATCH_CY;
           return (
-            `<circle cx="${cx}" cy="${cy}" r="8" ` +
+            `<circle cx="${cx}" cy="${cy}" r="${ECO_LEGEND_OUTER_R}" ` +
             `fill="#cccccc" stroke="${color}" stroke-width="1" />` +
-            `<circle cx="${cx}" cy="${cy}" r="6" ` +
+            `<circle cx="${cx}" cy="${cy}" r="${ECO_LEGEND_MID_R}" ` +
             `fill="#cccccc" stroke="${color}" stroke-width="1" stroke-dasharray="2,1" />` +
-            `<circle cx="${cx}" cy="${cy}" r="3" ` +
+            `<circle cx="${cx}" cy="${cy}" r="${ECO_LEGEND_INNER_R}" ` +
             `fill="#ffffff" stroke="${color}" stroke-width="1" />`
           );
         },
@@ -192,42 +233,18 @@ function collectLegendItems(ctx: RenderContext): LegendItem[] {
     }
   }
 
-  // ── Edge styles ───────────────────────────────────────────────────
-  const hasSolidEdge = ctx.edges.some(
-    (e) => !e.relation.flow?.style || e.relation.flow.style === "solid"
-  );
-  if (hasSolidEdge) {
-    items.push({
-      label: "Dependency",
-      renderSwatch: (x, y) =>
-        `<line x1="${x + 2}" y1="${y + 10}" x2="${x + 22}" y2="${y + 10}" ` +
-        `stroke="${EDGE_COLOR}" stroke-width="1.5" />`,
-    });
+  // ── Edge styles (single-pass detection) ─────────────────────────
+  let hasSolidEdge = false, hasDashedEdge = false, hasBoldEdge = false;
+  for (const e of ctx.edges) {
+    const style = e.relation.flow?.style;
+    if (!style || style === "solid") hasSolidEdge = true;
+    else if (style === "dashed") hasDashedEdge = true;
+    else if (style === "bold") hasBoldEdge = true;
   }
 
-  const hasDashedEdge = ctx.edges.some(
-    (e) => e.relation.flow?.style === "dashed"
-  );
-  if (hasDashedEdge) {
-    items.push({
-      label: "Flow",
-      renderSwatch: (x, y) =>
-        `<line x1="${x + 2}" y1="${y + 10}" x2="${x + 22}" y2="${y + 10}" ` +
-        `stroke="${EDGE_COLOR}" stroke-width="1.5" stroke-dasharray="6,4" />`,
-    });
-  }
-
-  const hasBoldEdge = ctx.edges.some(
-    (e) => e.relation.flow?.style === "bold"
-  );
-  if (hasBoldEdge) {
-    items.push({
-      label: "Flow (bold)",
-      renderSwatch: (x, y) =>
-        `<line x1="${x + 2}" y1="${y + 10}" x2="${x + 22}" y2="${y + 10}" ` +
-        `stroke="${EDGE_COLOR}" stroke-width="3" />`,
-    });
-  }
+  if (hasSolidEdge) items.push(edgeLegendItem("Dependency"));
+  if (hasDashedEdge) items.push(edgeLegendItem("Flow", `stroke-dasharray="6,4"`));
+  if (hasBoldEdge) items.push(edgeLegendItem("Flow (bold)", `stroke-width="3"`));
 
   // ── Evolution arrows ──────────────────────────────────────────────
   const evolveTypes = new Set(ctx.evolves.map((e) => e.evolveType));
@@ -252,8 +269,8 @@ function collectLegendItems(ctx: RenderContext): LegendItem[] {
     items.push({
       label: inertiaLabel,
       renderSwatch: (x, y) =>
-        `<line x1="${x + 12}" y1="${y + 2}" x2="${x + 12}" y2="${y + 18}" ` +
-        `stroke="#000000" stroke-width="4" />`,
+        `<line x1="${x + SWATCH_CX}" y1="${y + 2}" x2="${x + SWATCH_CX}" y2="${y + 18}" ` +
+        `stroke="${INERTIA_STROKE}" stroke-width="4" />`,
     });
   }
 
@@ -290,43 +307,22 @@ function collectLegendItems(ctx: RenderContext): LegendItem[] {
     });
   }
 
-  // ── Accelerators / Deaccelerators ───────────────────────────────────
+  // ── Accelerators / Deaccelerators (single-pass detection) ───────────
   const accelerators = ctx.map.accelerators ?? [];
-  const hasAccelerator = accelerators.some((a) => a.type === "accelerator");
-  const hasDeaccelerator = accelerators.some((a) => a.type === "deaccelerator");
+  let hasAccelerator = false, hasDeaccelerator = false;
+  for (const a of accelerators) {
+    if (a.type === "accelerator") hasAccelerator = true;
+    else if (a.type === "deaccelerator") hasDeaccelerator = true;
+  }
 
   if (hasAccelerator) {
     const accelLabel = ACCELERATOR_LABELS[locale] ?? ACCELERATOR_LABELS.en;
-    items.push({
-      label: accelLabel,
-      renderSwatch: (x, y) => {
-        // Right-pointing arrow (mini version)
-        const cx = x + 12;
-        const cy = y + 10;
-        return (
-          `<path d="M ${cx - 7} ${cy - 4} L ${cx} ${cy - 4} L ${cx} ${cy - 7} L ${cx + 7} ${cy} ` +
-          `L ${cx} ${cy + 7} L ${cx} ${cy + 4} L ${cx - 7} ${cy + 4} Z" ` +
-          `fill="#000000" stroke="#000000" stroke-width="1" />`
-        );
-      },
-    });
+    items.push(arrowLegendItem(accelLabel, 1));
   }
 
   if (hasDeaccelerator) {
     const deaccelLabel = DEACCELERATOR_LABELS[locale] ?? DEACCELERATOR_LABELS.en;
-    items.push({
-      label: deaccelLabel,
-      renderSwatch: (x, y) => {
-        // Left-pointing arrow (mini version — mirrored)
-        const cx = x + 12;
-        const cy = y + 10;
-        return (
-          `<path d="M ${cx + 7} ${cy - 4} L ${cx} ${cy - 4} L ${cx} ${cy - 7} L ${cx - 7} ${cy} ` +
-          `L ${cx} ${cy + 7} L ${cx} ${cy + 4} L ${cx + 7} ${cy + 4} Z" ` +
-          `fill="#000000" stroke="#000000" stroke-width="1" />`
-        );
-      },
-    });
+    items.push(arrowLegendItem(deaccelLabel, -1));
   }
 
   // ── Steps ───────────────────────────────────────────────────────────
@@ -339,7 +335,7 @@ function collectLegendItems(ctx: RenderContext): LegendItem[] {
         const cx = x + 12;
         const cy = y + 10;
         return (
-          `<circle cx="${cx}" cy="${cy}" r="7" fill="#cc0000" />` +
+          `<circle cx="${cx}" cy="${cy}" r="7" fill="${STEP_LEGEND_FILL}" />` +
           `<text x="${cx}" y="${cy + 4}" text-anchor="middle" ` +
           `font-family="Inter, sans-serif" font-size="9" font-weight="bold" ` +
           `fill="#ffffff">1</text>`

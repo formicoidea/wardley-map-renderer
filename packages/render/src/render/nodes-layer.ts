@@ -227,7 +227,7 @@ function renderMarketSymbol(
 }
 
 // ── Exported constants for testing ──────────────────────────────────
-export { METHOD_AURA_R, METHOD_DEFAULT_COLOR, MARKET_OUTER_R, MARKET_TRIANGLE_R, MARKET_VERTEX_R };
+export { METHOD_AURA_R, METHOD_DEFAULT_COLOR, MARKET_OUTER_R, MARKET_TRIANGLE_R, MARKET_VERTEX_R, SIN60, COS60 };
 
 // ── Layer renderer ───────────────────────────────────────────────────
 

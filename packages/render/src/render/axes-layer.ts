@@ -20,17 +20,7 @@ import {
   PHASE_LABEL_FONT_SIZE,
   DIRECTION_LABEL_FONT_SIZE,
 } from "../blocks/wardley-map/wardley-map-consts.js";
-
-// ── Helpers ─────────────────────────────────────────────────────────
-
-function esc(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
+import { esc } from "./svg-composer.js";
 
 // ── Layer renderer ──────────────────────────────────────────────────
 

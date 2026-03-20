@@ -29,17 +29,7 @@ const COMPONENT_LABEL_COLOR = "#333333";
 /** Component types that get a text label on the map */
 const LABEL_TYPES = new Set(["component", "user-need", "anchor", "pipeline", "market", "ecosystem"]);
 
-// ── Helpers ──────────────────────────────────────────────────────────
-
-/** Escape text for XML/SVG attribute/content safety */
-function esc(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
+import { esc } from "./svg-composer.js";
 
 // ── Layer renderer ───────────────────────────────────────────────────
 

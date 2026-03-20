@@ -15,16 +15,7 @@
  */
 
 import type { RenderContext, LayerRenderer } from "./types.js";
-
-/** Escape text for XML/SVG content safety */
-function escapeXml(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
+import { esc } from "./svg-composer.js";
 
 // ── Visual constants ─────────────────────────────────────────────────
 
@@ -143,7 +134,7 @@ export const renderAcceleratorsLayer: LayerRenderer = (
       `<text x="${labelX}" y="${cy}" text-anchor="${textAnchor}" ` +
         `dominant-baseline="central" ` +
         `font-family="${fontFamily}" font-size="${LABEL_FONT_SIZE}" ` +
-        `fill="${ARROW_STROKE}">${escapeXml(acc.label)}</text>`
+        `fill="${ARROW_STROKE}">${esc(acc.label)}</text>`
     );
   }
 

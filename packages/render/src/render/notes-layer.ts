@@ -13,6 +13,7 @@
  */
 
 import type { RenderContext, LayerRenderer } from "./types.js";
+import { esc } from "./svg-composer.js";
 
 // ── Visual constants ─────────────────────────────────────────────────
 
@@ -20,18 +21,6 @@ const NOTE_FONT_SIZE = 11;
 const NOTE_LINE_HEIGHT = 15;
 const NOTE_COLOR = "#666666";
 const NOTE_FONT_STYLE = "italic";
-
-// ── Helpers ──────────────────────────────────────────────────────────
-
-/** Escape text for XML/SVG attribute/content safety */
-function esc(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
 
 // ── Layer renderer ───────────────────────────────────────────────────
 
