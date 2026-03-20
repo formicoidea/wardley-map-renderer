@@ -2,7 +2,7 @@
  * Tests for the layer registry and type definitions.
  *
  * Validates:
- * - 9 layers are defined in correct order
+ * - 10 layers are defined in correct order
  * - registerLayer / getOrderedLayers / getLayer work correctly
  * - validateRegistry detects missing layers
  * - Layers execute in z-order (back-to-front)
@@ -25,8 +25,8 @@ import type { LayerName, LayerRenderer, RenderContext } from "./types.js";
 const stubRenderer = (name: string): LayerRenderer => () => [`<!-- ${name} -->`];
 
 describe("LAYER_ORDER", () => {
-  it("defines exactly 9 layers", () => {
-    expect(Object.keys(LAYER_ORDER)).toHaveLength(9);
+  it("defines exactly 11 layers", () => {
+    expect(Object.keys(LAYER_ORDER)).toHaveLength(11);
   });
 
   it("contains all expected layer names", () => {
@@ -67,9 +67,9 @@ describe("LAYER_ORDER", () => {
 
 describe("LAYER_NAMES", () => {
   it("has 9 entries in execution order", () => {
-    expect(LAYER_NAMES).toHaveLength(9);
+    expect(LAYER_NAMES).toHaveLength(11);
     expect(LAYER_NAMES[0]).toBe("title");
-    expect(LAYER_NAMES[8]).toBe("legend");
+    expect(LAYER_NAMES[10]).toBe("legend");
   });
 });
 
@@ -119,13 +119,13 @@ describe("validateRegistry", () => {
     clearRegistry();
   });
 
-  it("reports all 9 layers missing when registry is empty", () => {
+  it("reports all 11 layers missing when registry is empty", () => {
     const result = validateRegistry();
     expect(result.valid).toBe(false);
-    expect(result.missing).toHaveLength(9);
+    expect(result.missing).toHaveLength(11);
   });
 
-  it("reports valid when all 9 layers are registered", () => {
+  it("reports valid when all 11 layers are registered", () => {
     for (const name of LAYER_NAMES) {
       registerLayer(name, stubRenderer(name));
     }
@@ -165,7 +165,7 @@ describe("Layer execution order (z-order)", () => {
   });
 
   it("produces SVG fragments in back-to-front order", () => {
-    // Register all 9 layers with traceable output
+    // Register all 11 layers with traceable output
     for (const name of LAYER_NAMES) {
       registerLayer(name, () => [`<!-- layer:${name} -->`]);
     }
@@ -180,6 +180,8 @@ describe("Layer execution order (z-order)", () => {
       "<!-- layer:edges -->",
       "<!-- layer:evolvesTo -->",
       "<!-- layer:nodes -->",
+      "<!-- layer:steps -->",
+      "<!-- layer:accelerators -->",
       "<!-- layer:labels -->",
       "<!-- layer:notes -->",
       "<!-- layer:legend -->",

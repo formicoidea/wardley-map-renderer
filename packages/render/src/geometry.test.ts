@@ -65,12 +65,12 @@ describe("createRenderContext", () => {
 
     expect(ctx.width).toBe(1600);
     expect(ctx.height).toBe(800);
-    expect(ctx.plotLeft).toBe(48); // AXIS_MARGIN_LEFT
-    expect(ctx.plotTop).toBe(24); // AXIS_MARGIN_TOP
+    expect(ctx.plotLeft).toBe(28); // AXIS_MARGIN_LEFT
+    expect(ctx.plotTop).toBe(28); // AXIS_MARGIN_TOP
     expect(ctx.plotRight).toBe(1580); // 1600 - 20
-    expect(ctx.plotBottom).toBe(752); // 800 - 48
-    expect(ctx.plotWidth).toBe(1532); // 1580 - 48
-    expect(ctx.plotHeight).toBe(728); // 752 - 24
+    expect(ctx.plotBottom).toBe(772); // 800 - 28
+    expect(ctx.plotWidth).toBe(1552); // 1580 - 28
+    expect(ctx.plotHeight).toBe(744); // 772 - 28
   });
 
   it("adapts to different renderConfig while keeping fixed margins", () => {
@@ -81,12 +81,12 @@ describe("createRenderContext", () => {
     expect(ctx.width).toBe(800);
     expect(ctx.height).toBe(600);
     // Margins stay the same
-    expect(ctx.plotLeft).toBe(48);
-    expect(ctx.plotTop).toBe(24);
+    expect(ctx.plotLeft).toBe(28);
+    expect(ctx.plotTop).toBe(28);
     expect(ctx.plotRight).toBe(780); // 800 - 20
-    expect(ctx.plotBottom).toBe(552); // 600 - 48
-    expect(ctx.plotWidth).toBe(732); // 780 - 48
-    expect(ctx.plotHeight).toBe(528); // 552 - 24
+    expect(ctx.plotBottom).toBe(572); // 600 - 28
+    expect(ctx.plotWidth).toBe(752); // 780 - 28
+    expect(ctx.plotHeight).toBe(544); // 572 - 28
   });
 });
 

@@ -28,7 +28,7 @@ const EvolutionRangeSchema = z
   .openapi("EvolutionRange");
 
 const ComponentTypeEnum = z.enum([
-  "component", "user-need", "pipeline", "note", "anchor",
+  "component", "user-need", "pipeline", "note", "anchor", "market", "ecosystem",
 ]).openapi("ComponentType");
 
 const NatureEnum = z.enum([
@@ -66,6 +66,7 @@ const EvolvesToSchema = z.object({
     visibility: z.object({ scalar: z.number().min(0).max(1) }),
   }),
   evolveType: z.enum(["natural", "ecosystem", "forced", "late"]).default("natural"),
+  inertia: z.boolean().optional(),
 }).openapi("EvolvesTo");
 
 const PipelineGeometrySchema = z.object({
@@ -75,6 +76,11 @@ const PipelineGeometrySchema = z.object({
   visEnd: z.number().min(0).max(1),
   handleEvolution: z.number().min(0).max(1).optional(),
 }).openapi("PipelineGeometry");
+
+const MethodSchema = z.object({
+  type: z.string(),
+  preconisation: z.string(),
+}).openapi("Method");
 
 const ComponentSchema = z.object({
   id: z.string(),
@@ -86,6 +92,7 @@ const ComponentSchema = z.object({
   evolvesTo: z.array(EvolvesToSchema).optional(),
   pipelineGeometry: PipelineGeometrySchema.optional(),
   color: z.string().optional(),
+  method: MethodSchema.optional(),
 }).openapi("Component");
 
 const FlowSchema = z.object({
@@ -170,6 +177,15 @@ const EvolveStyleSchema = z.object({
   strokeDasharray: z.string().optional(),
 }).openapi("EvolveStyle");
 
+const MethodConfigSchema = z.object({
+  type: z.string(),
+  color: z.string(),
+  legend: z.record(z.string(), z.string()).refine(
+    (rec) => Object.keys(rec).length === 3,
+    { message: "methods[].legend must have exactly 3 keys" },
+  ),
+}).openapi("MethodConfig");
+
 const RenderConfigSchema = z.object({
   /** Override canvas width (defaults to 1600) */
   width: z.number().positive().optional(),
@@ -203,7 +219,24 @@ const RenderConfigSchema = z.object({
   filters: FiltersSchema.optional(),
   /** Stroke width in pixels for edges and node outlines (defaults to 1) */
   strokeWidth: z.number().min(0.25).max(8).default(1),
+  /** Per-method rendering configuration (type, color, i18n legend labels) */
+  methods: z.array(MethodConfigSchema).optional(),
 }).openapi("RenderConfig");
+
+const AcceleratorTypeEnum = z.enum(["accelerator", "deaccelerator"]).openapi("AcceleratorType");
+
+const AcceleratorSchema = z.object({
+  id: z.string(),
+  label: z.string(),
+  position: PositionSchema,
+  type: AcceleratorTypeEnum,
+}).openapi("Accelerator");
+
+const StepSchema = z.object({
+  number: z.number().int().min(1),
+  position: PositionSchema,
+  color: z.string().optional(),
+}).openapi("Step");
 
 const WardleyMapSchema = z.object({
   title: z.string(),
@@ -211,6 +244,8 @@ const WardleyMapSchema = z.object({
   relations: z.array(RelationSchema),
   context: z.string().optional(),
   renderConfig: RenderConfigSchema.optional(),
+  accelerators: z.array(AcceleratorSchema).optional(),
+  steps: z.array(StepSchema).optional(),
 }).openapi("WardleyMap");
 
 // ── RFC 7807 Problem Detail (manually defined, not from Zod) ──

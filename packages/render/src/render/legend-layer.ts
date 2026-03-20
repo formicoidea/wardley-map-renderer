@@ -47,8 +47,8 @@ const EVOLVE_COLORS: Record<string, string> = {
 const TITLE_LABELS: Record<string, string> = { en: "Legend", fr: "Légende" };
 
 const TYPE_LABELS: Record<string, Record<string, string>> = {
-  en: { component: "Component", "user-need": "User Need", pipeline: "Pipeline", anchor: "User / Stakeholder", note: "Note" },
-  fr: { component: "Composant", "user-need": "Besoin utilisateur", pipeline: "Pipeline", anchor: "Utilisateur / Partie prenante", note: "Note" },
+  en: { component: "Component", "user-need": "User Need", pipeline: "Pipeline", anchor: "User / Stakeholder", note: "Note", market: "Market", ecosystem: "Ecosystem" },
+  fr: { component: "Composant", "user-need": "Besoin utilisateur", pipeline: "Pipeline", anchor: "Utilisateur / Partie prenante", note: "Note", market: "Marché", ecosystem: "Écosystème" },
 };
 
 const EVOLVE_LABELS: Record<string, Record<string, string>> = {
@@ -56,8 +56,15 @@ const EVOLVE_LABELS: Record<string, Record<string, string>> = {
   fr: { natural: "Changement futur", ecosystem: "Poussée par l'écosystème", forced: "Changement forcé", late: "Changement déjà en cours" },
 };
 
+// Method colors and labels are resolved from renderConfig.methods[] — no hardcoded constants
+
+const INERTIA_LABELS: Record<string, string> = { en: "Inertia", fr: "Inertie" };
+const ACCELERATOR_LABELS: Record<string, string> = { en: "Accelerator", fr: "Accélérateur" };
+const DEACCELERATOR_LABELS: Record<string, string> = { en: "Deaccelerator", fr: "Décélérateur" };
+const STEP_LABELS: Record<string, string> = { en: "Step", fr: "Étape" };
+
 /** Canonical display order for component types in the legend */
-const TYPE_ORDER = ["component", "user-need", "pipeline", "anchor", "note"];
+const TYPE_ORDER = ["component", "user-need", "pipeline", "anchor", "market", "ecosystem", "note"] as const;
 
 // ── Legend item definition ─────────────────────────────────────────────
 
@@ -127,6 +134,53 @@ function collectLegendItems(ctx: RenderContext): LegendItem[] {
           );
         },
       });
+    } else if (type === "market") {
+      // Market swatch: small circle + inscribed triangle + 3 vertex dots (scaled down for legend)
+      items.push({
+        label,
+        renderSwatch: (x, y) => {
+          const cx = x + 12;
+          const cy = y + 10;
+          const r = 7; // scaled-down outer radius for legend
+          const sin60 = Math.sin(Math.PI / 3);
+          const cos60 = Math.cos(Math.PI / 3);
+          const tTopX = cx;
+          const tTopY = cy - r;
+          const tBlX = cx - r * sin60;
+          const tBlY = cy + r * cos60;
+          const tBrX = cx + r * sin60;
+          const tBrY = cy + r * cos60;
+          return (
+            `<circle cx="${cx}" cy="${cy}" r="${r}" ` +
+            `fill="#ffffff" stroke="${color}" stroke-width="1" />` +
+            `<polygon points="${tTopX},${tTopY} ${tBlX},${tBlY} ${tBrX},${tBrY}" ` +
+            `fill="none" stroke="${color}" stroke-width="1" stroke-linejoin="round" />` +
+            `<circle cx="${tTopX}" cy="${tTopY}" r="2" ` +
+            `fill="#ffffff" stroke="${color}" stroke-width="1" />` +
+            `<circle cx="${tBlX}" cy="${tBlY}" r="2" ` +
+            `fill="#ffffff" stroke="${color}" stroke-width="1" />` +
+            `<circle cx="${tBrX}" cy="${tBrY}" r="2" ` +
+            `fill="#ffffff" stroke="${color}" stroke-width="1" />`
+          );
+        },
+      });
+    } else if (type === "ecosystem") {
+      // Ecosystem swatch: 3 concentric circles (scaled down for legend)
+      items.push({
+        label,
+        renderSwatch: (x, y) => {
+          const cx = x + 12;
+          const cy = y + 10;
+          return (
+            `<circle cx="${cx}" cy="${cy}" r="8" ` +
+            `fill="#cccccc" stroke="${color}" stroke-width="1" />` +
+            `<circle cx="${cx}" cy="${cy}" r="6" ` +
+            `fill="#cccccc" stroke="${color}" stroke-width="1" stroke-dasharray="2,1" />` +
+            `<circle cx="${cx}" cy="${cy}" r="3" ` +
+            `fill="#ffffff" stroke="${color}" stroke-width="1" />`
+          );
+        },
+      });
     } else {
       // component, user-need, note — all use circle swatch
       items.push({
@@ -188,6 +242,109 @@ function collectLegendItems(ctx: RenderContext): LegendItem[] {
         `<line x1="${x + 2}" y1="${y + 10}" x2="${x + 18}" y2="${y + 10}" ` +
         `stroke="${color}" stroke-width="1.5" stroke-dasharray="6,3" />` +
         `<polygon points="${x + 22},${y + 10} ${x + 17},${y + 7} ${x + 17},${y + 13}" fill="${color}" />`,
+    });
+  }
+
+  // ── Inertia ─────────────────────────────────────────────────────────
+  const hasInertia = ctx.evolves.some((e) => e.inertia);
+  if (hasInertia) {
+    const inertiaLabel = INERTIA_LABELS[locale] ?? INERTIA_LABELS.en;
+    items.push({
+      label: inertiaLabel,
+      renderSwatch: (x, y) =>
+        `<line x1="${x + 12}" y1="${y + 2}" x2="${x + 12}" y2="${y + 18}" ` +
+        `stroke="#000000" stroke-width="4" />`,
+    });
+  }
+
+  // ── Method indicators ───────────────────────────────────────────────
+  // Colors and labels resolved from renderConfig.methods[] — textual legend values, not symbols
+  const presentMethods = new Set(
+    ctx.nodes.map((n) => n.component.method?.type).filter(Boolean) as string[]
+  );
+  const methodConfigs = ctx.resolvedConfig.methods;
+  // Build lookup for configured methods
+  const methodConfigMap = new Map(methodConfigs.map((mc) => [mc.type, mc]));
+  // Iterate configured methods first (stable order), then any unconfigured present methods
+  const orderedMethodTypes = [
+    ...methodConfigs.map((mc) => mc.type).filter((t) => presentMethods.has(t)),
+    ...[...presentMethods].filter((t) => !methodConfigMap.has(t)),
+  ];
+  for (const m of orderedMethodTypes) {
+    const mc = methodConfigMap.get(m);
+    const mColor = mc?.color ?? "#888888";
+    // Legend label: capitalize the method type name (e.g., "buying-policy" → "Buying Policy")
+    const mLabel = m.split("-").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+    items.push({
+      label: mLabel,
+      renderSwatch: (x, y) => {
+        // Concentric circles swatch (matches node-level method indicator from AC 4)
+        const cx = x + 12;
+        const cy = y + 10;
+        return (
+          `<circle cx="${cx}" cy="${cy}" r="7" fill="${mColor}" />` +
+          `<circle cx="${cx}" cy="${cy}" r="4" fill="${mColor}" stroke="#ffffff" stroke-width="1" />` +
+          `<circle cx="${cx}" cy="${cy}" r="1.5" fill="#ffffff" />`
+        );
+      },
+    });
+  }
+
+  // ── Accelerators / Deaccelerators ───────────────────────────────────
+  const accelerators = ctx.map.accelerators ?? [];
+  const hasAccelerator = accelerators.some((a) => a.type === "accelerator");
+  const hasDeaccelerator = accelerators.some((a) => a.type === "deaccelerator");
+
+  if (hasAccelerator) {
+    const accelLabel = ACCELERATOR_LABELS[locale] ?? ACCELERATOR_LABELS.en;
+    items.push({
+      label: accelLabel,
+      renderSwatch: (x, y) => {
+        // Right-pointing arrow (mini version)
+        const cx = x + 12;
+        const cy = y + 10;
+        return (
+          `<path d="M ${cx - 7} ${cy - 4} L ${cx} ${cy - 4} L ${cx} ${cy - 7} L ${cx + 7} ${cy} ` +
+          `L ${cx} ${cy + 7} L ${cx} ${cy + 4} L ${cx - 7} ${cy + 4} Z" ` +
+          `fill="#000000" stroke="#000000" stroke-width="1" />`
+        );
+      },
+    });
+  }
+
+  if (hasDeaccelerator) {
+    const deaccelLabel = DEACCELERATOR_LABELS[locale] ?? DEACCELERATOR_LABELS.en;
+    items.push({
+      label: deaccelLabel,
+      renderSwatch: (x, y) => {
+        // Left-pointing arrow (mini version — mirrored)
+        const cx = x + 12;
+        const cy = y + 10;
+        return (
+          `<path d="M ${cx + 7} ${cy - 4} L ${cx} ${cy - 4} L ${cx} ${cy - 7} L ${cx - 7} ${cy} ` +
+          `L ${cx} ${cy + 7} L ${cx} ${cy + 4} L ${cx + 7} ${cy + 4} Z" ` +
+          `fill="#000000" stroke="#000000" stroke-width="1" />`
+        );
+      },
+    });
+  }
+
+  // ── Steps ───────────────────────────────────────────────────────────
+  const steps = ctx.map.steps ?? [];
+  if (steps.length > 0) {
+    const stepLabel = STEP_LABELS[locale] ?? STEP_LABELS.en;
+    items.push({
+      label: stepLabel,
+      renderSwatch: (x, y) => {
+        const cx = x + 12;
+        const cy = y + 10;
+        return (
+          `<circle cx="${cx}" cy="${cy}" r="7" fill="#cc0000" />` +
+          `<text x="${cx}" y="${cy + 4}" text-anchor="middle" ` +
+          `font-family="Inter, sans-serif" font-size="9" font-weight="bold" ` +
+          `fill="#ffffff">1</text>`
+        );
+      },
     });
   }
 

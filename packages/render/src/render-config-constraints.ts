@@ -54,7 +54,7 @@
  * @module render-config-constraints
  */
 
-import type { RenderConfig } from "./schema.js";
+import type { RenderConfig, Legend } from "./schema.js";
 import { LAYER_TOGGLE_DAG } from "./schema.js";
 import {
   EXECUTABLE_CONSTRAINT_GRAPH,
@@ -207,7 +207,7 @@ function clipLegendBounds(config: RenderConfig): RenderConfig {
     legend: {
       ...config.legend,
       position: { x: clampedX, y: clampedY },
-    },
+    } as Legend,
   };
 }
 

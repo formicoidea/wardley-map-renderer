@@ -63,6 +63,20 @@ export interface EvolveGeometry {
   readonly toY: number;
   readonly evolveType: "natural" | "ecosystem" | "forced"| "late";
   readonly component: Component;
+  /** When true, inertia barrier lines are rendered at crossed phase boundaries */
+  readonly inertia?: boolean;
+}
+
+/** Pixel geometry for an inertia barrier line (thick vertical line at phase boundary) */
+export interface InertiaGeometry {
+  /** X pixel coordinate of the phase boundary */
+  readonly x: number;
+  /** Top Y pixel coordinate of the inertia line */
+  readonly y1: number;
+  /** Bottom Y pixel coordinate of the inertia line */
+  readonly y2: number;
+  /** The associated component */
+  readonly component: Component;
 }
 
 /** Pixel geometry for a pipeline background rect */
@@ -133,6 +147,9 @@ export interface RenderGeometry {
 
   /** Pre-computed evolvesTo arrow pixel positions */
   readonly evolves: ReadonlyArray<EvolveGeometry>;
+
+  /** Pre-computed inertia barrier line positions (thick vertical lines at phase boundaries) */
+  readonly inertiaBarriers: ReadonlyArray<InertiaGeometry>;
 
   /** Pre-computed pipeline rectangle pixel positions */
   readonly pipelines: ReadonlyArray<PipelineGeometryPixels>;
@@ -256,6 +273,9 @@ export interface RenderContext {
   /** Pre-computed evolvesTo arrow positions (Phase 1 output) — shortcut to geometry.evolves */
   readonly evolves: ReadonlyArray<EvolveGeometry>;
 
+  /** Pre-computed inertia barrier positions (Phase 1 output) — shortcut to geometry.inertiaBarriers */
+  readonly inertiaBarriers: ReadonlyArray<InertiaGeometry>;
+
   /** Pre-computed pipeline rectangles (Phase 1 output) — shortcut to geometry.pipelines */
   readonly pipelines: ReadonlyArray<PipelineGeometryPixels>;
 
@@ -300,6 +320,8 @@ export type LayerName =
   | "edges"
   | "evolvesTo"
   | "nodes"
+  | "steps"
+  | "accelerators"
   | "labels"
   | "notes"
   | "legend";

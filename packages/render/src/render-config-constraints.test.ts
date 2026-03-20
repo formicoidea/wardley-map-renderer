@@ -41,7 +41,7 @@ import {
   type ConstraintCheckInput,
 } from "./config-constraint-graph.js";
 import { resolveConfig } from "./resolve-conflict.js";
-import { RenderConfigSchema, type RenderConfig } from "./schema.js";
+import { RenderConfigSchema, type RenderConfig, type CoordinateSpace, type Legend, type EvolutionPhases } from "./schema.js";
 
 // ── Test helpers ──────────────────────────────────────────────────────────────
 
@@ -457,8 +457,8 @@ describe("resolveConfig integration — constraints run after merge", () => {
       const { config: result } = resolveConfig(
         {},
         {
-          coordinateSpace: { width: 800, height: 800 },
-          legend: { position: { x: 900, y: 100 } },
+          coordinateSpace: { width: 800, height: 800 } as CoordinateSpace,
+          legend: { position: { x: 900, y: 100 } } as Legend,
         },
         // no options → default warn
       );
@@ -476,8 +476,8 @@ describe("resolveConfig integration — constraints run after merge", () => {
       resolveConfig(
         {},
         {
-          coordinateSpace: { width: 800, height: 800 },
-          legend: { position: { x: 900, y: 100 } },
+          coordinateSpace: { width: 800, height: 800 } as CoordinateSpace,
+          legend: { position: { x: 900, y: 100 } } as Legend,
         },
         { violationPolicy: "throw" },
       ),
@@ -490,7 +490,7 @@ describe("resolveConfig integration — constraints run after merge", () => {
       resolveConfig(
         {},
         {
-          background: { evolutionPhases: { phases: ["A", "B", "C"] } },
+          background: { evolutionPhases: { phases: ["A", "B", "C"] } as EvolutionPhases },
           evolveStyles: { natural: {}, ecosystem: {} },
         },
         { violationPolicy: "throw" },
@@ -502,8 +502,8 @@ describe("resolveConfig integration — constraints run after merge", () => {
     const { config: result } = resolveConfig(
       {},
       {
-        coordinateSpace: { width: 800, height: 400 },
-        legend: { position: { x: 1200, y: 50 } },
+        coordinateSpace: { width: 800, height: 400 } as CoordinateSpace,
+        legend: { position: { x: 1200, y: 50 } } as Legend,
         // x=1200 > coordinateSpace.width=800 but ≤ Zod default 1600
       },
       { violationPolicy: "clip" },
@@ -535,8 +535,8 @@ describe("resolveConfig integration — constraints run after merge", () => {
     const { config: result } = resolveConfig(
       { theme: "dark" },
       {
-        coordinateSpace: { width: 400, height: 200 },
-        legend: { position: { x: 500, y: 100 } },
+        coordinateSpace: { width: 400, height: 200 } as CoordinateSpace,
+        legend: { position: { x: 500, y: 100 } } as Legend,
         // x=500 > coordinateSpace.width=400 but ≤ Zod default 1600
       },
       { violationPolicy: "clip" },

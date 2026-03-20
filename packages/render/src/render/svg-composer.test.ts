@@ -240,12 +240,12 @@ describe("buildRenderContext()", () => {
 
   it("computes plot area with fixed margins", () => {
     const ctx = buildRenderContext(MINIMAL_MAP);
-    expect(ctx.plot.left).toBe(48);   // AXIS_MARGIN_LEFT
-    expect(ctx.plot.top).toBe(24);    // AXIS_MARGIN_TOP
+    expect(ctx.plot.left).toBe(28);   // AXIS_MARGIN_LEFT
+    expect(ctx.plot.top).toBe(28);    // AXIS_MARGIN_TOP
     expect(ctx.plot.right).toBe(1580); // 1600 - 20
-    expect(ctx.plot.bottom).toBe(752); // 800 - 48
-    expect(ctx.plot.width).toBe(1532); // 1580 - 48
-    expect(ctx.plot.height).toBe(728); // 752 - 24
+    expect(ctx.plot.bottom).toBe(772); // 800 - 28
+    expect(ctx.plot.width).toBe(1552); // 1580 - 28
+    expect(ctx.plot.height).toBe(744); // 772 - 28
   });
 
   it("provides evoToX and visToY converters", () => {
@@ -293,7 +293,7 @@ describe("buildRenderContext()", () => {
     expect(ctx.canvasWidth).toBe(800);
     expect(ctx.canvasHeight).toBe(400);
     // Margins are still fixed
-    expect(ctx.plot.left).toBe(48);
+    expect(ctx.plot.left).toBe(28);
     expect(ctx.plot.right).toBe(780); // 800 - 20
   });
 

@@ -27,7 +27,7 @@ const COMPONENT_LABEL_BASE_FONT_SIZE = 12;
 const COMPONENT_LABEL_COLOR = "#333333";
 
 /** Component types that get a text label on the map */
-const LABEL_TYPES = new Set(["component", "user-need", "anchor", "pipeline"]);
+const LABEL_TYPES = new Set(["component", "user-need", "anchor", "pipeline", "market", "ecosystem"]);
 
 // ── Helpers ──────────────────────────────────────────────────────────
 

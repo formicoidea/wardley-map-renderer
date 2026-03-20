@@ -38,7 +38,7 @@ import {
   evaluateConstraints,
   ConstraintViolationError,
 } from "./render-config-constraints.js";
-import { RenderConfigSchema, type RenderConfig } from "./schema.js";
+import { RenderConfigSchema, type RenderConfig, type CoordinateSpace, type Legend } from "./schema.js";
 import {
   collectConfigDiagnostics,
   createDiagnosticsCollector,
@@ -307,8 +307,8 @@ describe("end-to-end resolveConfig diagnostic flow — Zod + constraint graph in
       resolveConfig(
         { theme: "dark" },
         {
-          coordinateSpace: { width: 1600, height: 800 },
-          legend: { position: { x: 100, y: 100 } }, // within bounds
+          coordinateSpace: { width: 1600, height: 800 } as CoordinateSpace,
+          legend: { position: { x: 100, y: 100 } } as Legend, // within bounds
           evolveStyles: { natural: { stroke: "#ef4444" } },
           filters: { layers: { nodes: true, evolvesTo: true, labels: true } },
         },
@@ -341,8 +341,8 @@ describe("end-to-end resolveConfig diagnostic flow — Zod + constraint graph in
       resolveConfig(
         {},
         {
-          coordinateSpace: { width: 800, height: 800 },
-          legend: { position: { x: 900, y: 100 } },
+          coordinateSpace: { width: 800, height: 800 } as CoordinateSpace,
+          legend: { position: { x: 900, y: 100 } } as Legend,
         },
         { violationPolicy: "throw" },
       );
@@ -366,8 +366,8 @@ describe("end-to-end resolveConfig diagnostic flow — Zod + constraint graph in
       const { config: result } = resolveConfig(
         {},
         {
-          coordinateSpace: { width: 600, height: 400 },
-          legend: { position: { x: 700, y: 50 } }, // x=700 > width=600, ≤ Zod max 1600
+          coordinateSpace: { width: 600, height: 400 } as CoordinateSpace,
+          legend: { position: { x: 700, y: 50 } } as Legend, // x=700 > width=600, ≤ Zod max 1600
         },
         { violationPolicy: "warn" },
       );
@@ -388,8 +388,8 @@ describe("end-to-end resolveConfig diagnostic flow — Zod + constraint graph in
     const { config: result } = resolveConfig(
       {},
       {
-        coordinateSpace: { width: 400, height: 300 },
-        legend: { position: { x: 500, y: 50 } }, // x=500 > width=400, ≤ Zod default 1600
+        coordinateSpace: { width: 400, height: 300 } as CoordinateSpace,
+        legend: { position: { x: 500, y: 50 } } as Legend, // x=500 > width=400, ≤ Zod default 1600
       },
       { violationPolicy: "clip" },
     );
@@ -413,7 +413,7 @@ describe("representative diagnostic scenarios — combined unrecognized types + 
           // Unknown evolveStyles key → Zod rejects
           evolveStyles: { "genesis-phase": { stroke: "#f00" } } as never,
           // Legend OOB would be a constraint violation — but Zod fires first
-          legend: { position: { x: 9999, y: 0 } },
+          legend: { position: { x: 9999, y: 0 } } as Legend,
         },
       ),
     ).toThrow(ZodError);

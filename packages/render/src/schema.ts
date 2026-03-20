@@ -30,14 +30,16 @@ export const EvolutionRangeSchema = z
     message: "evolutionRange[0] (min) must be ≤ evolutionRange[1] (max)",
   });
 
-// ── Component types (aligned with MapKeep) ──────────────────
-// 5 types: component (generic capacity), user-need, pipeline, note, anchor
+// ── Component types (aligned with MapKeep + OWM standard) ──────────────────
+// 7 types: component (generic capacity), user-need, pipeline, note, anchor, market, ecosystem
 export const ComponentTypeEnum = z.enum([
   "component",
   "user-need",
   "pipeline",
   "note",
   "anchor",
+  "market",
+  "ecosystem",
 ]);
 
 // ── Nature (optional semantic annotation) ───────────────────
@@ -95,6 +97,8 @@ export const EvolvesToSchema = z.object({
     visibility: z.object({ scalar: z.number().min(0).max(1) }),
   }),
   evolveType: EvolveTypeEnum.default("natural"),
+  /** When true, indicates resistance to evolution (inertia barrier at phase boundary). */
+  inertia: z.boolean().optional(),
 });
 
 // ── Pipeline geometry ───────────────────────────────────────
@@ -106,6 +110,14 @@ export const PipelineGeometrySchema = z.object({
   visEnd: z.number().min(0).max(1),
   handleEvolution: EvolutionSchema.optional(),
 });
+
+// ── Method (Build / Buy / Outsource) ──────────────────────
+/** @deprecated Kept for backward-compatible re-export; prefer MethodSchema. */
+export const MethodEnum = z.object({
+  type: z.string(),
+  preconisation: z.string(),
+});
+export const MethodSchema = MethodEnum;
 
 // ── Component ──────────────────────────────────────────────
 export const ComponentSchema = z.object({
@@ -121,6 +133,8 @@ export const ComponentSchema = z.object({
   pipelineGeometry: PipelineGeometrySchema.optional(),
   // Optional color override (Tailwind-style name, e.g. "red-600")
   color: z.string().optional(),
+  // Optional method annotation (Build / Buy / Outsource)
+  method: MethodSchema.optional(),
 });
 
 // ── Relation (edge) ────────────────────────────────────────
@@ -1031,7 +1045,7 @@ export const FiltersSchema = z.object({
    * a visual-layer toggle. The field name `excludeComponentTypes` also makes explicit
    * that the filter discriminates by component **type** (as defined by `ComponentTypeEnum`).
    *
-   * Valid type values: `"component"` | `"user-need"` | `"pipeline"` | `"note"` | `"anchor"`
+   * Valid type values: `"component"` | `"user-need"` | `"pipeline"` | `"note"` | `"anchor"` | `"market"` | `"ecosystem"`
    *
    * @distinction Contrast with `layers` (visual-layer toggles, post-render):
    *   - `excludeComponentTypes` operates at the **data level** (pre-render): filtered
@@ -1277,6 +1291,31 @@ export function resolveConfigIntent(partial?: Partial<ConfigIntent>): ConfigInte
 // TypeScript resolves type aliases lazily, so this is always valid.
 export type ConfigFieldCategory = FieldCategory;
 
+// ── MethodConfig — per-method rendering configuration ──────────────────
+/**
+ * Schema for a single method entry in `renderConfig.methods[]`.
+ *
+ * Each entry maps a method type string to its rendering color and i18n legend labels.
+ * The `legend` record must contain exactly 3 keys (typically "en", "fr", and one more,
+ * or the three method display names for different contexts).
+ *
+ * @example
+ *   { type: "build", color: "#00a86b", legend: { en: "Build", fr: "Construire", de: "Bauen" } }
+ */
+export const MethodConfigSchema = z.object({
+  /** Method type identifier (free string, validated at runtime against renderConfig) */
+  type: z.string(),
+  /** CSS color string for method indicator rendering */
+  color: z.string(),
+  /** i18n legend labels — must contain exactly 3 keys */
+  legend: z.record(z.string(), z.string()).refine(
+    (rec) => Object.keys(rec).length === 3,
+    { message: "methods[].legend must have exactly 3 keys" },
+  ),
+});
+
+export type MethodConfig = z.infer<typeof MethodConfigSchema>;
+
 export const RenderConfigSchema = z.object({
   /**
    * Canvas width in pixels — defines the horizontal extent of the canvas coordinate space.
@@ -1514,6 +1553,17 @@ export const RenderConfigSchema = z.object({
    * @see resolveConfigIntent — for merging partial overrides
    * @category platform-constraint
    */
+  /**
+   * Method rendering configuration — maps method type strings to colors and i18n legend labels.
+   *
+   * Each entry defines how a specific method type (e.g. "build", "buy", "outsource") is
+   * rendered: its indicator color and its legend labels (exactly 3 keys per entry).
+   *
+   * This is an array of single method config objects (one method per entry).
+   *
+   * @category author-intent
+   */
+  methods: z.array(MethodConfigSchema).optional(),
   configIntent: ConfigIntentSchema.partial().optional(),
 })
   /**
@@ -1552,6 +1602,31 @@ export const RenderConfigSchema = z.object({
   }
 });
 
+// ── Accelerator / Deaccelerator (gameplay layer) ──────────
+export const AcceleratorTypeEnum = z.enum(["accelerator", "deaccelerator"]);
+
+export const AcceleratorSchema = z.object({
+  id: z.string(),
+  label: z.string(),
+  position: PositionSchema,
+  type: AcceleratorTypeEnum,
+});
+
+// ── Steps (stage stickers) ─────────────────────────────────
+/**
+ * A step sticker placed on the map. Steps are numbered markers with a position
+ * and an optional colour override. The descriptive text associated with each
+ * step number lives outside the JSON (managed client-side).
+ */
+export const StepSchema = z.object({
+  /** Step number displayed inside the sticker (e.g. 1, 2, 3…). */
+  number: z.number().int().min(1),
+  /** Position on the map (evolution × visibility). */
+  position: PositionSchema,
+  /** Optional fill colour override (any valid CSS colour string). */
+  color: z.string().optional(),
+});
+
 // ── Wardley Map ────────────────────────────────────────────
 export const WardleyMapSchema = z.object({
   title: z.string(),
@@ -1561,12 +1636,18 @@ export const WardleyMapSchema = z.object({
   // Optional render config — single source of truth for all visual overrides
   // Canvas dimensions: renderConfig.width (default 1600), renderConfig.height (default 800)
   renderConfig: RenderConfigSchema.optional(),
+  // Gameplay layer: accelerators and deaccelerators
+  accelerators: z.array(AcceleratorSchema).optional(),
+  // Steps: numbered stage stickers on the map
+  steps: z.array(StepSchema).optional(),
 });
 
 // ── TypeScript types derived from Zod ──────────────────────
 export type Component = z.infer<typeof ComponentSchema>;
 /** Union of all valid component type strings (derived from ComponentTypeEnum). */
 export type ComponentType = z.infer<typeof ComponentTypeEnum>;
+/** Method annotation object (type + preconisation, free strings). */
+export type Method = z.infer<typeof MethodSchema>;
 export type Label = z.infer<typeof LabelSchema>;
 export type LabelPosition = z.infer<typeof LabelPositionSchema>;
 export type EvolutionField = z.infer<typeof EvolutionFieldSchema>;
@@ -1616,6 +1697,9 @@ export type RenderConfig = z.infer<typeof RenderConfigSchema>;
 export type RenderConfigInput = z.input<typeof RenderConfigSchema>;
 export type EvolveStyle = z.infer<typeof EvolveStyleSchema>;
 export type EvolveStylesMap = z.infer<typeof EvolveStylesMapSchema>;
+export type AcceleratorType = z.infer<typeof AcceleratorTypeEnum>;
+export type Accelerator = z.infer<typeof AcceleratorSchema>;
+export type Step = z.infer<typeof StepSchema>;
 export type WardleyMap = z.infer<typeof WardleyMapSchema>;
 
 // TypeStyleMap<V> is defined earlier alongside makeTypeStyleMapSchema and TypeColorsSchema.
@@ -1740,6 +1824,8 @@ const LEGACY_TYPE_MAP: Record<string, Component["type"]> = {
   "user-need": "user-need",
   pipeline: "pipeline",
   note: "note",
+  market: "market",
+  ecosystem: "ecosystem",
 };
 
 const LEGACY_RELATION_TYPE_MAP: Record<string, string> = {
@@ -2186,6 +2272,8 @@ export interface ResolvedRenderConfig {
    * @see ConfigIntentSchema — the Zod schema
    * @see DEFAULT_CONFIG_INTENT — the defaults
    */
+  /** Method rendering configuration — array of method configs with type, color, and i18n legend labels */
+  methods: MethodConfig[];
   configIntent: ConfigIntent;
 }
 
@@ -2213,6 +2301,23 @@ const THEME_BASELINE_DEFAULT: Omit<ResolvedRenderConfig, "theme"> = {
   legend: { show: true, position: "bottom-right" as const, legendOverflow: "allow" as const },
   strokeWidth: 1,
   coordinateSpace: DEFAULT_COORDINATE_SPACE,
+  methods: [
+    {
+      type: "buying-policy",
+      color: "#2563eb",
+      legend: { Uncharted: "build", Transitional: "buy", Industrialized: "outsource" },
+    },
+    {
+      type: "project-management",
+      color: "#16a34a",
+      legend: { Uncharted: "agile", Transitional: "lean", Industrialized: "sixsigma" },
+    },
+    {
+      type: "attitudes",
+      color: "#f59e0b",
+      legend: { Uncharted: "pioneers", Transitional: "settlers", Industrialized: "town-planners" },
+    },
+  ],
   configIntent: DEFAULT_CONFIG_INTENT,
 };
 
@@ -2345,6 +2450,8 @@ export function resolveTheme(renderConfig?: RenderConfigInput): ResolvedRenderCo
     coordinateSpace: renderConfig?.coordinateSpace != null
       ? { ...DEFAULT_COORDINATE_SPACE, ...renderConfig.coordinateSpace }
       : baseline.coordinateSpace,
+    // methods: use provided array or fall back to baseline (empty array)
+    methods: renderConfig?.methods ?? baseline.methods,
     // configIntent: merge explicit partial overrides over DEFAULT_CONFIG_INTENT
     configIntent: resolveConfigIntent(renderConfig?.configIntent ?? undefined),
   };
@@ -2546,6 +2653,12 @@ export const RENDER_CONFIG_FIELD_TAXONOMY = {
     category: "author-intent" as const,
     description:
       "Default stroke width in px-space for edges and node outlines — visual design decision",
+    overridable: false,
+  },
+  methods: {
+    category: "author-intent" as const,
+    description:
+      "Per-method rendering configuration (type, color, i18n legend labels) — visual design decision",
     overridable: false,
   },
   configIntent: {
@@ -2930,6 +3043,11 @@ export const TIERED_RENDER_CONFIG_TAXONOMY = {
   strokeWidth: {
     category: "author-intent" as const,
     description: "Default stroke width for edges and node outlines — visual design decision",
+    overridable: false,
+  },
+  methods: {
+    category: "author-intent" as const,
+    description: "Per-method rendering configuration (type, color, i18n legend labels) — visual design decision",
     overridable: false,
   },
   // ── Tier 4: viewer-preference (lowest authority) ──────────────────────────

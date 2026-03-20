@@ -121,5 +121,16 @@ export const renderEvolvesToLayer: LayerRenderer = (
     }
   }
 
+  // ── Inertia barriers (thick vertical lines at phase boundaries) ──
+  const INERTIA_STROKE_WIDTH = 6;
+  const INERTIA_COLOR = "#000000";
+  for (const barrier of ctx.inertiaBarriers) {
+    parts.push(
+      `<line x1="${barrier.x}" y1="${barrier.y1}" ` +
+        `x2="${barrier.x}" y2="${barrier.y2}" ` +
+        `stroke="${INERTIA_COLOR}" stroke-width="${INERTIA_STROKE_WIDTH}" />`
+    );
+  }
+
   return parts;
 };

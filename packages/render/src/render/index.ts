@@ -69,6 +69,8 @@ export { renderPipelinesLayer } from "./pipelines-layer.js";
 export { renderEdgesLayer } from "./edges-layer.js";
 export { renderEvolvesToLayer } from "./evolvesto-layer.js";
 export { renderNodesLayer } from "./nodes-layer.js";
+export { renderStepsLayer } from "./steps-layer.js";
+export { renderAcceleratorsLayer } from "./accelerators-layer.js";
 export { renderLabelsLayer } from "./labels-layer.js";
 export { renderNotesLayer } from "./notes-layer.js";
 export { renderLegendLayer } from "./legend-layer.js";

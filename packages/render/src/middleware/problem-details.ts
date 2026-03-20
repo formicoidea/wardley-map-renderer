@@ -133,7 +133,7 @@ export const PROBLEM_HINTS: Record<string, string> = {
     "Fix the validation errors listed in the 'errors' array. " +
     "Each entry has a 'path' (dotted JSON path) and 'message'. " +
     "Common issues: position.evolution.scalar and position.visibility.scalar must be numbers in [0, 1]; " +
-    "component type must be one of: component, user-need, pipeline, note, anchor; " +
+    "component type must be one of: component, user-need, pipeline, note, anchor, market, ecosystem; " +
     "relations need valid source/target component IDs.",
 
   [ProblemTypes.AUTHENTICATION_ERROR]:

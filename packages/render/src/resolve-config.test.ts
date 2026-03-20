@@ -231,9 +231,9 @@ describe("LAYOUT_STRUCTURAL_FIELDS", () => {
   });
 
   it("platform-constraint and layout-structural fields are disjoint", () => {
-    const pcSet = new Set(PLATFORM_CONSTRAINT_FIELDS);
+    const pcSet = new Set<string>(PLATFORM_CONSTRAINT_FIELDS);
     for (const field of LAYOUT_STRUCTURAL_FIELDS) {
-      expect(pcSet.has(field as string), `${field} should not be in both tiers`).toBe(false);
+      expect(pcSet.has(field), `${field} should not be in both tiers`).toBe(false);
     }
   });
 });

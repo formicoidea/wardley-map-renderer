@@ -17,6 +17,8 @@ import {
   typeStyleMapSchema,
   type TypeStyleMap,
   type LayerToggleDAG,
+  type Background,
+  type EvolveStyle,
 } from "./schema";
 import {
   AXIS_LABELS_EN,
@@ -1138,7 +1140,7 @@ describe("resolveTheme", () => {
       background: {
         // axisLabels with evolutionStart/evolutionEnd fields are silently stripped (no-op)
         axisLabels: {} as Record<string, unknown>,
-      },
+      } as Background,
     });
     // Locale default is used since overrides are no longer supported
     expect(rc.axisLabels.evolutionStart).toBe("Uncharted"); // en locale default
@@ -4678,7 +4680,7 @@ describe("cardinality-independence — phase label count vs evolveStyles lookup 
 
   it("[cardinality] boundary positions (0, 0.17, 1.0): _default fallback resolves for all unset evolve types", () => {
     // Minimal evolveStyles map: only 'natural' is explicitly styled; all others use _default
-    const evolveStyles = {
+    const evolveStyles: Partial<TypeStyleMap<EvolveStyle>> = {
       natural: { stroke: "#dc2626", strokeDasharray: "4 2" }, // only natural explicitly set
       _default: { stroke: "#555555" },                         // catch-all fallback
     };

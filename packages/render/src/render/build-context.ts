@@ -20,6 +20,7 @@ import type {
   NodeGeometry,
   EdgeGeometry,
   EvolveGeometry,
+  InertiaGeometry,
   PipelineGeometryPixels,
   AxesZoneGeometry,
   ComponentBoundingBox,
@@ -29,6 +30,7 @@ import {
   AXIS_MARGIN_BOTTOM,
   AXIS_MARGIN_TOP,
   EVOLUTION_PHASES,
+  EVOLUTION_BOUNDARIES,
 } from "../blocks/wardley-map/wardley-map-consts.js";
 import { applyPipelineContainment, resolvePipelines, pipelineToRect } from "../pipeline-geometry.js";
 import { computeScaleFactor } from "../coordinate-space.js";
@@ -36,10 +38,10 @@ import { computeScaleFactor } from "../coordinate-space.js";
 // ── Fixed margins (pixels, identical regardless of canvas size or axes) ──
 
 const FIXED_MARGINS: Margins = {
-  top: AXIS_MARGIN_TOP,     // 24
+  top: AXIS_MARGIN_TOP,     // 28
   right: 20,
-  bottom: AXIS_MARGIN_BOTTOM, // 48
-  left: AXIS_MARGIN_LEFT,     // 48
+  bottom: AXIS_MARGIN_BOTTOM, // 28
+  left: AXIS_MARGIN_LEFT,     // 28
 };
 
 // ── Coordinate conversion helpers ─────────────────────────────────────
@@ -227,7 +229,39 @@ export function buildRenderContext(map: WardleyMap, options: RenderOptions = DEF
         toY: visToY(visTarget(e)),
         evolveType: e.evolveType ?? "natural",
         component: comp,
+        inertia: e.inertia,
       });
+    }
+  }
+
+  // Inertia barriers — thick vertical lines at phase boundaries crossed by evolve arrows
+  const INERTIA_HALF_HEIGHT = 15; // pixels above and below the arrow's Y at the boundary
+  const inertiaBarriers: InertiaGeometry[] = [];
+  for (const evolve of evolves) {
+    if (!evolve.inertia) continue;
+    // Determine the normalized evolution range of this arrow
+    const fromEvo = evo(evolve.component);
+    const toEvo = evoTarget(
+      evolve.component.evolvesTo!.find(
+        (e) => evoToX(evoTarget(e)) === evolve.toX && visToY(visTarget(e)) === evolve.toY
+      )!
+    );
+    const minEvo = Math.min(fromEvo, toEvo);
+    const maxEvo = Math.max(fromEvo, toEvo);
+
+    for (const boundary of EVOLUTION_BOUNDARIES) {
+      if (boundary > minEvo && boundary < maxEvo) {
+        const bx = evoToX(boundary);
+        // Interpolate Y at the boundary crossing point
+        const t = (boundary - fromEvo) / (toEvo - fromEvo);
+        const yAtBoundary = evolve.fromY + t * (evolve.toY - evolve.fromY);
+        inertiaBarriers.push({
+          x: bx,
+          y1: yAtBoundary - INERTIA_HALF_HEIGHT,
+          y2: yAtBoundary + INERTIA_HALF_HEIGHT,
+          component: evolve.component,
+        });
+      }
     }
   }
 
@@ -292,6 +326,7 @@ export function buildRenderContext(map: WardleyMap, options: RenderOptions = DEF
     nodes,
     edges,
     evolves,
+    inertiaBarriers,
     pipelines,
     axesZones,
     boundingBoxes,
@@ -307,6 +342,7 @@ export function buildRenderContext(map: WardleyMap, options: RenderOptions = DEF
     nodes,
     edges,
     evolves,
+    inertiaBarriers,
     pipelines,
     componentById,
     evoToX,

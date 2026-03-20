@@ -39,6 +39,8 @@ import { renderPipelinesLayer } from "./render/pipelines-layer.js";
 import { renderEdgesLayer } from "./render/edges-layer.js";
 import { renderEvolvesToLayer } from "./render/evolvesto-layer.js";
 import { renderNodesLayer } from "./render/nodes-layer.js";
+import { renderStepsLayer } from "./render/steps-layer.js";
+import { renderAcceleratorsLayer } from "./render/accelerators-layer.js";
 import { renderLabelsLayer } from "./render/labels-layer.js";
 import { renderNotesLayer } from "./render/notes-layer.js";
 import { renderLegendLayer } from "./render/legend-layer.js";
@@ -52,6 +54,8 @@ const LAYERS: readonly LayerRegistration[] = [
   { name: "edges", order: LAYER_ORDER.edges, render: renderEdgesLayer },
   { name: "evolvesTo", order: LAYER_ORDER.evolvesTo, render: renderEvolvesToLayer },
   { name: "nodes", order: LAYER_ORDER.nodes, render: renderNodesLayer },
+  { name: "steps", order: LAYER_ORDER.steps, render: renderStepsLayer },
+  { name: "accelerators", order: LAYER_ORDER.accelerators, render: renderAcceleratorsLayer },
   { name: "labels", order: LAYER_ORDER.labels, render: renderLabelsLayer },
   { name: "notes", order: LAYER_ORDER.notes, render: renderNotesLayer },
   { name: "legend", order: LAYER_ORDER.legend, render: renderLegendLayer },

@@ -34,6 +34,8 @@ describe("KNOWN_RENDERABLE_TYPES", () => {
       "pipeline",
       "note",
       "anchor",
+      "market",
+      "ecosystem",
     ];
     expect([...KNOWN_RENDERABLE_TYPES]).toEqual(expected);
   });

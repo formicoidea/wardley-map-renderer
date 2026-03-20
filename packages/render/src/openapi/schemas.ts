@@ -41,6 +41,11 @@ import {
   EvolveStyleSchema,
   RenderConfigSchema,
   WardleyMapSchema,
+  MethodSchema,
+  MethodConfigSchema,
+  AcceleratorTypeEnum,
+  AcceleratorSchema,
+  StepSchema,
 } from "../schema.js";
 import { ProblemDetailSchema, HealthResponseSchema } from "./routes.js";
 
@@ -84,6 +89,14 @@ export function registerSchemas(): void {
     description: "Type of relation between components.",
   }));
 
+  registry.register("Method", MethodSchema.openapi({
+    description: "Method annotation for a component (type + preconisation, free strings).",
+  }));
+
+  registry.register("AcceleratorType", AcceleratorTypeEnum.openapi({
+    description: "Whether the gameplay element accelerates or decelerates evolution.",
+  }));
+
   registry.register("LegendPosition", LegendPositionEnum.openapi({
     description: "Position of the legend on the rendered map.",
   }));
@@ -122,7 +135,7 @@ export function registerSchemas(): void {
   }));
 
   registry.register("EvolvesTo", EvolvesToSchema.openapi({
-    description: "Evolution movement target for a component.",
+    description: "Evolution movement target for a component. When inertia is true, a resistance barrier is drawn at the phase boundary.",
   }));
 
   registry.register("PipelineGeometry", PipelineGeometrySchema.openapi({
@@ -165,6 +178,33 @@ export function registerSchemas(): void {
 
   registry.register("EvolveStyle", EvolveStyleSchema.openapi({
     description: "Stroke style overrides for evolution arrows.",
+  }));
+
+  registry.register("MethodConfig", MethodConfigSchema.openapi({
+    description: "Per-method rendering configuration: type identifier, indicator color, and i18n legend labels (exactly 3 keys).",
+    example: {
+      type: "build",
+      color: "#00a86b",
+      legend: { en: "Build", fr: "Construire", de: "Bauen" },
+    },
+  }));
+
+  registry.register("Accelerator", AcceleratorSchema.openapi({
+    description: "A gameplay accelerator or deaccelerator placed on the map, indicating forces that speed up or slow down evolution.",
+    example: {
+      id: "open-source",
+      label: "Open Source",
+      position: { evolution: { scalar: 0.6 }, visibility: { scalar: 0.5 } },
+      type: "accelerator",
+    },
+  }));
+
+  registry.register("Step", StepSchema.openapi({
+    description: "A numbered step sticker placed on the map. Step numbers are rendered as circled markers; descriptive text is managed client-side.",
+    example: {
+      number: 1,
+      position: { evolution: { scalar: 0.4 }, visibility: { scalar: 0.3 } },
+    },
   }));
 
   registry.register("RenderConfig", RenderConfigSchema.openapi({

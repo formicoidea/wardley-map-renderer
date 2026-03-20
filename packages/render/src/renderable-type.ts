@@ -30,7 +30,9 @@ export type KnownRenderableType =
   | "user-need"
   | "pipeline"
   | "note"
-  | "anchor";
+  | "anchor"
+  | "market"
+  | "ecosystem";
 
 /** Tuple of all known renderable type literals (useful for Zod enums, iteration). */
 export const KNOWN_RENDERABLE_TYPES = [
@@ -39,6 +41,8 @@ export const KNOWN_RENDERABLE_TYPES = [
   "pipeline",
   "note",
   "anchor",
+  "market",
+  "ecosystem",
 ] as const satisfies readonly KnownRenderableType[];
 
 // ---------------------------------------------------------------------------
@@ -150,6 +154,8 @@ const KNOWN_DATA_COMPONENT_TYPES: ReadonlySet<string> = new Set<string>([
   "pipeline",
   "note",
   "anchor",
+  "market",
+  "ecosystem",
 ]);
 
 /**
@@ -161,7 +167,7 @@ const KNOWN_DATA_COMPONENT_TYPES: ReadonlySet<string> = new Set<string>([
  * `build-context.ts`) and work exclusively with `RenderableType` values thereafter.
  *
  * ## Mapping rules
- * 1. **Known types** — "component" | "user-need" | "pipeline" | "note" | "anchor"
+ * 1. **Known types** — "component" | "user-need" | "pipeline" | "note" | "anchor" | "market" | "ecosystem"
  *    map 1:1 to their identically-named `KnownRenderableType` counterpart.
  * 2. **'_default' sentinel** — passed as input is returned as-is; it is the
  *    TypeStyleMap fallback key and is valid in the rendering vocabulary.

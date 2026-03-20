@@ -49,6 +49,8 @@ function makeAllTypesMap(): WardleyMap {
         pipelineGeometry: { evoStart: 0.2, evoEnd: 0.8, visStart: 0.6, visEnd: 0.8 },
       },
       { id: "e", label: { name: "Note" }, type: "note", position: { evolution: { scalar: 0.1 }, visibility: { scalar: 0.9 } } },
+      { id: "f", label: { name: "Trading" }, type: "market", position: { evolution: { scalar: 0.7 }, visibility: { scalar: 0.4 } } },
+      { id: "g", label: { name: "Cloud" }, type: "ecosystem", position: { evolution: { scalar: 0.8 }, visibility: { scalar: 0.6 } } },
     ],
     relations: [{ source: "a", target: "b" }],
   }));
@@ -165,7 +167,7 @@ describe("LegendLayer — type+color", () => {
     expect(svg).toContain('stroke="#000000"');
   });
 
-  it("all 5 types present → 5 type entries + relation + evolve entries", () => {
+  it("all 7 types present → 7 type entries + relation + evolve entries", () => {
     const allMap = sanitizeMap(WardleyMapSchema.parse({
       title: "Full",
       components: [
@@ -182,18 +184,22 @@ describe("LegendLayer — type+color", () => {
           pipelineGeometry: { evoStart: 0.2, evoEnd: 0.8, visStart: 0.6, visEnd: 0.8 },
         },
         { id: "e", label: { name: "N" }, type: "note", position: { evolution: { scalar: 0.1 }, visibility: { scalar: 0.9 } } },
+        { id: "f", label: { name: "Trading" }, type: "market", position: { evolution: { scalar: 0.7 }, visibility: { scalar: 0.4 } } },
+        { id: "g", label: { name: "Cloud" }, type: "ecosystem", position: { evolution: { scalar: 0.8 }, visibility: { scalar: 0.6 } } },
       ],
       relations: [{ source: "a", target: "b" }],
     }));
     const ctx = buildRenderContext(allMap);
     const parts = renderLegendLayer(ctx);
     const svg = parts.join("");
-    // 5 types
+    // 7 types
     expect(svg).toContain("Component");
     expect(svg).toContain("User Need");
     expect(svg).toContain("Pipeline");
     expect(svg).toContain("User / Stakeholder");
     expect(svg).toContain(">Note<");
+    expect(svg).toContain("Market");
+    expect(svg).toContain("Ecosystem");
     // 1 dependency edge
     expect(svg).toContain("Dependency");
     // 1 evolution arrow
@@ -266,5 +272,394 @@ describe("LegendLayer — evolution arrows", () => {
   it("late evolve → entry present", () => {
     const ctx = buildRenderContext(makeEvolveMap("late"));
     expect(legendContains(renderLegendLayer(ctx), "already happening")).toBe(true);
+  });
+});
+
+// ── New element legend entries ────────────────────────────────────────
+
+describe("LegendLayer — method entries (resolved textual values)", () => {
+  it("legend shows capitalized method type name, not raw kebab-case", () => {
+    const map = sanitizeMap(WardleyMapSchema.parse({
+      title: "Method",
+      components: [
+        {
+          id: "a", label: { name: "Svc" }, type: "component",
+          position: { evolution: { scalar: 0.5 }, visibility: { scalar: 0.5 } },
+          method: { type: "buying-policy", preconisation: "Uncharted" },
+        },
+      ],
+      relations: [],
+    }));
+    const ctx = buildRenderContext(map);
+    const parts = renderLegendLayer(ctx);
+    const svg = parts.join("");
+    // Shows capitalized type name, NOT raw kebab-case
+    expect(svg).toContain("Buying Policy");
+    expect(svg).not.toContain("buying-policy");
+    expect(svg).toContain('fill="#2563eb"');
+  });
+
+  it("legend label is capitalized method type name regardless of locale", () => {
+    const map = sanitizeMap(WardleyMapSchema.parse({
+      title: "Method FR",
+      components: [
+        {
+          id: "a", label: { name: "Svc" }, type: "component",
+          position: { evolution: { scalar: 0.5 }, visibility: { scalar: 0.5 } },
+          method: { type: "project-management", preconisation: "Uncharted" },
+        },
+      ],
+      relations: [],
+      renderConfig: { locale: "fr" },
+    }));
+    const ctx = buildRenderContext(map);
+    const parts = renderLegendLayer(ctx);
+    const svg = parts.join("");
+    expect(svg).toContain("Project Management");
+    expect(svg).not.toContain("project-management");
+  });
+
+  it("custom renderConfig.methods[] drives legend colors", () => {
+    const map = sanitizeMap(WardleyMapSchema.parse({
+      title: "Custom",
+      components: [
+        {
+          id: "a", label: { name: "Svc" }, type: "component",
+          position: { evolution: { scalar: 0.5 }, visibility: { scalar: 0.5 } },
+          method: { type: "custom-method", preconisation: "phase1" },
+        },
+      ],
+      relations: [],
+      renderConfig: {
+        methods: [
+          { type: "custom-method", color: "#00a86b", legend: { phase1: "do", phase2: "delegate", phase3: "automate" } },
+        ],
+      },
+    }));
+    const ctx = buildRenderContext(map);
+    const parts = renderLegendLayer(ctx);
+    const svg = parts.join("");
+    expect(svg).toContain("Custom Method");
+    expect(svg).toContain('fill="#00a86b"');
+  });
+
+  it("multiple methods → each gets its own resolved textual entry", () => {
+    const map = sanitizeMap(WardleyMapSchema.parse({
+      title: "Methods",
+      components: [
+        { id: "a", label: { name: "A" }, type: "component", position: { evolution: { scalar: 0.3 }, visibility: { scalar: 0.3 } }, method: { type: "buying-policy", preconisation: "Uncharted" } },
+        { id: "b", label: { name: "B" }, type: "component", position: { evolution: { scalar: 0.6 }, visibility: { scalar: 0.6 } }, method: { type: "attitudes", preconisation: "Transitional" } },
+      ],
+      relations: [],
+    }));
+    const ctx = buildRenderContext(map);
+    const parts = renderLegendLayer(ctx);
+    const svg = parts.join("");
+    expect(svg).toContain("Buying Policy");
+    expect(svg).toContain("Attitudes");
+    expect(svg).not.toContain("Project Management");
+  });
+
+  it("unknown method type falls back to raw type as label with grey color", () => {
+    const map = sanitizeMap(WardleyMapSchema.parse({
+      title: "Unknown",
+      components: [
+        {
+          id: "a", label: { name: "A" }, type: "component",
+          position: { evolution: { scalar: 0.5 }, visibility: { scalar: 0.5 } },
+          method: { type: "custom-method", preconisation: "trial" },
+        },
+      ],
+      relations: [],
+    }));
+    const ctx = buildRenderContext(map);
+    const parts = renderLegendLayer(ctx);
+    const svg = parts.join("");
+    // Falls back to capitalized type name
+    expect(svg).toContain("Custom Method");
+    // Uses fallback grey color
+    expect(svg).toContain('fill="#888888"');
+  });
+
+  it("method swatch uses concentric circles, not letter symbols", () => {
+    const map = sanitizeMap(WardleyMapSchema.parse({
+      title: "Swatch",
+      components: [
+        {
+          id: "a", label: { name: "A" }, type: "component",
+          position: { evolution: { scalar: 0.5 }, visibility: { scalar: 0.5 } },
+          method: { type: "buying-policy", preconisation: "recommended" },
+        },
+      ],
+      relations: [],
+    }));
+    const ctx = buildRenderContext(map);
+    const parts = renderLegendLayer(ctx);
+    const svg = parts.join("");
+    // Concentric circles swatch: 3 circles with method color, no letter text
+    const methodParts = parts.filter((p) => p.includes("#2563eb"));
+    expect(methodParts.length).toBeGreaterThanOrEqual(1);
+    // Should NOT contain bold text with a letter symbol
+    const methodSvg = methodParts.join("");
+    expect(methodSvg).not.toContain('font-weight="bold"');
+    // Should have concentric circles (fill + stroke pattern)
+    expect(methodSvg).toContain('r="7"');
+    expect(methodSvg).toContain('r="4"');
+    expect(methodSvg).toContain('r="1.5"');
+  });
+
+  it("no method → no method entry in legend", () => {
+    const map = makeMap();
+    const ctx = buildRenderContext(map);
+    const parts = renderLegendLayer(ctx);
+    const svg = parts.join("");
+    expect(svg).not.toContain("Buying Policy");
+    expect(svg).not.toContain("Project Management");
+    expect(svg).not.toContain("Attitudes");
+  });
+});
+
+describe("LegendLayer — accelerator/deaccelerator entries", () => {
+  it("accelerators present → 'Accelerator' entry with arrow swatch", () => {
+    const map = sanitizeMap(WardleyMapSchema.parse({
+      title: "Accel",
+      components: [
+        { id: "a", label: { name: "Svc" }, type: "component", position: { evolution: { scalar: 0.5 }, visibility: { scalar: 0.5 } } },
+      ],
+      relations: [],
+      accelerators: [
+        { id: "acc1", label: "Push", position: { evolution: { scalar: 0.5 }, visibility: { scalar: 0.5 } }, type: "accelerator" },
+      ],
+    }));
+    const ctx = buildRenderContext(map);
+    const parts = renderLegendLayer(ctx);
+    const svg = parts.join("");
+    expect(svg).toContain("Accelerator");
+    expect(svg).toContain("<path");
+  });
+
+  it("deaccelerator present → 'Deaccelerator' entry", () => {
+    const map = sanitizeMap(WardleyMapSchema.parse({
+      title: "Deaccel",
+      components: [
+        { id: "a", label: { name: "Svc" }, type: "component", position: { evolution: { scalar: 0.5 }, visibility: { scalar: 0.5 } } },
+      ],
+      relations: [],
+      accelerators: [
+        { id: "d1", label: "Drag", position: { evolution: { scalar: 0.5 }, visibility: { scalar: 0.5 } }, type: "deaccelerator" },
+      ],
+    }));
+    const ctx = buildRenderContext(map);
+    const parts = renderLegendLayer(ctx);
+    const svg = parts.join("");
+    expect(svg).toContain("Deaccelerator");
+  });
+
+  it("mixed accelerators → both entries", () => {
+    const map = sanitizeMap(WardleyMapSchema.parse({
+      title: "Mixed",
+      components: [
+        { id: "a", label: { name: "Svc" }, type: "component", position: { evolution: { scalar: 0.5 }, visibility: { scalar: 0.5 } } },
+      ],
+      relations: [],
+      accelerators: [
+        { id: "acc1", label: "Push", position: { evolution: { scalar: 0.3 }, visibility: { scalar: 0.3 } }, type: "accelerator" },
+        { id: "d1", label: "Drag", position: { evolution: { scalar: 0.7 }, visibility: { scalar: 0.7 } }, type: "deaccelerator" },
+      ],
+    }));
+    const ctx = buildRenderContext(map);
+    const parts = renderLegendLayer(ctx);
+    const svg = parts.join("");
+    expect(svg).toContain("Accelerator");
+    expect(svg).toContain("Deaccelerator");
+  });
+
+  it("no accelerators → no accelerator entry", () => {
+    const map = makeMap();
+    const ctx = buildRenderContext(map);
+    const parts = renderLegendLayer(ctx);
+    const svg = parts.join("");
+    expect(svg).not.toContain("Accelerator");
+    expect(svg).not.toContain("Deaccelerator");
+  });
+});
+
+describe("LegendLayer — steps entries", () => {
+  it("steps present → 'Step' entry with red circle swatch", () => {
+    const map = sanitizeMap(WardleyMapSchema.parse({
+      title: "Steps",
+      components: [
+        { id: "a", label: { name: "Svc" }, type: "component", position: { evolution: { scalar: 0.5 }, visibility: { scalar: 0.5 } } },
+      ],
+      relations: [],
+      steps: [
+        { number: 1, position: { evolution: { scalar: 0.3 }, visibility: { scalar: 0.3 } } },
+      ],
+    }));
+    const ctx = buildRenderContext(map);
+    const parts = renderLegendLayer(ctx);
+    const svg = parts.join("");
+    expect(svg).toContain("Step");
+    expect(svg).toContain('fill="#cc0000"');
+  });
+
+  it("no steps → no step entry", () => {
+    const map = makeMap();
+    const ctx = buildRenderContext(map);
+    const parts = renderLegendLayer(ctx);
+    const svg = parts.join("");
+    expect(svg).not.toContain(">Step<");
+  });
+});
+
+describe("LegendLayer — inertia entry", () => {
+  it("inertia on evolve → 'Inertia' entry with thick vertical line", () => {
+    const map = sanitizeMap(WardleyMapSchema.parse({
+      title: "Inertia",
+      components: [
+        {
+          id: "a", label: { name: "Svc" }, type: "component",
+          position: { evolution: { scalar: 0.2 }, visibility: { scalar: 0.5 } },
+          evolvesTo: [{ position: { evolution: { scalar: 0.7 }, visibility: { scalar: 0.5 } }, evolveType: "natural", inertia: true }],
+        },
+      ],
+      relations: [],
+    }));
+    const ctx = buildRenderContext(map);
+    const parts = renderLegendLayer(ctx);
+    const svg = parts.join("");
+    expect(svg).toContain("Inertia");
+    expect(svg).toContain('stroke-width="4"');
+  });
+
+  it("no inertia → no inertia entry", () => {
+    const map = makeEvolveMap("natural");
+    const ctx = buildRenderContext(map);
+    const parts = renderLegendLayer(ctx);
+    const svg = parts.join("");
+    expect(svg).not.toContain("Inertia");
+  });
+});
+
+describe("LegendLayer — i18n for new elements", () => {
+  it("French labels for method, accelerator, step, inertia", () => {
+    const map = sanitizeMap(WardleyMapSchema.parse({
+      title: "FR",
+      components: [
+        {
+          id: "a", label: { name: "Svc" }, type: "component",
+          position: { evolution: { scalar: 0.2 }, visibility: { scalar: 0.5 } },
+          method: { type: "build", preconisation: "recommended" },
+          evolvesTo: [{ position: { evolution: { scalar: 0.7 }, visibility: { scalar: 0.5 } }, evolveType: "natural", inertia: true }],
+        },
+      ],
+      relations: [],
+      renderConfig: {
+        locale: "fr",
+        methods: [
+          { type: "build", color: "#00a86b", legend: { Uncharted: "faire", Transitional: "acheter", Industrialized: "externaliser" } },
+        ],
+      },
+      accelerators: [
+        { id: "acc1", label: "Go", position: { evolution: { scalar: 0.5 }, visibility: { scalar: 0.5 } }, type: "accelerator" },
+      ],
+      steps: [
+        { number: 1, position: { evolution: { scalar: 0.3 }, visibility: { scalar: 0.3 } } },
+      ],
+    }));
+    const ctx = buildRenderContext(map);
+    const parts = renderLegendLayer(ctx);
+    const svg = parts.join("");
+    expect(svg).toContain("Build");
+    expect(svg).toContain("Accélérateur");
+    expect(svg).toContain("Étape");
+    expect(svg).toContain("Inertie");
+  });
+});
+
+// ── Market & Ecosystem in legend ──────────────────────────────────────
+
+describe("LegendLayer — Market & Ecosystem entries", () => {
+  it("market type present → 'Market' entry with triangle-in-circle swatch", () => {
+    const map = sanitizeMap(WardleyMapSchema.parse({
+      title: "Market",
+      components: [
+        { id: "a", label: { name: "Trading" }, type: "market", position: { evolution: { scalar: 0.6 }, visibility: { scalar: 0.4 } } },
+      ],
+      relations: [],
+    }));
+    const ctx = buildRenderContext(map);
+    const parts = renderLegendLayer(ctx);
+    const svg = parts.join("");
+    expect(svg).toContain("Market");
+    // Triangle inscribed in circle: polygon for triangle + circle for outer ring
+    expect(svg).toContain("<polygon");
+    expect(svg).toContain("<circle");
+  });
+
+  it("ecosystem type present → 'Ecosystem' entry with concentric circles swatch", () => {
+    const map = sanitizeMap(WardleyMapSchema.parse({
+      title: "Eco",
+      components: [
+        { id: "a", label: { name: "Cloud" }, type: "ecosystem", position: { evolution: { scalar: 0.8 }, visibility: { scalar: 0.5 } } },
+      ],
+      relations: [],
+    }));
+    const ctx = buildRenderContext(map);
+    const parts = renderLegendLayer(ctx);
+    const svg = parts.join("");
+    expect(svg).toContain("Ecosystem");
+    // 3 concentric circles
+    const circleCount = (svg.match(/<circle/g) || []).length;
+    expect(circleCount).toBeGreaterThanOrEqual(3);
+  });
+
+  it("makeAllTypesMap includes Market and Ecosystem entries", () => {
+    const map = makeAllTypesMap();
+    const ctx = buildRenderContext(map);
+    const parts = renderLegendLayer(ctx);
+    const svg = parts.join("");
+    expect(svg).toContain("Market");
+    expect(svg).toContain("Ecosystem");
+  });
+});
+
+// ── Accelerator subtype-only rendering ─────────────────────────────────
+
+describe("LegendLayer — accelerator subtype isolation", () => {
+  it("only accelerator subtype → shows Accelerator, not Deaccelerator", () => {
+    const map = sanitizeMap(WardleyMapSchema.parse({
+      title: "AccOnly",
+      components: [
+        { id: "a", label: { name: "Svc" }, type: "component", position: { evolution: { scalar: 0.5 }, visibility: { scalar: 0.5 } } },
+      ],
+      relations: [],
+      accelerators: [
+        { id: "acc1", label: "Push", position: { evolution: { scalar: 0.5 }, visibility: { scalar: 0.5 } }, type: "accelerator" },
+      ],
+    }));
+    const ctx = buildRenderContext(map);
+    const parts = renderLegendLayer(ctx);
+    const svg = parts.join("");
+    expect(svg).toContain("Accelerator");
+    expect(svg).not.toContain("Deaccelerator");
+  });
+
+  it("only deaccelerator subtype → shows Deaccelerator, not Accelerator", () => {
+    const map = sanitizeMap(WardleyMapSchema.parse({
+      title: "DeaccOnly",
+      components: [
+        { id: "a", label: { name: "Svc" }, type: "component", position: { evolution: { scalar: 0.5 }, visibility: { scalar: 0.5 } } },
+      ],
+      relations: [],
+      accelerators: [
+        { id: "d1", label: "Drag", position: { evolution: { scalar: 0.5 }, visibility: { scalar: 0.5 } }, type: "deaccelerator" },
+      ],
+    }));
+    const ctx = buildRenderContext(map);
+    const parts = renderLegendLayer(ctx);
+    const svg = parts.join("");
+    expect(svg).toContain("Deaccelerator");
+    expect(svg).not.toContain(">Accelerator<");
   });
 });
