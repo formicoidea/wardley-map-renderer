@@ -95,13 +95,13 @@ describe("CoordinateSpace rendering invariant 1 — explicit defaults = no coord
 
     // Map B: explicit coordinateSpace with all default values
     const mapWithDefaultCs = makeTestMap({
-      coordinateSpace: {
+      spatial: { coordinateSpace: {
         width: 1600,
         height: 800,
         evolutionRange: [0, 1],
         visibilityRange: [0, 1],
         unit: "canvas-px",
-      },
+      } },
     });
 
     const svgNoCs = renderToSVG(mapNoCs);
@@ -114,13 +114,13 @@ describe("CoordinateSpace rendering invariant 1 — explicit defaults = no coord
   it("explicit default coordinateSpace produces identical RenderContext geometry to no coordinateSpace", () => {
     const mapNoCs = makeTestMap({});
     const mapWithDefaultCs = makeTestMap({
-      coordinateSpace: {
+      spatial: { coordinateSpace: {
         width: 1600,
         height: 800,
         evolutionRange: [0, 1],
         visibilityRange: [0, 1],
         unit: "canvas-px",
-      },
+      } },
     });
 
     const ctxNoCs = buildRenderContext(mapNoCs);
@@ -162,10 +162,10 @@ describe("CoordinateSpace rendering invariant 2 — evolutionRange affects x pos
     // Zoom into the left half of the evolution axis: [0, 0.5]
     // Now evo=0.5 maps to plotRight (the boundary of the zoomed range)
     const map = makeTestMap({
-      coordinateSpace: {
+      spatial: { coordinateSpace: {
         evolutionRange: [0, 0.5],
         visibilityRange: [0, 1],
-      },
+      } },
     });
     const ctx = buildRenderContext(map);
 
@@ -178,9 +178,9 @@ describe("CoordinateSpace rendering invariant 2 — evolutionRange affects x pos
   });
 
   it("zoomed-in evolutionRange moves component x further right than full range", () => {
-    const mapFull = makeTestMap({ coordinateSpace: { evolutionRange: [0, 1] } });
+    const mapFull = makeTestMap({ spatial: { coordinateSpace: { evolutionRange: [0, 1] } } });
     const mapZoomed = makeTestMap({
-      coordinateSpace: { evolutionRange: [0, 0.5] },
+      spatial: { coordinateSpace: { evolutionRange: [0, 0.5] } },
     });
 
     const ctxFull = buildRenderContext(mapFull);
@@ -215,10 +215,10 @@ describe("CoordinateSpace rendering invariant 2 — evolutionRange affects x pos
         ],
         relations: [],
         renderConfig: {
-          coordinateSpace: {
+          spatial: { coordinateSpace: {
             evolutionRange: [0.25, 0.75],
             visibilityRange: [0, 1],
-          },
+          } },
         },
       })
     );
@@ -244,9 +244,9 @@ describe("CoordinateSpace rendering invariant 3 — MapChrome is presentational 
   it("hiding evolution X axis does not change component cx pixel positions", () => {
     const mapWithAxes = makeTestMap({});
     const mapNoXAxis = makeTestMap({
-      background: {
+      styling: { background: {
         evolutionXAxis: { show: false },
-      },
+      } },
     });
 
     const ctxWithAxes = buildRenderContext(mapWithAxes);
@@ -264,11 +264,11 @@ describe("CoordinateSpace rendering invariant 3 — MapChrome is presentational 
   it("hiding all chrome (axes, value chain, phase dividers) does not move nodes", () => {
     const mapWithAllChrome = makeTestMap({});
     const mapNoChrome = makeTestMap({
-      background: {
+      styling: { background: {
         evolutionXAxis: { show: false },
         valueChainYAxis: { show: false },
         evolutionPhases: { showPhaseDividerAndLabel: false },
-      },
+      } },
     });
 
     const ctxWithChrome = buildRenderContext(mapWithAllChrome);
@@ -293,13 +293,13 @@ describe("CoordinateSpace rendering invariant 3 — MapChrome is presentational 
     // Sub-AC 2: axisLabels direction overrides removed from MapChrome — only xAxis/yAxis/phases remain
     const mapDefaultLabels = makeTestMap({});
     const mapCustomLabels = makeTestMap({
-      background: {
+      styling: { background: {
         evolutionXAxis: { xAxis: "Custom Evolution Axis" },
         valueChainYAxis: { yAxis: "Custom Value Chain" },
         evolutionPhases: {
           phases: ["Phase A", "Phase B", "Phase C", "Phase D"],
         },
-      },
+      } },
     });
 
     const ctxDefault = buildRenderContext(mapDefaultLabels);
@@ -333,10 +333,10 @@ describe("CoordinateSpace rendering invariant 4 — visibilityRange affects y po
     // Zoom into the top half of the visibility axis: [0, 0.5]
     // Now vis=0.5 maps to plot bottom (the boundary of the zoomed range)
     const map = makeTestMap({
-      coordinateSpace: {
+      spatial: { coordinateSpace: {
         evolutionRange: [0, 1],
         visibilityRange: [0, 0.5],
-      },
+      } },
     });
     const ctx = buildRenderContext(map);
 
@@ -349,9 +349,9 @@ describe("CoordinateSpace rendering invariant 4 — visibilityRange affects y po
   });
 
   it("zoomed-in visibilityRange moves component y further down than full range", () => {
-    const mapFull = makeTestMap({ coordinateSpace: { visibilityRange: [0, 1] } });
+    const mapFull = makeTestMap({ spatial: { coordinateSpace: { visibilityRange: [0, 1] } } });
     const mapZoomed = makeTestMap({
-      coordinateSpace: { visibilityRange: [0, 0.5] },
+      spatial: { coordinateSpace: { visibilityRange: [0, 0.5] } },
     });
 
     const ctxFull = buildRenderContext(mapFull);
@@ -371,18 +371,20 @@ describe("CoordinateSpace rendering invariant 4 — visibilityRange affects y po
 describe("CoordinateSpace rendering invariant 5 — canvas dimensions consistency", () => {
   it("800×400 canvas with matching coordinateSpace produces same SVG as top-level width/height only", () => {
     // Map A: canvas dimensions via top-level fields only
-    const mapTopLevel = makeTestMap({ width: 800, height: 400 });
+    const mapTopLevel = makeTestMap({ spatial: { width: 800, height: 400 } });
 
     // Map B: same canvas dimensions declared both at top-level AND in coordinateSpace
     const mapWithCs = makeTestMap({
-      width: 800,
-      height: 400,
-      coordinateSpace: {
+      spatial: {
         width: 800,
         height: 400,
-        evolutionRange: [0, 1],
-        visibilityRange: [0, 1],
-        unit: "canvas-px",
+        coordinateSpace: {
+          width: 800,
+          height: 400,
+          evolutionRange: [0, 1],
+          visibilityRange: [0, 1],
+          unit: "canvas-px",
+        },
       },
     });
 
@@ -394,7 +396,7 @@ describe("CoordinateSpace rendering invariant 5 — canvas dimensions consistenc
   });
 
   it("800×400 canvas produces SVG with correct viewBox dimensions", () => {
-    const map = makeTestMap({ width: 800, height: 400 });
+    const map = makeTestMap({ spatial: { width: 800, height: 400 } });
     const svg = renderToSVG(map);
 
     // SVG viewBox must reflect the declared canvas dimensions
@@ -417,13 +419,13 @@ describe("CoordinateSpace rendering invariant 6 — structural classification", 
   it("coordinateSpace evolutionRange affects node positions; background.evolutionXAxis.show does not", () => {
     // Two maps with same coordinateSpace but different axis chrome
     const mapShowAxes = makeTestMap({
-      coordinateSpace: { evolutionRange: [0.1, 0.9] },
-      background: { evolutionXAxis: { show: true } },
+      spatial: { coordinateSpace: { evolutionRange: [0.1, 0.9] } },
+      styling: { background: { evolutionXAxis: { show: true } } },
     });
 
     const mapHideAxes = makeTestMap({
-      coordinateSpace: { evolutionRange: [0.1, 0.9] },
-      background: { evolutionXAxis: { show: false } },
+      spatial: { coordinateSpace: { evolutionRange: [0.1, 0.9] } },
+      styling: { background: { evolutionXAxis: { show: false } } },
     });
 
     const ctxShow = buildRenderContext(mapShowAxes);
@@ -440,7 +442,7 @@ describe("CoordinateSpace rendering invariant 6 — structural classification", 
   it("different coordinateSpace configs produce different SVG outputs (not accidentally identical)", () => {
     const mapDefault = makeTestMap({});
     const mapZoomed = makeTestMap({
-      coordinateSpace: { evolutionRange: [0.2, 0.8] },
+      spatial: { coordinateSpace: { evolutionRange: [0.2, 0.8] } },
     });
 
     const svgDefault = renderToSVG(mapDefault);
@@ -464,7 +466,7 @@ describe("outputHint — resolution-independence scaling in render pipeline", ()
 
   it("outputHint.targetWidth=800 → canvasWidth is 800 (half of 1600 default)", () => {
     const map = makeTestMap({
-      coordinateSpace: { outputHint: { targetWidth: 800, targetHeight: 400 } },
+      spatial: { coordinateSpace: { outputHint: { targetWidth: 800, targetHeight: 400 } } },
     });
     const ctx = buildRenderContext(sanitizeMap(map));
     expect(ctx.canvasWidth).toBe(800);
@@ -473,7 +475,7 @@ describe("outputHint — resolution-independence scaling in render pipeline", ()
 
   it("outputHint scaling: nodeRadii._default is scaled by 0.5 when target is half size", () => {
     const map = makeTestMap({
-      coordinateSpace: { outputHint: { targetWidth: 800, targetHeight: 400 } },
+      spatial: { coordinateSpace: { outputHint: { targetWidth: 800, targetHeight: 400 } } },
     });
     const ctx = buildRenderContext(sanitizeMap(map));
     // Default nodeRadii._default is 5px; at 0.5x scale → 2.5px
@@ -482,7 +484,7 @@ describe("outputHint — resolution-independence scaling in render pipeline", ()
 
   it("outputHint scaling: strokeWidth is scaled by 0.5 when target is half size", () => {
     const map = makeTestMap({
-      coordinateSpace: { outputHint: { targetWidth: 800, targetHeight: 400 } },
+      spatial: { coordinateSpace: { outputHint: { targetWidth: 800, targetHeight: 400 } } },
     });
     const ctx = buildRenderContext(sanitizeMap(map));
     // Default strokeWidth is 1px; at 0.5x scale → 0.5px
@@ -491,17 +493,17 @@ describe("outputHint — resolution-independence scaling in render pipeline", ()
 
   it("outputHint scaling does NOT affect labelScale (unitless multiplier)", () => {
     const map = makeTestMap({
-      coordinateSpace: { outputHint: { targetWidth: 400, targetHeight: 200 } },
-      labelScale: 1.5, // explicit labelScale
+      spatial: { coordinateSpace: { outputHint: { targetWidth: 400, targetHeight: 200 } } },
+      typography: { labelScale: 1.5 }, // explicit labelScale
     });
     const ctx = buildRenderContext(sanitizeMap(map));
     // labelScale is unitless — it must remain 1.5 regardless of 0.25x canvas scale
-    expect(ctx.resolvedConfig.labelScale).toBeCloseTo(1.5);
+    expect(ctx.resolvedConfig.typography.labelScale).toBeCloseTo(1.5);
   });
 
   it("options.width takes priority over outputHint.targetWidth", () => {
     const map = makeTestMap({
-      coordinateSpace: { outputHint: { targetWidth: 800 } },
+      spatial: { coordinateSpace: { outputHint: { targetWidth: 800 } } },
     });
     // Runtime options.width overrides outputHint
     const ctx = buildRenderContext(sanitizeMap(map), { width: 1200 });
@@ -510,7 +512,7 @@ describe("outputHint — resolution-independence scaling in render pipeline", ()
 
   it("outputHint identity (target=canvas size) → nodeRadii unchanged", () => {
     const map = makeTestMap({
-      coordinateSpace: { outputHint: { targetWidth: 1600, targetHeight: 800 } },
+      spatial: { coordinateSpace: { outputHint: { targetWidth: 1600, targetHeight: 800 } } },
     });
     const ctx = buildRenderContext(sanitizeMap(map));
     // 1:1 scale — nodeRadii must remain at default 5px
@@ -521,7 +523,7 @@ describe("outputHint — resolution-independence scaling in render pipeline", ()
   it("outputHint 2x scale: nodeRadii doubled, strokeWidth doubled", () => {
     // Canvas is 1600×800, target is 3200×1600 (2x) — used for retina raster export
     const map = makeTestMap({
-      coordinateSpace: { outputHint: { targetWidth: 3200, targetHeight: 1600 } },
+      spatial: { coordinateSpace: { outputHint: { targetWidth: 3200, targetHeight: 1600 } } },
     });
     const ctx = buildRenderContext(sanitizeMap(map));
     expect(ctx.canvasWidth).toBe(3200);
@@ -532,8 +534,7 @@ describe("outputHint — resolution-independence scaling in render pipeline", ()
 
   it("outputHint scaling applies to all nodeRadii entries (including per-type overrides)", () => {
     const map = makeTestMap({
-      nodeRadii: { _default: 5, anchor: 8, "user-need": 7 },
-      coordinateSpace: { outputHint: { targetWidth: 800, targetHeight: 400 } },
+      spatial: { nodeRadii: { _default: 5, anchor: 8, "user-need": 7 }, coordinateSpace: { outputHint: { targetWidth: 800, targetHeight: 400 } } },
     });
     const ctx = buildRenderContext(sanitizeMap(map));
     // All nodeRadii entries are scaled uniformly by 0.5
@@ -545,7 +546,7 @@ describe("outputHint — resolution-independence scaling in render pipeline", ()
   it("no-outputHint render and outputHint=identity render produce same SVG", () => {
     const mapDefault = makeTestMap({});
     const mapIdentity = makeTestMap({
-      coordinateSpace: { outputHint: { targetWidth: 1600, targetHeight: 800 } },
+      spatial: { coordinateSpace: { outputHint: { targetWidth: 1600, targetHeight: 800 } } },
     });
     const svgDefault = renderToSVG(mapDefault);
     const svgIdentity = renderToSVG(mapIdentity);

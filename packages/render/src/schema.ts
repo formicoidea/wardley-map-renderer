@@ -12,14 +12,53 @@ import {
   DEFAULT_COORDINATE_SPACE,
   type CoordinateSpace,
 } from "./coordinate-space.js";
+// TypographyConfigSchema is defined locally below to avoid circular dependency
+// with render-config-v2.ts (which imports from schema.ts).
+// The render-config-v2.ts TypographyConfigSchema is the canonical definition;
+// this local copy MUST stay in sync.
 
 // Re-export coordinate space types and defaults for convenience
 export { DEFAULT_COORDINATE_SPACE } from "./coordinate-space.js";
 export type { CoordinateSpace } from "./coordinate-space.js";
 
+// ── Typography sub-schema ────────────────────────────────────────────────────
+// Defined here (not imported from render-config-v2.ts) to avoid circular deps.
+// render-config-v2.ts imports from schema.ts, so schema.ts cannot import back.
+
+/**
+ * TypographyConfigSchema — groups font and text-scale concerns.
+ *   - `fontFamily`  — CSS font-family stack applied to all map text elements
+ *   - `labelScale`  — unitless multiplier for component label font size
+ *
+ * Each leaf has its own `.default()` — omit partially or entirely.
+ */
+export const TypographyConfigSchema = z.object({
+  /** CSS font-family stack applied to all map text elements. Default: "Inter, sans-serif" */
+  fontFamily: z.string().default("Inter, sans-serif"),
+  /**
+   * Unitless multiplier for component label font size.
+   * Base: 12 px; 1.0 = no scaling. Resolution-independent.
+   * Valid range: >0 to 5×.
+   */
+  labelScale: z.number().positive().max(5).default(1.0),
+});
+
+/** TypeScript type for TypographyConfig (output after Zod defaults applied) */
+export type TypographyConfig = z.infer<typeof TypographyConfigSchema>;
+
+/** TypeScript input type for TypographyConfig (accepts partial input before defaults) */
+export type TypographyConfigInput = z.input<typeof TypographyConfigSchema>;
+
+/** Default TypographyConfig values (Inter font, 1.0× label scale) */
+export const DEFAULT_TYPOGRAPHY_CONFIG: TypographyConfig = TypographyConfigSchema.parse({});
+
+// ── 3-decimal precision helper ──────────────────────────────
+/** Round a number to 3 decimal places (API boundary normalization). */
+export const round3 = (v: number): number => Math.round(v * 1000) / 1000;
+
 // ── Evolution axis ──────────────────────────────────────────
 // Phase 1: single float. Phase 2+: swap to distribution array.
-export const EvolutionSchema = z.number().min(0).max(1);
+export const EvolutionSchema = z.number().min(0).max(1).transform(round3);
 
 // ── Evolution range (optional min-max span) ─────────────────
 // Represents a component's evolution uncertainty or span as [min, max].
@@ -73,7 +112,7 @@ export const EvolutionFieldSchema = z.object({
 });
 
 export const VisibilityFieldSchema = z.object({
-  scalar: z.number().min(0).max(1),
+  scalar: z.number().min(0).max(1).transform(round3),
 });
 
 export const PositionSchema = z.object({
@@ -94,7 +133,7 @@ export type EvolveType = z.infer<typeof EvolveTypeEnum>;
 export const EvolvesToSchema = z.object({
   position: z.object({
     evolution: z.object({ scalar: EvolutionSchema }),
-    visibility: z.object({ scalar: z.number().min(0).max(1) }),
+    visibility: z.object({ scalar: z.number().min(0).max(1).transform(round3) }),
   }),
   evolveType: EvolveTypeEnum.default("natural"),
   /** When true, indicates resistance to evolution (inertia barrier at phase boundary). */
@@ -106,8 +145,8 @@ export const EvolvesToSchema = z.object({
 export const PipelineGeometrySchema = z.object({
   evoStart: EvolutionSchema,
   evoEnd: EvolutionSchema,
-  visStart: z.number().min(0).max(1),
-  visEnd: z.number().min(0).max(1),
+  visStart: z.number().min(0).max(1).transform(round3),
+  visEnd: z.number().min(0).max(1).transform(round3),
   handleEvolution: EvolutionSchema.optional(),
 });
 
@@ -165,8 +204,7 @@ export const RelationSchema = z.object({
 export const LocaleEnum = z.enum(["en", "fr"]);
 
 // ── Axis labels (i18n) ────────────────────────────────────
-// All fields optional — renderConfig.locale selects the preset, individual fields override.
-// Note: locale has moved to the top-level of RenderConfigSchema.
+// All fields optional — renderConfig.axes.locale selects the preset, individual fields override.
 export const AxisLabelsSchema = z.object({
   /** X-axis main label (e.g. "Evolution") */
   xAxis: z.string().optional(),
@@ -196,6 +234,30 @@ export const AxisLabelsSchema = z.object({
   /** Direction indicator at bottom of value chain axis (e.g. "Invisible") */
   visibilityLow: z.string().optional(),
 });
+
+// ── Axes config (groups axisLabels + locale) ──────────────
+/**
+ * Axes configuration sub-schema — groups all axis-related settings:
+ *   - `locale`     — language preset for axis labels ("en" | "fr")
+ *   - `axisLabels` — i18n label overrides for axes and phase labels
+ *
+ * Each leaf field has its own Zod `.default()` or `.optional()` — omit partially or entirely.
+ *
+ * @see AxisLabelsSchema for the full label override fields
+ * @see LocaleEnum for supported locales
+ */
+export const AxesConfigSchema = z.object({
+  /** Locale preset for axis labels (default: "en"). */
+  locale: LocaleEnum.default("en"),
+  /** i18n axis label overrides — locale preset used as base, individual fields override. */
+  axisLabels: AxisLabelsSchema.optional(),
+});
+
+export type AxesConfig = z.infer<typeof AxesConfigSchema>;
+export type AxesConfigInput = z.input<typeof AxesConfigSchema>;
+
+/** Default axes config — English locale, no label overrides. */
+export const DEFAULT_AXES_CONFIG: AxesConfig = AxesConfigSchema.parse({});
 
 // ── Legend config ──────────────────────────────────────────
 export const LegendPositionEnum = z.enum([
@@ -651,7 +713,7 @@ export const ValueChainYAxisSchema = z.object({
  * @deprecated Sub-AC 2 (MapChrome refactor): direction indicator label overrides
  * (`evolutionStart`, `evolutionEnd`, `visibilityHigh`, `visibilityLow`) have been
  * removed from `MapChrome` / `BackgroundSchema`.  Direction cue labels are now
- * locale-only — use `renderConfig.locale` to select the language preset.
+ * locale-only — use `renderConfig.axes.locale` to select the language preset.
  *
  * This schema is kept as an empty object to preserve the exported type name for
  * downstream consumers; any previously supported fields are silently stripped by Zod.
@@ -731,7 +793,7 @@ export const EvolutionPhasesSchema = z.object({
  *    `visibilityRange`, `coordinateSpace`) — those live in {@link CoordinateSpace}
  *  - Axis direction indicator labels (`evolutionStart`, `evolutionEnd`,
  *    `visibilityHigh`, `visibilityLow`) — removed in Sub-AC 2; direction cues are
- *    now locale-only (see `renderConfig.locale`)
+ *    now locale-only (see `renderConfig.axes.locale`)
  *  - Any author-intent or data-layer fields
  *
  * All fields (including sub-fields of nested schemas) carry `@category viewer-preference`.
@@ -1064,6 +1126,89 @@ export const FiltersSchema = z.object({
   excludeComponentTypes: z.array(ComponentTypeEnum).optional(),
 });
 
+// ── SpatialConfig sub-schema ──────────────────────────────────────────────────
+/**
+ * SpatialConfigSchema — groups all canvas dimension, coordinate space, and
+ * geometry concerns for a Wardley Map render.
+ *
+ * Fields:
+ *   - `width`           — canvas width in pixels (default: 1600)
+ *   - `height`          — canvas height in pixels (default: 800)
+ *   - `coordinateSpace` — explicit coordinate space declaration (units + origin)
+ *   - `strokeWidth`     — edge/outline stroke width in canvas px-space (default: 1)
+ *   - `nodeRadii`       — per-type node circle radii in canvas px-space (default: { _default: 5 })
+ *
+ * Each leaf field has its own Zod `.default()` — omit partially or entirely.
+ *
+ * @see CoordinateSpaceSchema in coordinate-space.ts — full Zod definition
+ * @see NodeRadiiSchema — TypeStyleMap<number> schema with required _default
+ */
+export const SpatialConfigSchema = z.object({
+  /** Canvas width in pixels. Default: 1600 px. Valid range: 1–10000 px. */
+  width: z
+    .number()
+    .positive()
+    .max(10000, "Canvas width must not exceed 10000 px")
+    .default(1600),
+  /** Canvas height in pixels. Default: 800 px. Valid range: 1–10000 px. */
+  height: z
+    .number()
+    .positive()
+    .max(10000, "Canvas height must not exceed 10000 px")
+    .default(800),
+  /** Explicit coordinate space declaration (units, origin, ranges). */
+  coordinateSpace: CanvasCoordinateSpaceSchema.optional(),
+  /** Stroke width in canvas px-space for edges and node outlines. Default: 1 px. */
+  strokeWidth: z.number().min(0.25).max(8).default(1),
+  /** Per-type node circle radii in canvas px-space. _default is required. */
+  nodeRadii: NodeRadiiSchema.default({ _default: 5 }),
+});
+
+/** TypeScript type for SpatialConfig (output after Zod defaults applied) */
+export type SpatialConfig = z.infer<typeof SpatialConfigSchema>;
+
+/** TypeScript input type for SpatialConfig (accepts partial input before defaults) */
+export type SpatialConfigInput = z.input<typeof SpatialConfigSchema>;
+
+/** Default SpatialConfig — canvas 1600×800 px, strokeWidth 1, nodeRadii._default 5 */
+export const DEFAULT_SPATIAL_CONFIG: SpatialConfig = SpatialConfigSchema.parse({});
+
+// ── StylingConfig sub-schema ──────────────────────────────────────────────────
+/**
+ * StylingConfigSchema — groups all visual styling concerns:
+ *   - `theme`        — named visual theme preset (default: "default")
+ *   - `palette`      — per-component-type color overrides
+ *   - `evolveStyles` — per-evolve-type arrow stroke style overrides
+ *   - `background`   — canvas background color and axis/phase display controls
+ *
+ * Design rule: themes handle only colors and font — strokeWidth and nodeRadii belong to spatial.
+ *
+ * Each leaf field has its own Zod `.default()` or `.optional()` — omit partially or entirely.
+ *
+ * @see ThemeEnum — Zod enum definition for theme names
+ * @see TypeColorsSchema — palette shape (KNOWN_RENDERABLE_TYPES keys)
+ * @see EvolveStylesMapSchema — evolveStyles key constraints (EvolveTypeEnum)
+ * @see BackgroundSchema — background canvas color and axis/phase controls
+ */
+export const StylingConfigSchema = z.object({
+  /** Named visual theme preset. Default: "default". */
+  theme: ThemeEnum.default("default"),
+  /** Per-renderable-type color overrides (any CSS color string). */
+  palette: TypeColorsSchema.optional(),
+  /** Per-evolve-type arrow stroke style overrides. */
+  evolveStyles: EvolveStylesMapSchema.optional(),
+  /** Background canvas color and axis/phase display controls. */
+  background: BackgroundSchema.optional(),
+});
+
+/** TypeScript type for StylingConfig (output after Zod defaults applied) */
+export type StylingConfig = z.infer<typeof StylingConfigSchema>;
+
+/** TypeScript input type for StylingConfig (accepts partial input before defaults) */
+export type StylingConfigInput = z.input<typeof StylingConfigSchema>;
+
+/** Default StylingConfig — "default" theme, no palette/evolveStyles/background overrides */
+export const DEFAULT_STYLING_CONFIG: StylingConfig = StylingConfigSchema.parse({});
 
 // ── ConfigIntent (scope-boundary intent flags as first-class booleans) ──
 //
@@ -1130,6 +1275,9 @@ export const ConfigIntentSchema = z.object({
 
 /** TypeScript type inferred from {@link ConfigIntentSchema}. */
 export type ConfigIntent = z.infer<typeof ConfigIntentSchema>;
+
+/** Input type for ConfigIntent — accepts partial input before defaults */
+export type ConfigIntentInput = z.input<typeof ConfigIntentSchema>;
 
 /**
  * Default ConfigIntent for the `@wardleyapi/render` package.
@@ -1318,268 +1466,134 @@ export type MethodConfig = z.infer<typeof MethodConfigSchema>;
 
 export const RenderConfigSchema = z.object({
   /**
-   * Canvas width in pixels — defines the horizontal extent of the canvas coordinate space.
-   * All px-space values (nodeRadii, strokeWidth, legend position) are interpreted within this space.
-   * Default: 1600 px. Valid range: 1–10000 px.
-   * @see CoordinateSpace in coordinate-space.ts for the full coordinate space declaration
+   * Spatial — canvas dimensions, coordinate space, stroke width, and node radii.
+   *
+   * Groups all canvas dimension, coordinate space, and geometry concerns:
+   *   - `width`           — canvas width in pixels (default: 1600)
+   *   - `height`          — canvas height in pixels (default: 800)
+   *   - `coordinateSpace` — explicit coordinate space declaration (units + origin)
+   *   - `strokeWidth`     — edge/outline stroke width in canvas px-space (default: 1)
+   *   - `nodeRadii`       — per-type node circle radii in canvas px-space (default: { _default: 5 })
+   *
+   * Each leaf field has its own Zod `.default()` — omit partially or entirely.
+   *
+   * @see SpatialConfigSchema for the full sub-schema
    * @category layout-structural
    */
-  width: z.number().positive().max(10000, "Canvas width must not exceed 10000 px").optional(),
+  spatial: SpatialConfigSchema.optional(),
+
   /**
-   * Canvas height in pixels — defines the vertical extent of the canvas coordinate space.
-   * Default: 800 px. Valid range: 1–10000 px.
-   * @see CoordinateSpace in coordinate-space.ts for the full coordinate space declaration
-   * @category layout-structural
-   */
-  height: z.number().positive().max(10000, "Canvas height must not exceed 10000 px").optional(),
-  /**
-   * Coordinate space declaration — ALL coordinate-system-defining parameters.
+   * Typography — font family and label scale multiplier.
    *
-   * Encapsulates width, height (canvas px-space), evolutionRange and visibilityRange
-   * (normalized display ranges), and unit declaration.  These are the coordinate-defining
-   * fields that MUST NOT live inside decorative/chrome containers (MapChrome/background).
+   * Groups all font and text-scale concerns:
+   *   - `fontFamily`  — CSS font-family stack applied to all map text elements
+   *   - `labelScale`  — unitless multiplier for component label font size (1.0 = 12 px base)
    *
-   * All fields default automatically — omit the entire field for current behavior.
+   * Each leaf field has its own Zod `.default()` — omit partially or entirely.
    *
-   * @see CanvasCoordinateSpaceSchema (coordinate-space.ts) for the Zod definition
-   * @see DEFAULT_COORDINATE_SPACE for the default values
-   * @category platform-constraint
-   */
-  coordinateSpace: CanvasCoordinateSpaceSchema.optional(),
-  /**
-   * Named visual theme preset (default: "default").
+   * @see TypographyConfigSchema for the Zod sub-schema
+   * @see DEFAULT_TYPOGRAPHY_CONFIG for the default values
    * @category viewer-preference
    */
-  theme: ThemeEnum.optional(),
+  typography: TypographyConfigSchema.optional(),
+
   /**
-   * Locale preset for axis labels (default: "en").
-   * Selects built-in label set; individual label overrides in background sub-objects take precedence.
-   * @category viewer-preference
-   */
-  locale: LocaleEnum.optional(),
-  /**
-   * Background canvas color and axis/phase display controls.
-   * @category viewer-preference
-   */
-  background: BackgroundSchema.optional(),
-  /**
-   * Font family for all text.
-   * @category viewer-preference
-   */
-  fontFamily: z.string().optional(),
-  /**
-   * Unitless multiplier for component label font size (default 1.0 = 12 px base size).
+   * Styling — theme, palette (colors), evolve styles, background.
    *
-   * This is **NOT** a px-space value — it scales relative to the base font size,
-   * independent of canvas width/height and independent of any `outputHint`.
+   * Groups all visual styling concerns:
+   *   - `theme`        — named visual theme preset (default: "default")
+   *   - `palette`      — per-component-type color overrides
+   *   - `evolveStyles` — per-evolve-type arrow stroke style overrides
+   *   - `background`   — canvas background color and axis/phase display controls
    *
-   * ## Resolution independence
+   * Design rule: themes handle only colors and font — strokeWidth and nodeRadii belong to spatial.
    *
-   * `labelScale` is **resolution-independent**: it is a dimensionless ratio applied
-   * to the 12 px base font size, not an absolute pixel dimension.  Consequently:
+   * Each leaf field has its own Zod `.default()` or `.optional()` — omit partially or entirely.
    *
-   * - Changing `coordinateSpace.width` (canvas resize) does NOT require updating `labelScale`.
-   * - Adding `coordinateSpace.outputHint.targetWidth` (PNG export at higher resolution) does
-   *   NOT scale `labelScale` — the label size ratio remains the same regardless of output pixels.
-   *
-   * Contrast with `nodeRadii` and `strokeWidth`, which ARE px-space values and ARE
-   * scaled by `coordinateSpace.outputHint.targetWidth / coordinateSpace.width` when
-   * `coordinateSpace.outputHint` is present.
-   *
-   * Valid range: >0 to 5× (e.g. 0.8 = smaller, 1.5 = 50% larger).
-   *
-   * @see coordinateSpace.outputHint — controls px-space scaling; does NOT affect labelScale
-   * @see nodeRadii — px-space value that IS scaled by coordinateSpace.outputHint
-   * @see strokeWidth — px-space value that IS scaled by coordinateSpace.outputHint
-   * @see computeScaleFactor in coordinate-space.ts — derives ScaleFactor; labelScale excluded
-   * @see CoordinateSpace in coordinate-space.ts — labelScale is listed as a unitless multiplier
-   * @category viewer-preference
-   */
-  labelScale: z.number().positive().max(5).optional(),
-  /**
-   * Node circle radii in **canvas px-space**, keyed by component type.
-   * `_default` is required when provided and serves as catch-all fallback.
-   *
-   * These are absolute pixel values in the canvas coordinate space defined by
-   * `coordinateSpace.width × coordinateSpace.height`.
-   *
-   * ## Scaling with coordinateSpace.outputHint (resolution independence)
-   *
-   * When `coordinateSpace.outputHint.targetWidth` is present, these values are scaled
-   * by the ratio `outputHint.targetWidth / coordinateSpace.width` before rasterisation:
-   *
-   * ```
-   *   scaleFactor   = coordinateSpace.outputHint.targetWidth / coordinateSpace.width
-   *   renderedRadius = nodeRadii[type] × scaleFactor
-   * ```
-   *
-   * Use `computeScaleFactor(coordinateSpace)` from `coordinate-space.ts` to obtain the
-   * `ScaleFactor` object; apply `scaleFactor.uniform` to all px-space values.
-   *
-   * This ensures a 5 px radius on a 1600 px canvas becomes 10 px when exported at 3200 px,
-   * keeping the visual proportion identical across output resolutions.
-   *
-   * Contrast with `labelScale`, which is a **unitless multiplier** and is NOT scaled
-   * by `outputHint` — it is already resolution-independent.
-   *
-   * Precedence (highest wins): `nodeRadii[type]` → `nodeRadii._default`
-   *
-   * @see coordinateSpace — set coordinateSpace.outputHint.targetWidth to declare output resolution
-   * @see computeScaleFactor in coordinate-space.ts — derives ScaleFactor from CoordinateSpace
-   * @see labelScale — unitless multiplier; NOT scaled by outputHint
-   * @see CoordinateSpace in coordinate-space.ts for the canvas coordinate space definition
-   *
-   * @example
-   *   nodeRadii: { _default: 5 }                     // all types use 5 px
-   *   nodeRadii: { _default: 5, "user-need": 8 }      // user-need uses 8 px, others 5 px
-   *
-   * @category layout-structural
-   */
-  nodeRadii: NodeRadiiSchema.optional(),
-  /**
-   * Enable/disable label collision avoidance.
-   * @category layout-structural
-   */
-  avoidCollisions: z.boolean().optional(),
-  /**
-   * Custom color overrides by component type using the TypeStyleMap pattern.
-   * `_default` is required when provided and acts as the fallback color.
-   *
-   * Precedence (highest wins): `component.color` → `typeColors[type]` → `typeColors._default` → node default
-   *
-   * @see TypeColorsSchema — schema definition with full documentation
+   * @see StylingConfigSchema for the full sub-schema
    * @category author-intent
    */
-  typeColors: TypeColorsSchema.optional(),
-  /**
-   * evolveType → stroke style mapping for evolution arrows.
-   * Keys are constrained to EvolveTypeEnum (natural/ecosystem/forced/late); unknown keys are rejected.
-   * @category author-intent
-   */
-  evolveStyles: EvolveStylesMapSchema.optional(),
-  /**
-   * Legend visibility and position.
-   * @category viewer-preference
-   */
-  legend: LegendSchema.optional(),
+  styling: StylingConfigSchema.optional(),
+
   /**
    * Unified visibility filters — consolidates two distinct mechanisms for controlling
    * what is shown in the rendered output.
    *
-   * ## Two-level filtering model
+   * ### `filters.layers` — Visual layer toggles (post-render)
+   * Enables or disables individual SVG rendering layers.
    *
    * ### `filters.excludeComponentTypes` — Data filter (pre-render)
-   * Removes component types from the map data **before** any rendering layer processes
-   * them. Components of the excluded types are removed from ALL layers simultaneously —
-   * nodes, labels, edges, pipelines, notes — as if they did not exist in the map data.
-   *
-   * This is the renamed successor to the old top-level `excludeTypes` field.
-   *
-   * ### `filters.layers` — Visual layer toggles (post-render)
-   * Enables or disables individual SVG rendering layers. When a layer toggle is `false`,
-   * that layer's renderer is skipped and contributes no SVG fragments — but all map data
-   * remains loaded in the render context for other layers to reference.
-   *
-   * ## Key distinction
-   * `layers` operates at the **visual layer level** (post-render): only the SVG output
-   * of the toggled layer is omitted; other layers may still reference the same data.
-   * `excludeComponentTypes` operates at the **data level** (pre-render): filtered
-   * components are removed before geometry is computed, affecting ALL layers simultaneously.
-   *
-   * @example Data-level filter — remove notes and anchors from all layers:
-   *   `filters: { excludeComponentTypes: ["note", "anchor"] }`
-   *
-   * @example Visual-layer toggle — hide the nodes layer only:
-   *   `filters: { layers: { nodes: false, evolvesTo: false, labels: false } }`
+   * Removes component types from the map data before any layer processes them.
    *
    * @see FiltersSchema for full Zod field definitions and per-field JSDoc
    * @category viewer-preference
    */
   filters: FiltersSchema.optional(),
+
   /**
-   * Stroke width in **canvas px-space** for edges and node outlines.
-   * Default: 1 px. Valid range: 0.25–8 px.
+   * Legend visibility and position.
    *
-   * ## Scaling with coordinateSpace.outputHint (resolution independence)
+   * Groups all legend-related settings:
+   *   - `show`           — show/hide the legend box (default: true)
+   *   - `position`       — named anchor or explicit {x, y} coordinates (default: "bottom-right")
+   *   - `legendOverflow` — overflow handling for explicit position (default: "allow")
    *
-   * When `coordinateSpace.outputHint.targetWidth` is present, this value is scaled
-   * by the ratio `outputHint.targetWidth / coordinateSpace.width` before rasterisation:
-   *
-   * ```
-   *   scaleFactor         = coordinateSpace.outputHint.targetWidth / coordinateSpace.width
-   *   renderedStrokeWidth = strokeWidth × scaleFactor
-   * ```
-   *
-   * Use `computeScaleFactor(coordinateSpace)` from `coordinate-space.ts` to obtain the
-   * `ScaleFactor` object; apply `scaleFactor.uniform` to all px-space values.
-   *
-   * This ensures a 1 px stroke on a 1600 px canvas becomes 2 px when exported at 3200 px,
-   * keeping the visual proportion identical across output resolutions.
-   *
-   * Contrast with `labelScale`, which is a **unitless multiplier** and is NOT scaled
-   * by `outputHint` — it is already resolution-independent.
-   *
-   * @see coordinateSpace — set coordinateSpace.outputHint.targetWidth to declare output resolution
-   * @see computeScaleFactor in coordinate-space.ts — derives ScaleFactor from CoordinateSpace
-   * @see nodeRadii — also px-space; also scaled by outputHint
-   * @see labelScale — unitless multiplier; NOT scaled by outputHint
-   * @see CoordinateSpace in coordinate-space.ts for the canvas coordinate space definition
+   * @see LegendSchema for the full sub-schema
    * @category viewer-preference
    */
-  strokeWidth: z.number().min(0.25).max(8).default(1),
+  legend: LegendSchema.optional(),
+
   /**
-   * Configurable scope-boundary intent flags.
+   * Axes configuration — locale preset and i18n axis label overrides.
    *
-   * Declares what this renderer does (`staticExport`) and does NOT do
-   * (`noTemporalDiff`, `noInteraction`) as first-class boolean metadata.
+   * Groups all axis-related settings:
+   *   - `axes.locale`     — language preset for axis labels ("en" | "fr"), default "en"
+   *   - `axes.axisLabels`  — per-field label overrides (xAxis, yAxis, phases, etc.)
    *
-   * Uses `z.boolean()` with defaults, allowing future renderer variants
-   * to declare different intent profiles (e.g. an interactive HTML/canvas
-   * renderer that sets `noInteraction: false`) while sharing the same
-   * schema and merge infrastructure.
+   * Each leaf field has its own Zod default — omit partially or entirely.
    *
-   * All flags default to `true` when this field is omitted. The canonical
-   * resolved value is always present in {@link ResolvedRenderConfig}:
-   *
-   * ```ts
-   * const resolved = resolveTheme({});
-   * resolved.configIntent.staticExport   // true
-   * resolved.configIntent.noTemporalDiff // true
-   * resolved.configIntent.noInteraction  // true
-   * ```
-   *
-   * @see ConfigIntentSchema — the full field schema
-   * @see DEFAULT_CONFIG_INTENT — the default values
-   * @see resolveConfigIntent — for merging partial overrides
-   * @category platform-constraint
+   * @see AxesConfigSchema for the full sub-schema
+   * @category viewer-preference
    */
+  axes: AxesConfigSchema.optional(),
+
+  /**
+   * Enable/disable label collision avoidance.
+   * @category layout-structural
+   */
+  avoidCollisions: z.boolean().optional(),
+
   /**
    * Method rendering configuration — maps method type strings to colors and i18n legend labels.
    *
    * Each entry defines how a specific method type (e.g. "build", "buy", "outsource") is
    * rendered: its indicator color and its legend labels (exactly 3 keys per entry).
    *
-   * This is an array of single method config objects (one method per entry).
-   *
    * @category author-intent
    */
   methods: z.array(MethodConfigSchema).optional(),
+
+  /**
+   * Configurable scope-boundary intent flags.
+   *
+   * Declares what this renderer does (`staticExport`) and does NOT do
+   * (`noTemporalDiff`, `noInteraction`) as first-class boolean metadata.
+   *
+   * @see ConfigIntentSchema — the full field schema
+   * @see DEFAULT_CONFIG_INTENT — the default values
+   * @category platform-constraint
+   */
   configIntent: ConfigIntentSchema.partial().optional(),
 })
-  /**
-   * Strict mode — unknown keys are rejected at parse time.
-   * `.strict()` is closed-world: all unknown keys are rejected.
-   */
-  .strict()
   .superRefine((data, ctx) => {
   // ── Legend {x,y} bounds validation ───────────────────────────────────────
   // When legend.position is an explicit {x, y} coordinate object, enforce that
   // the position lies within the canvas: 0 ≤ x ≤ width and 0 ≤ y ≤ height.
-  // Default canvas dimensions match the theme baseline (width=1600, height=800).
+  // Canvas dimensions read from spatial sub-object (default 1600 × 800 px).
   const pos = data.legend?.position;
   if (pos !== undefined && typeof pos === "object" && "x" in pos && "y" in pos) {
-    const canvasWidth = data.width ?? 1600;
-    const canvasHeight = data.height ?? 800;
+    const canvasWidth = data.spatial?.width ?? 1600;
+    const canvasHeight = data.spatial?.height ?? 800;
     const { x, y } = pos as { x: number; y: number };
 
     if (x < 0 || x > canvasWidth) {
@@ -1662,6 +1676,8 @@ export type RelationType = z.infer<typeof RelationTypeEnum>;
 export type AxisLabels = z.infer<typeof AxisLabelsSchema>;
 export type Locale = z.infer<typeof LocaleEnum>;
 export type Legend = z.infer<typeof LegendSchema>;
+/** Input type for Legend — accepts partial input before defaults */
+export type LegendInput = z.input<typeof LegendSchema>;
 export type LegendPosition = z.infer<typeof LegendPositionEnum>;
 export type LegendPositionXY = z.infer<typeof LegendPositionXYSchema>;
 export type Theme = z.infer<typeof ThemeEnum>;
@@ -1692,9 +1708,39 @@ export type MapChrome = z.infer<typeof BackgroundSchema>;
 export type Background = MapChrome;
 export type LayerToggles = z.infer<typeof LayerTogglesSchema>;
 export type Filters = z.infer<typeof FiltersSchema>;
+/** Input type for Filters — accepts partial input before defaults */
+export type FiltersInput = z.input<typeof FiltersSchema>;
 export type RenderConfig = z.infer<typeof RenderConfigSchema>;
-/** Input type for RenderConfig — strokeWidth is optional (before Zod applies .default(1)) */
+/** Input type for RenderConfig — all nested sub-schemas accept partial input before defaults */
 export type RenderConfigInput = z.input<typeof RenderConfigSchema>;
+
+/**
+ * Default render configuration — concrete baseline values for the nested RenderConfig.
+ *
+ * Represents the standard "out-of-box" canvas configuration before any caller
+ * overrides or theme resolution. All sub-schemas are resolved with their defaults.
+ *
+ * @see SpatialConfigSchema — spatial defaults (1600×800 canvas, strokeWidth 1, nodeRadii._default 5)
+ * @see TypographyConfigSchema — typography defaults (Inter font, 1.0× label scale)
+ * @see StylingConfigSchema — styling defaults ("default" theme, no overrides)
+ * @see AxesConfigSchema — axes defaults (English locale, no label overrides)
+ * @see LegendSchema — legend defaults (show=true, position="bottom-right")
+ */
+/** Default legend config — show=true, position="bottom-right", overflow="allow". */
+export const DEFAULT_LEGEND_CONFIG = LegendSchema.parse({});
+
+/** Default filters config — all layers visible, no component types excluded. */
+export const DEFAULT_FILTERS_CONFIG = FiltersSchema.parse({});
+
+export const DEFAULT_RENDER_CONFIG: RenderConfig = {
+  spatial: DEFAULT_SPATIAL_CONFIG,
+  typography: DEFAULT_TYPOGRAPHY_CONFIG,
+  styling: DEFAULT_STYLING_CONFIG,
+  filters: DEFAULT_FILTERS_CONFIG,
+  legend: DEFAULT_LEGEND_CONFIG,
+  axes: DEFAULT_AXES_CONFIG,
+  configIntent: DEFAULT_CONFIG_INTENT,
+};
 export type EvolveStyle = z.infer<typeof EvolveStyleSchema>;
 export type EvolveStylesMap = z.infer<typeof EvolveStylesMapSchema>;
 export type AcceleratorType = z.infer<typeof AcceleratorTypeEnum>;
@@ -1719,6 +1765,78 @@ export function evoTarget(e: EvolvesTo): number { return e.position.evolution.sc
 
 /** Get visibility scalar from an evolvesTo target */
 export function visTarget(e: EvolvesTo): number { return e.position.visibility.scalar; }
+
+// ── RenderConfig accessor helpers ───────────────────────────
+// Reduce verbosity when accessing nested RenderConfig sub-schema fields.
+// Each accessor reads from the nested group with a fallback to the default.
+
+// Cached resolved defaults for accessors (avoids repeated optional chaining)
+const _defaultSpatial = DEFAULT_SPATIAL_CONFIG;
+const _defaultTypography = DEFAULT_TYPOGRAPHY_CONFIG;
+const _defaultStyling = DEFAULT_STYLING_CONFIG;
+const _defaultAxes = DEFAULT_AXES_CONFIG;
+
+/** Get canvas width from a RenderConfig (spatial.width, default 1600) */
+export function rcWidth(rc?: RenderConfigInput): number {
+  return rc?.spatial?.width ?? _defaultSpatial.width;
+}
+
+/** Get canvas height from a RenderConfig (spatial.height, default 800) */
+export function rcHeight(rc?: RenderConfigInput): number {
+  return rc?.spatial?.height ?? _defaultSpatial.height;
+}
+
+/** Get stroke width from a RenderConfig (spatial.strokeWidth, default 1) */
+export function rcStrokeWidth(rc?: RenderConfigInput): number {
+  return rc?.spatial?.strokeWidth ?? _defaultSpatial.strokeWidth;
+}
+
+/** Get font family from a RenderConfig (typography.fontFamily, default "Inter, sans-serif") */
+export function rcFontFamily(rc?: RenderConfigInput): string {
+  return rc?.typography?.fontFamily ?? _defaultTypography.fontFamily;
+}
+
+/** Get label scale from a RenderConfig (typography.labelScale, default 1.0) */
+export function rcLabelScale(rc?: RenderConfigInput): number {
+  return rc?.typography?.labelScale ?? _defaultTypography.labelScale;
+}
+
+/** Get theme from a RenderConfig (styling.theme, default "default") */
+export function rcTheme(rc?: RenderConfigInput): Theme {
+  return (rc?.styling?.theme ?? _defaultStyling.theme) as Theme;
+}
+
+/** Get locale from a RenderConfig (axes.locale, default "en") */
+export function rcLocale(rc?: RenderConfigInput): Locale {
+  return (rc?.axes?.locale ?? _defaultAxes.locale) as Locale;
+}
+
+/**
+ * Merge a partial RenderConfigInput with defaults to produce a fully resolved RenderConfig.
+ *
+ * Parses the input through RenderConfigSchema (applying Zod defaults) then
+ * deep-merges with DEFAULT_RENDER_CONFIG to guarantee every leaf field is present.
+ *
+ * @param input - Partial nested config input (any sub-schema can be omitted)
+ * @returns Fully resolved RenderConfig with all defaults applied
+ */
+export function resolveRenderConfigDefaults(input?: RenderConfigInput): RenderConfig {
+  if (!input) return { ...DEFAULT_RENDER_CONFIG };
+  const parsed = RenderConfigSchema.parse(input);
+  return {
+    spatial: parsed.spatial ? { ..._defaultSpatial, ...parsed.spatial } : _defaultSpatial,
+    typography: parsed.typography ? { ..._defaultTypography, ...parsed.typography } : _defaultTypography,
+    styling: parsed.styling ? { ..._defaultStyling, ...parsed.styling } : _defaultStyling,
+    filters: parsed.filters ? { ...DEFAULT_FILTERS_CONFIG, ...parsed.filters } : DEFAULT_FILTERS_CONFIG,
+    legend: parsed.legend ? { ...DEFAULT_LEGEND_CONFIG, ...parsed.legend } : DEFAULT_LEGEND_CONFIG,
+    axes: parsed.axes ? { ..._defaultAxes, ...parsed.axes } : _defaultAxes,
+    avoidCollisions: parsed.avoidCollisions,
+    methods: parsed.methods,
+    configIntent: parsed.configIntent
+      ? { ...DEFAULT_CONFIG_INTENT, ...parsed.configIntent }
+      : DEFAULT_CONFIG_INTENT,
+  };
+}
 
 // ── Color mapping ──────────────────────────────────────────
 // Minimal Tailwind-to-hex mapping with black fallback
@@ -2137,19 +2255,13 @@ export interface ResolvedRenderConfig {
   showValueChainYAxis: boolean;
   /** Whether evolution phase dividers AND phase labels are shown (orthogonal to showEvolutionXAxis) */
   showPhaseDividerAndLabel: boolean;
-  /** Font family for all text */
-  fontFamily: string;
   /**
-   * Unitless multiplier for component label font size (1.0 = default 12px).
+   * Typography — font family and label scale multiplier.
+   * All fields are fully resolved (no undefined) after resolveTheme().
    *
-   * Resolution-independent: NOT scaled by `coordinateSpace.outputHint.targetWidth /
-   * coordinateSpace.width`. The label size ratio stays constant regardless of canvas
-   * dimensions or export resolution.
-   *
-   * @see coordinateSpace.outputHint — controls px-space scaling; does NOT affect labelScale
-   * @see computeScaleFactor in coordinate-space.ts — labelScale intentionally excluded
+   * @see TypographyConfigSchema in render-config-v2.ts
    */
-  labelScale: number;
+  typography: TypographyConfig;
   /**
    * Node circle radii in **canvas px-space**, keyed by component type.
    * `_default` is always present (guaranteed by resolveTheme with baseline value 5 px).
@@ -2290,8 +2402,7 @@ const THEME_BASELINE_DEFAULT: Omit<ResolvedRenderConfig, "theme"> = {
   showEvolutionXAxis: true,
   showValueChainYAxis: true,
   showPhaseDividerAndLabel: true,
-  fontFamily: "Inter, sans-serif",
-  labelScale: 1.0,
+  typography: { fontFamily: "Inter, sans-serif", labelScale: 1.0 },
   nodeRadii: { _default: 5 },
   avoidCollisions: true,
   excludeComponentTypes: [],
@@ -2339,7 +2450,7 @@ const THEME_BASELINE_DARK: Omit<ResolvedRenderConfig, "theme"> = {
 const THEME_BASELINE_HIGH_CONTRAST: Omit<ResolvedRenderConfig, "theme"> = {
   ...THEME_BASELINE_DEFAULT,
   background: { color: "#000000" }, // pure black
-  fontFamily: "Arial, sans-serif", // widely available accessible font
+  typography: { fontFamily: "Arial, sans-serif", labelScale: 1.0 }, // widely available accessible font
   strokeWidth: 2,
 };
 
@@ -2410,45 +2521,50 @@ const THEME_BASELINES: Record<"default" | "dark" | "highContrast", Omit<Resolved
  * @returns Flat ResolvedRenderConfig with all values resolved to concrete values
  */
 export function resolveTheme(renderConfig?: RenderConfigInput): ResolvedRenderConfig {
-  const themeName = renderConfig?.theme ?? "default";
+  const themeName = renderConfig?.styling?.theme ?? "default";
   const baseline = THEME_BASELINES[themeName];
+
+  // Access nested sub-schemas
+  const spatial = renderConfig?.spatial;
+  const styling = renderConfig?.styling;
+  const bg = styling?.background;
 
   return {
     theme: themeName,
-    locale: renderConfig?.locale ?? "en",
-    width: renderConfig?.width ?? baseline.width,
-    height: renderConfig?.height ?? baseline.height,
-    background: { color: renderConfig?.background?.color ?? baseline.background.color },
-    showEvolutionXAxis: renderConfig?.background?.evolutionXAxis?.show ?? baseline.showEvolutionXAxis,
-    showValueChainYAxis: renderConfig?.background?.valueChainYAxis?.show ?? baseline.showValueChainYAxis,
-    showPhaseDividerAndLabel: renderConfig?.background?.evolutionPhases?.showPhaseDividerAndLabel ?? baseline.showPhaseDividerAndLabel,
-    fontFamily: renderConfig?.fontFamily ?? baseline.fontFamily,
-    labelScale: renderConfig?.labelScale ?? baseline.labelScale,
-    nodeRadii: (renderConfig?.nodeRadii
-      ? { ...baseline.nodeRadii, ...renderConfig.nodeRadii }
+    locale: renderConfig?.axes?.locale ?? "en",
+    width: spatial?.width ?? baseline.width,
+    height: spatial?.height ?? baseline.height,
+    background: { color: bg?.color ?? baseline.background.color },
+    showEvolutionXAxis: bg?.evolutionXAxis?.show ?? baseline.showEvolutionXAxis,
+    showValueChainYAxis: bg?.valueChainYAxis?.show ?? baseline.showValueChainYAxis,
+    showPhaseDividerAndLabel: bg?.evolutionPhases?.showPhaseDividerAndLabel ?? baseline.showPhaseDividerAndLabel,
+    typography: {
+      fontFamily: renderConfig?.typography?.fontFamily ?? baseline.typography.fontFamily,
+      labelScale: renderConfig?.typography?.labelScale ?? baseline.typography.labelScale,
+    },
+    nodeRadii: (spatial?.nodeRadii
+      ? { ...baseline.nodeRadii, ...spatial.nodeRadii }
       : baseline.nodeRadii) as NodeRadii,
     avoidCollisions: renderConfig?.avoidCollisions ?? baseline.avoidCollisions,
     excludeComponentTypes: renderConfig?.filters?.excludeComponentTypes ?? baseline.excludeComponentTypes,
-    typeColors: renderConfig?.typeColors ?? baseline.typeColors,
-    evolveStyles: renderConfig?.evolveStyles ?? baseline.evolveStyles,
+    typeColors: styling?.palette ?? baseline.typeColors,
+    evolveStyles: styling?.evolveStyles ?? baseline.evolveStyles,
     axisLabels: resolveAxisLabels({
-      locale: renderConfig?.locale,
-      // Main axis label overrides — colocalized in axis control sub-objects
-      xAxis: renderConfig?.background?.evolutionXAxis?.xAxis,
-      yAxis: renderConfig?.background?.valueChainYAxis?.yAxis,
-      phases: renderConfig?.background?.evolutionPhases?.phases,
-      // Direction indicator labels (evolutionStart/End, visibilityHigh/Low) removed from MapChrome
-      // in Sub-AC 2 — they are now locale-only (resolved from the locale preset above).
+      locale: renderConfig?.axes?.locale,
+      // Axis label overrides from axes.axisLabels, fallback to background sub-fields
+      xAxis: renderConfig?.axes?.axisLabels?.xAxis ?? bg?.evolutionXAxis?.xAxis,
+      yAxis: renderConfig?.axes?.axisLabels?.yAxis ?? bg?.valueChainYAxis?.yAxis,
+      phases: renderConfig?.axes?.axisLabels?.phases ?? bg?.evolutionPhases?.phases,
     }),
     legend: {
       show: renderConfig?.legend?.show ?? baseline.legend.show,
       position: renderConfig?.legend?.position ?? baseline.legend.position,
       legendOverflow: renderConfig?.legend?.legendOverflow ?? baseline.legend.legendOverflow,
     },
-    strokeWidth: renderConfig?.strokeWidth ?? baseline.strokeWidth,
+    strokeWidth: spatial?.strokeWidth ?? baseline.strokeWidth,
     // coordinateSpace: use provided value (already validated by CanvasCoordinateSpaceSchema) or fall back to DEFAULT_COORDINATE_SPACE
-    coordinateSpace: renderConfig?.coordinateSpace != null
-      ? { ...DEFAULT_COORDINATE_SPACE, ...renderConfig.coordinateSpace }
+    coordinateSpace: spatial?.coordinateSpace != null
+      ? { ...DEFAULT_COORDINATE_SPACE, ...spatial.coordinateSpace }
       : baseline.coordinateSpace,
     // methods: use provided array or fall back to baseline (empty array)
     methods: renderConfig?.methods ?? baseline.methods,
@@ -2546,10 +2662,9 @@ export interface FieldMetadata {
  * | width / height   | author-intent      | Coordinate-system-defining — locked (goal constraint) |
  * | coordinateSpace  | author-intent      | Encapsulates ALL coord-system params |
  * | theme            | viewer-preference  | Visual preset, no semantic change |
- * | locale           | viewer-preference  | Language, no semantic change |
+ * | axes             | viewer-preference  | Locale + axis labels, no semantic change |
  * | background       | author-intent      | Contains structural axis-visibility sub-fields |
- * | fontFamily       | author-intent      | Brand font — typographic design decision |
- * | labelScale       | viewer-preference  | Accessibility / readability size multiplier |
+ * | typography       | author-intent      | fontFamily (brand) + labelScale (accessibility) |
  * | nodeRadii        | author-intent      | Node sizes in px-space — visual design |
  * | avoidCollisions  | author-intent      | Label layout algorithm — design decision |
  * | typeColors       | author-intent      | Color overrides per type — visual design |
@@ -2559,86 +2674,25 @@ export interface FieldMetadata {
  * | strokeWidth      | author-intent      | Edge/outline line weight — visual design |
  */
 export const RENDER_CONFIG_FIELD_TAXONOMY = {
-  width: {
+  spatial: {
     category: "author-intent" as const,
     description:
-      "Canvas width in pixels — coordinate-system-defining, must not live in chrome/background containers",
+      "Spatial group — canvas dimensions, coordinate space, stroke width, node radii. " +
+      "Contains coordinate-system-defining fields that must not live in chrome/background containers.",
     overridable: false,
   },
-  height: {
+  typography: {
     category: "author-intent" as const,
     description:
-      "Canvas height in pixels — coordinate-system-defining, must not live in chrome/background containers",
+      "Typography group — fontFamily (author brand decision) and labelScale (viewer accessibility). " +
+      "Compound field classified author-intent at top level due to fontFamily.",
     overridable: false,
   },
-  coordinateSpace: {
+  styling: {
     category: "author-intent" as const,
     description:
-      "Full coordinate-space declaration (canvas dimensions, evolution/visibility ranges, unit system)",
-    overridable: false,
-  },
-  theme: {
-    category: "viewer-preference" as const,
-    description:
-      "Named visual theme preset (default/dark/highContrast) — cosmetic, no semantic change",
-    overridable: true,
-  },
-  locale: {
-    category: "viewer-preference" as const,
-    description:
-      "Language for axis label presets — cosmetic, does not change map structure",
-    overridable: true,
-  },
-  background: {
-    category: "author-intent" as const,
-    description:
-      "Compound field: axis/phase show-flags are structural (author-intent); background.color is cosmetic. " +
-      "Classified author-intent at top level due to structural sub-fields. " +
-      "See BACKGROUND_FIELD_TAXONOMY for per-sub-field detail.",
-    overridable: false,
-  },
-  fontFamily: {
-    category: "author-intent" as const,
-    description:
-      "Brand font choice — typographic design decision made by the map author",
-    overridable: false,
-  },
-  labelScale: {
-    category: "viewer-preference" as const,
-    description:
-      "Unitless multiplier for component label font size — accessibility / readability setting",
-    overridable: true,
-  },
-  nodeRadii: {
-    category: "author-intent" as const,
-    description:
-      "Per-type node circle radii in px-space (TypeStyleMap pattern) — visual design decision",
-    overridable: false,
-  },
-  avoidCollisions: {
-    category: "author-intent" as const,
-    description:
-      "Label collision-avoidance algorithm toggle — layout design decision",
-    overridable: false,
-  },
-  typeColors: {
-    category: "author-intent" as const,
-    description:
-      "Per-type node color overrides (TypeStyleMap pattern) — visual design decision",
-    overridable: false,
-  },
-  evolveStyles: {
-    category: "author-intent" as const,
-    description:
-      "Per-evolveType line style overrides (TypeStyleMap pattern) — visual design decision",
-    overridable: false,
-  },
-  legend: {
-    category: "author-intent" as const,
-    description:
-      "Compound field: legend.show is a structural author decision; " +
-      "position and overflow are viewer-preference. " +
-      "See LEGEND_FIELD_TAXONOMY for per-sub-field detail.",
+      "Styling group — theme, palette (colors), evolve styles, background. " +
+      "Contains visual design decisions (colors, theme, axis display controls).",
     overridable: false,
   },
   filters: {
@@ -2649,10 +2703,25 @@ export const RENDER_CONFIG_FIELD_TAXONOMY = {
       "See FILTERS_FIELD_TAXONOMY for per-sub-field detail.",
     overridable: false,
   },
-  strokeWidth: {
+  legend: {
     category: "author-intent" as const,
     description:
-      "Default stroke width in px-space for edges and node outlines — visual design decision",
+      "Compound field: legend.show is a structural author decision; " +
+      "position and overflow are viewer-preference. " +
+      "See LEGEND_FIELD_TAXONOMY for per-sub-field detail.",
+    overridable: false,
+  },
+  axes: {
+    category: "viewer-preference" as const,
+    description:
+      "Axes configuration group — locale preset and i18n axis label overrides. " +
+      "Cosmetic, does not change map structure.",
+    overridable: true,
+  },
+  avoidCollisions: {
+    category: "author-intent" as const,
+    description:
+      "Label collision-avoidance algorithm toggle — layout design decision",
     overridable: false,
   },
   methods: {
@@ -2904,7 +2973,7 @@ export function isViewerOverridable(
  *
  * @example
  *   getViewerOverridableFields()
- *   // ["theme", "locale", "labelScale"]
+ *   // ["theme", "axes", "labelScale"]
  */
 export function getViewerOverridableFields(): ReadonlyArray<
   keyof typeof RENDER_CONFIG_FIELD_TAXONOMY
@@ -2966,31 +3035,20 @@ export const TIER_PRECEDENCE = [
  * | background       | layout-structural   |
  * | legend           | layout-structural   |
  * | filters          | layout-structural   |
- * | fontFamily       | author-intent       |
+ * | typography       | author-intent       |
  * | nodeRadii        | author-intent       |
  * | avoidCollisions  | author-intent       |
  * | typeColors       | author-intent       |
  * | evolveStyles     | author-intent       |
  * | strokeWidth      | author-intent       |
  * | theme            | viewer-preference   |
- * | locale           | viewer-preference   |
- * | labelScale       | viewer-preference   |
+ * | axes             | viewer-preference   |
  */
 export const TIERED_RENDER_CONFIG_TAXONOMY = {
   // ── Tier 1: platform-constraint (highest authority) ─────────────────────
-  width: {
+  spatial: {
     category: "platform-constraint" as const,
-    description: "Canvas width in pixels — constrains legend positioning and axis layout",
-    overridable: false,
-  },
-  height: {
-    category: "platform-constraint" as const,
-    description: "Canvas height in pixels — constrains legend positioning and axis layout",
-    overridable: false,
-  },
-  coordinateSpace: {
-    category: "platform-constraint" as const,
-    description: "Full coordinate-space declaration — constrains legend and all layer positioning",
+    description: "Canvas dimensions, coordinate space, stroke width, node radii — constrains all layout and positioning",
     overridable: false,
   },
   configIntent: {
@@ -2999,11 +3057,6 @@ export const TIERED_RENDER_CONFIG_TAXONOMY = {
     overridable: false,
   },
   // ── Tier 2: layout-structural ────────────────────────────────────────────
-  background: {
-    category: "layout-structural" as const,
-    description: "Axis/phase show-flags are structural scaffold; color is cosmetic but bundled",
-    overridable: false,
-  },
   legend: {
     category: "layout-structural" as const,
     description: "legend.show is a structural author decision; position/overflow bundled here",
@@ -3015,34 +3068,19 @@ export const TIERED_RENDER_CONFIG_TAXONOMY = {
     overridable: false,
   },
   // ── Tier 3: author-intent ────────────────────────────────────────────────
-  fontFamily: {
+  styling: {
     category: "author-intent" as const,
-    description: "Brand font choice — typographic design decision made by the map author",
+    description: "Theme, palette (colors), evolve styles, background — visual design decisions",
     overridable: false,
   },
-  nodeRadii: {
+  typography: {
     category: "author-intent" as const,
-    description: "Per-type node circle radii in px-space — visual design decision",
+    description: "Typography group — fontFamily (author brand) and labelScale (viewer accessibility)",
     overridable: false,
   },
   avoidCollisions: {
     category: "author-intent" as const,
     description: "Label collision-avoidance algorithm toggle — layout design decision",
-    overridable: false,
-  },
-  typeColors: {
-    category: "author-intent" as const,
-    description: "Per-type node color overrides — visual design decision",
-    overridable: false,
-  },
-  evolveStyles: {
-    category: "author-intent" as const,
-    description: "Per-evolveType line style overrides — visual design decision",
-    overridable: false,
-  },
-  strokeWidth: {
-    category: "author-intent" as const,
-    description: "Default stroke width for edges and node outlines — visual design decision",
     overridable: false,
   },
   methods: {
@@ -3051,19 +3089,9 @@ export const TIERED_RENDER_CONFIG_TAXONOMY = {
     overridable: false,
   },
   // ── Tier 4: viewer-preference (lowest authority) ──────────────────────────
-  theme: {
+  axes: {
     category: "viewer-preference" as const,
-    description: "Named visual theme preset — cosmetic, no semantic change",
-    overridable: true,
-  },
-  locale: {
-    category: "viewer-preference" as const,
-    description: "Language for axis label presets — cosmetic, does not change map structure",
-    overridable: true,
-  },
-  labelScale: {
-    category: "viewer-preference" as const,
-    description: "Unitless multiplier for component label font size — accessibility setting",
+    description: "Axes configuration — locale preset and i18n axis label overrides. Cosmetic, does not change map structure.",
     overridable: true,
   },
 } as const satisfies Record<string, FieldMetadata>;

@@ -131,7 +131,7 @@ describe("renderTitleLayer", () => {
   });
 
   it("centers title at half canvas width", () => {
-    const map = makeSimpleMap({ renderConfig: { width: 1600, height: 800 } });
+    const map = makeSimpleMap({ renderConfig: { spatial: { width: 1600, height: 800 } } });
     const ctx = buildRenderContext(map);
     const parts = renderTitleLayer(ctx);
 
@@ -147,11 +147,11 @@ describe("renderAxesLayer", () => {
   it("returns only arrowhead defs when both axes and phases are disabled", () => {
     const map = makeSimpleMap({
       renderConfig: {
-        background: {
+        styling: { background: {
           evolutionXAxis: { show: false },
           valueChainYAxis: { show: false },
           evolutionPhases: { showPhaseDividerAndLabel: false },
-        },
+        } },
       },
     });
     const ctx = buildRenderContext(map);
@@ -166,7 +166,7 @@ describe("renderAxesLayer", () => {
   it("does not render horizontal grid lines (removed for cleaner visual)", () => {
     const map = makeSimpleMap({
       renderConfig: {
-        background: { valueChainYAxis: { show: true }, evolutionXAxis: { show: false } },
+        styling: { background: { valueChainYAxis: { show: true }, evolutionXAxis: { show: false } } },
       },
     });
     const ctx = buildRenderContext(map);
@@ -192,7 +192,7 @@ describe("renderAxesLayer", () => {
   it("omits phase dividers when showPhaseDividerAndLabel is false", () => {
     const map = makeSimpleMap({
       renderConfig: {
-        background: { evolutionPhases: { showPhaseDividerAndLabel: false } },
+        styling: { background: { evolutionPhases: { showPhaseDividerAndLabel: false } } },
       },
     });
     const ctx = buildRenderContext(map);
@@ -218,7 +218,7 @@ describe("renderAxesLayer", () => {
   it("showPhaseDividerAndLabel=false hides both phase dividers and labels but keeps evolution axis", () => {
     const map = makeSimpleMap({
       renderConfig: {
-        background: { evolutionPhases: { showPhaseDividerAndLabel: false } },
+        styling: { background: { evolutionPhases: { showPhaseDividerAndLabel: false } } },
       },
     });
     const ctx = buildRenderContext(map);
@@ -338,7 +338,7 @@ describe("renderEdgesLayer", () => {
   });
 
   it("uses strokeWidth from renderConfig for edge lines", () => {
-    const map = makeSimpleMap({ renderConfig: { strokeWidth: 2.5 } });
+    const map = makeSimpleMap({ renderConfig: { spatial: { strokeWidth: 2.5 } } });
     const ctx = buildRenderContext(map);
     const parts = renderEdgesLayer(ctx);
 
@@ -408,7 +408,7 @@ describe("renderNodesLayer", () => {
   });
 
   it("uses nodeRadii._default from resolvedConfig", () => {
-    const map = makeSimpleMap({ renderConfig: { nodeRadii: { _default: 12 } } });
+    const map = makeSimpleMap({ renderConfig: { spatial: { nodeRadii: { _default: 12 } } } });
     const ctx = buildRenderContext(map);
     const parts = renderNodesLayer(ctx);
 
@@ -428,7 +428,7 @@ describe("renderNodesLayer", () => {
 
   it("applies typeColors for component type color override", () => {
     const map = makeSimpleMap({
-      renderConfig: { typeColors: { _default: "#000000", component: "#ff0000" } },
+      renderConfig: { styling: { palette: { _default: "#000000", component: "#ff0000" } } },
     });
     const ctx = buildRenderContext(map);
     const parts = renderNodesLayer(ctx);
@@ -450,7 +450,7 @@ describe("renderNodesLayer", () => {
         },
       ],
       relations: [],
-      renderConfig: { typeColors: { _default: "#000000", component: "#ff0000" } },
+      renderConfig: { styling: { palette: { _default: "#000000", component: "#ff0000" } } },
     }));
     const ctx = buildRenderContext(map);
     const parts = renderNodesLayer(ctx);
@@ -492,7 +492,7 @@ describe("renderNodesLayer", () => {
   });
 
   it("uses strokeWidth from renderConfig for node circles", () => {
-    const map = makeSimpleMap({ renderConfig: { strokeWidth: 3 } });
+    const map = makeSimpleMap({ renderConfig: { spatial: { strokeWidth: 3 } } });
     const ctx = buildRenderContext(map);
     const parts = renderNodesLayer(ctx);
 
@@ -535,7 +535,7 @@ describe("renderNodesLayer", () => {
   // ── nodeRadii per-type resolution tests ────────────────────────────
 
   it("nodeRadii._default applies to all node types when no per-type override", () => {
-    const map = makeSimpleMap({ renderConfig: { nodeRadii: { _default: 9 } } });
+    const map = makeSimpleMap({ renderConfig: { spatial: { nodeRadii: { _default: 9 } } } });
     const ctx = buildRenderContext(map);
     const parts = renderNodesLayer(ctx);
 
@@ -554,7 +554,7 @@ describe("renderNodesLayer", () => {
         { id: "s", label: { name: "Service" }, type: "component", position: { evolution: { scalar: 0.6 }, visibility: { scalar: 0.5 } } },
       ],
       relations: [],
-      renderConfig: { nodeRadii: { _default: 5, anchor: 12 } },
+      renderConfig: { spatial: { nodeRadii: { _default: 5, anchor: 12 } } },
     }));
     const ctx = buildRenderContext(map);
     const parts = renderNodesLayer(ctx);
@@ -573,7 +573,7 @@ describe("renderNodesLayer", () => {
         { id: "s", label: { name: "Service" }, type: "component", position: { evolution: { scalar: 0.6 }, visibility: { scalar: 0.5 } } },
       ],
       relations: [],
-      renderConfig: { nodeRadii: { _default: 5, component: 15 } },
+      renderConfig: { spatial: { nodeRadii: { _default: 5, component: 15 } } },
     }));
     const ctx = buildRenderContext(map);
     const parts = renderNodesLayer(ctx);
@@ -592,7 +592,7 @@ describe("renderNodesLayer", () => {
         { id: "s", label: { name: "Service" }, type: "component", position: { evolution: { scalar: 0.6 }, visibility: { scalar: 0.5 } } },
       ],
       relations: [],
-      renderConfig: { nodeRadii: { _default: 8, anchor: 15 } },
+      renderConfig: { spatial: { nodeRadii: { _default: 8, anchor: 15 } } },
     }));
     const ctx = buildRenderContext(map);
     const parts = renderNodesLayer(ctx);
@@ -606,7 +606,7 @@ describe("renderNodesLayer", () => {
   it("nodeRadii._default applies to all circles when no per-type override", () => {
     const map = makeSimpleMap({
       renderConfig: {
-        nodeRadii: { _default: 10 },
+        spatial: { nodeRadii: { _default: 10 } },
       },
     });
     const ctx = buildRenderContext(map);
@@ -641,7 +641,7 @@ describe("renderNodesLayer", () => {
         },
       ],
       relations: [],
-      renderConfig: { nodeRadii: { _default: 5, pipeline: 8 } },
+      renderConfig: { spatial: { nodeRadii: { _default: 5, pipeline: 8 } } },
     }));
     const ctx = buildRenderContext(map);
     const parts = renderNodesLayer(ctx);
@@ -664,11 +664,11 @@ describe("renderNodesLayer", () => {
       ],
       relations: [],
       renderConfig: {
-        nodeRadii: {
+        spatial: { nodeRadii: {
           _default: 8,           // catch-all (level 2)
           anchor: 12,            // per-type anchor (level 1)
           // component: not set → uses _default = 8
-        },
+        } },
       },
     }));
     const ctx = buildRenderContext(map);
@@ -737,7 +737,7 @@ describe("renderEvolvesToLayer", () => {
       ],
       relations: [],
       renderConfig: {
-        evolveStyles: { natural: { stroke: "#00ff00" } },
+        styling: { evolveStyles: { natural: { stroke: "#00ff00" } } },
       },
     }));
     const ctx = buildRenderContext(map);
@@ -768,7 +768,7 @@ describe("renderEvolvesToLayer", () => {
       ],
       relations: [],
       renderConfig: {
-        evolveStyles: { natural: { strokeDasharray: "10,5" } },
+        styling: { evolveStyles: { natural: { strokeDasharray: "10,5" } } },
       },
     }));
     const ctx = buildRenderContext(map);
@@ -805,7 +805,7 @@ describe("renderEvolvesToLayer", () => {
       ],
       relations: [],
       renderConfig: {
-        evolveStyles: { natural: { stroke: "#00ff00" } }, // only natural overridden
+        styling: { evolveStyles: { natural: { stroke: "#00ff00" } } }, // only natural overridden
       },
     }));
     const ctx = buildRenderContext(map);
@@ -847,10 +847,10 @@ describe("renderEvolvesToLayer", () => {
       ],
       relations: [],
       renderConfig: {
-        evolveStyles: {
+        styling: { evolveStyles: {
           _default: { stroke: "#aaaaaa" },
           natural: { stroke: "#dc2626" }, // only natural explicitly overridden
-        },
+        } },
       },
     }));
     const ctx = buildRenderContext(map);
@@ -894,10 +894,10 @@ describe("renderEvolvesToLayer", () => {
       ],
       relations: [],
       renderConfig: {
-        evolveStyles: {
+        styling: { evolveStyles: {
           _default: { stroke: "#aaaaaa" },
           natural: { stroke: "#00ff00" }, // explicit override wins over _default
-        },
+        } },
       },
     }));
     const ctx = buildRenderContext(map);
@@ -940,7 +940,7 @@ describe("renderEvolvesToLayer", () => {
         },
       ],
       relations: [],
-      renderConfig: { strokeWidth: 2 },
+      renderConfig: { spatial: { strokeWidth: 2 } },
     }));
     const ctx = buildRenderContext(map);
     const parts = renderEvolvesToLayer(ctx);

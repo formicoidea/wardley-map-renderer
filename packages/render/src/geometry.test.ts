@@ -75,7 +75,7 @@ describe("createRenderContext", () => {
 
   it("adapts to different renderConfig while keeping fixed margins", () => {
     const ctx = createRenderContext(
-      makeMap({ renderConfig: { width: 800, height: 600, strokeWidth: 1 } })
+      makeMap({ renderConfig: { spatial: { width: 800, height: 600, strokeWidth: 1 } } as any })
     );
 
     expect(ctx.width).toBe(800);

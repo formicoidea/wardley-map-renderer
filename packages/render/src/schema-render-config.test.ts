@@ -15,11 +15,16 @@ import {
   validateLayerToggles,
   makeTypeStyleMapSchema,
   typeStyleMapSchema,
+  EvolutionSchema,
+  round3,
   type TypeStyleMap,
   type LayerToggleDAG,
   type Background,
   type EvolveStyle,
 } from "./schema";
+import {
+  CoordinateSpaceSchema as CanvasCoordinateSpaceSchema,
+} from "./coordinate-space.js";
 import {
   AXIS_LABELS_EN,
   AXIS_LABELS_FR,
@@ -45,71 +50,69 @@ const baseMap = {
 // ── RenderConfigSchema unit tests ────────────────────────────
 
 describe("RenderConfigSchema", () => {
-  it("accepts an empty object (all fields optional)", () => {
+  it("accepts an empty object (all groups optional)", () => {
     const result = RenderConfigSchema.safeParse({});
     expect(result.success).toBe(true);
     if (result.success) {
-      // All optional fields should be undefined
-      expect(result.data.width).toBeUndefined();
-      expect(result.data.height).toBeUndefined();
-      expect(result.data.theme).toBeUndefined();
-      expect(result.data.background).toBeUndefined();
-      expect(result.data.fontFamily).toBeUndefined();
-      expect(result.data.labelScale).toBeUndefined();
-      expect(result.data.nodeRadii).toBeUndefined();
-      expect(result.data.avoidCollisions).toBeUndefined();
+      // All nested groups are optional — undefined when omitted
+      expect(result.data.spatial).toBeUndefined();
+      expect(result.data.typography).toBeUndefined();
+      expect(result.data.styling).toBeUndefined();
       expect(result.data.filters).toBeUndefined();
-      expect(result.data.typeColors).toBeUndefined();
-      expect(result.data.evolveStyles).toBeUndefined();
-      // strokeWidth has a default
-      expect(result.data.strokeWidth).toBe(1);
+      expect(result.data.legend).toBeUndefined();
+      expect(result.data.axes).toBeUndefined();
+      expect(result.data.avoidCollisions).toBeUndefined();
     }
   });
 
   it("accepts a fully-specified config", () => {
     const full = {
-      width: 1920,
-      height: 1080,
-      theme: "dark",
-      background: {
-        color: "#f0f0f0",
-        evolutionXAxis: { show: false },
-        valueChainYAxis: { show: true },
-        evolutionPhases: { showPhaseDividerAndLabel: false },
+      spatial: {
+        width: 1920,
+        height: 1080,
+        strokeWidth: 2,
+        nodeRadii: { _default: 8 },
       },
-      fontFamily: "Roboto, sans-serif",
-      labelScale: 1.5,
-      nodeRadii: { _default: 8 },
+      styling: {
+        theme: "dark",
+        background: {
+          color: "#f0f0f0",
+          evolutionXAxis: { show: false },
+          valueChainYAxis: { show: true },
+          evolutionPhases: { showPhaseDividerAndLabel: false },
+        },
+        palette: { _default: "#000000", component: "#ff0000" },
+        evolveStyles: { natural: { stroke: "#00ff00", strokeDasharray: "4 2" } },
+      },
+      typography: { fontFamily: "Roboto, sans-serif", labelScale: 1.5 },
       avoidCollisions: false,
       filters: { excludeComponentTypes: ["note"] },
-      typeColors: { _default: "#000000", component: "#ff0000" },
-      evolveStyles: { natural: { stroke: "#00ff00", strokeDasharray: "4 2" } },
-      strokeWidth: 2,
     };
     const result = RenderConfigSchema.safeParse(full);
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.width).toBe(1920);
-      expect(result.data.height).toBe(1080);
-      expect(result.data.theme).toBe("dark");
-      expect(result.data.background?.color).toBe("#f0f0f0");
-      expect(result.data.background?.evolutionXAxis?.show).toBe(false);
-      expect(result.data.background?.valueChainYAxis?.show).toBe(true);
-      expect(result.data.background?.evolutionPhases?.showPhaseDividerAndLabel).toBe(false);
-      expect(result.data.labelScale).toBe(1.5);
+      expect(result.data.spatial?.width).toBe(1920);
+      expect(result.data.spatial?.height).toBe(1080);
+      expect(result.data.styling?.theme).toBe("dark");
+      expect(result.data.styling?.background?.color).toBe("#f0f0f0");
+      expect(result.data.styling?.background?.evolutionXAxis?.show).toBe(false);
+      expect(result.data.styling?.background?.valueChainYAxis?.show).toBe(true);
+      expect(result.data.styling?.background?.evolutionPhases?.showPhaseDividerAndLabel).toBe(false);
+      expect(result.data.typography?.labelScale).toBe(1.5);
       expect(result.data.filters?.excludeComponentTypes).toEqual(["note"]);
-      expect(result.data.strokeWidth).toBe(2);
+      expect(result.data.spatial?.strokeWidth).toBe(2);
     }
   });
 
   // ── Partial overrides ──────────────────────────────────────
 
-  it("accepts partial config with only width", () => {
-    const result = RenderConfigSchema.safeParse({ width: 800 });
+  it("accepts partial spatial with only width", () => {
+    const result = RenderConfigSchema.safeParse({ spatial: { width: 800 } });
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.width).toBe(800);
-      expect(result.data.height).toBeUndefined();
+      expect(result.data.spatial?.width).toBe(800);
+      // height gets its Zod default when spatial group is provided
+      expect(result.data.spatial?.height).toBe(800);
     }
   });
 
@@ -123,15 +126,17 @@ describe("RenderConfigSchema", () => {
     }
   });
 
-  it("accepts partial config with only evolveStyles", () => {
+  it("accepts partial styling with only evolveStyles", () => {
     const result = RenderConfigSchema.safeParse({
-      evolveStyles: {
-        forced: { stroke: "#ff0000" },
+      styling: {
+        evolveStyles: {
+          forced: { stroke: "#ff0000" },
+        },
       },
     });
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.evolveStyles).toEqual({
+      expect(result.data.styling?.evolveStyles).toEqual({
         forced: { stroke: "#ff0000" },
       });
     }
@@ -139,32 +144,36 @@ describe("RenderConfigSchema", () => {
 
   it("accepts evolveStyles with 'late' key (closed enum includes late)", () => {
     const result = RenderConfigSchema.safeParse({
-      evolveStyles: {
-        late: { stroke: "#999999", strokeDasharray: "4,2" },
+      styling: {
+        evolveStyles: {
+          late: { stroke: "#999999", strokeDasharray: "4,2" },
+        },
       },
     });
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.evolveStyles?.late?.stroke).toBe("#999999");
-      expect(result.data.evolveStyles?.late?.strokeDasharray).toBe("4,2");
+      expect(result.data.styling?.evolveStyles?.late?.stroke).toBe("#999999");
+      expect(result.data.styling?.evolveStyles?.late?.strokeDasharray).toBe("4,2");
     }
   });
 
   it("accepts evolveStyles with all four EvolveType keys", () => {
     const result = RenderConfigSchema.safeParse({
-      evolveStyles: {
-        natural: { stroke: "#dc2626" },
-        ecosystem: { stroke: "#2563eb" },
-        forced: { stroke: "#9333ea" },
-        late: { stroke: "#999999" },
+      styling: {
+        evolveStyles: {
+          natural: { stroke: "#dc2626" },
+          ecosystem: { stroke: "#2563eb" },
+          forced: { stroke: "#9333ea" },
+          late: { stroke: "#999999" },
+        },
       },
     });
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.evolveStyles?.natural?.stroke).toBe("#dc2626");
-      expect(result.data.evolveStyles?.ecosystem?.stroke).toBe("#2563eb");
-      expect(result.data.evolveStyles?.forced?.stroke).toBe("#9333ea");
-      expect(result.data.evolveStyles?.late?.stroke).toBe("#999999");
+      expect(result.data.styling?.evolveStyles?.natural?.stroke).toBe("#dc2626");
+      expect(result.data.styling?.evolveStyles?.ecosystem?.stroke).toBe("#2563eb");
+      expect(result.data.styling?.evolveStyles?.forced?.stroke).toBe("#9333ea");
+      expect(result.data.styling?.evolveStyles?.late?.stroke).toBe("#999999");
     }
   });
 
@@ -178,129 +187,141 @@ describe("RenderConfigSchema", () => {
     }
   });
 
-  // ── background sub-object ──────────────────────────────────
+  // ── background sub-object (under styling) ──────────────────
 
-  it("accepts background.evolutionXAxis with axis show/label controls", () => {
+  it("accepts styling.background.evolutionXAxis with axis show/label controls", () => {
     const result = RenderConfigSchema.safeParse({
-      background: {
-        evolutionXAxis: {
-          show: true,
-          xAxis: "Custom X",
+      styling: {
+        background: {
+          evolutionXAxis: {
+            show: true,
+            xAxis: "Custom X",
+          },
         },
       },
     });
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.background?.evolutionXAxis?.xAxis).toBe("Custom X");
+      expect(result.data.styling?.background?.evolutionXAxis?.xAxis).toBe("Custom X");
     }
   });
 
   // Sub-AC 2: direction indicator label overrides (evolutionStart/End, visibilityHigh/Low)
   // have been removed from MapChrome — background.axisLabels no longer accepts these fields.
-  // Direction cue labels are now locale-only (set via renderConfig.locale).
+  // Direction cue labels are now locale-only (set via renderConfig.axes.locale).
 
-  it("accepts background.valueChainYAxis with axis show/label controls", () => {
+  it("accepts styling.background.valueChainYAxis with axis show/label controls", () => {
     const result = RenderConfigSchema.safeParse({
-      background: {
-        valueChainYAxis: {
-          show: true,
-          yAxis: "Custom Y",
+      styling: {
+        background: {
+          valueChainYAxis: {
+            show: true,
+            yAxis: "Custom Y",
+          },
         },
       },
     });
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.background?.valueChainYAxis?.yAxis).toBe("Custom Y");
+      expect(result.data.styling?.background?.valueChainYAxis?.yAxis).toBe("Custom Y");
     }
   });
 
   // Sub-AC 2: visibilityHigh/Low direction label overrides also removed from background.axisLabels.
 
-  it("accepts background.evolutionPhases.phases as 4-tuple override", () => {
+  it("accepts styling.background.evolutionPhases.phases as 4-tuple override", () => {
     const result = RenderConfigSchema.safeParse({
-      background: {
-        evolutionPhases: {
-          showPhaseDividerAndLabel: true,
-          phases: ["A", "B", "C", "D"],
+      styling: {
+        background: {
+          evolutionPhases: {
+            showPhaseDividerAndLabel: true,
+            phases: ["A", "B", "C", "D"],
+          },
         },
       },
     });
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.background?.evolutionPhases?.phases).toEqual(["A", "B", "C", "D"]);
+      expect(result.data.styling?.background?.evolutionPhases?.phases).toEqual(["A", "B", "C", "D"]);
     }
   });
 
   // AC 5: phaseLabels is now open-length — 3-element array is valid
-  it("accepts background.evolutionPhases.phases with 3 elements (arbitrary size, not locked to 4)", () => {
+  it("accepts styling.background.evolutionPhases.phases with 3 elements (arbitrary size, not locked to 4)", () => {
     const result = RenderConfigSchema.safeParse({
-      background: {
-        evolutionPhases: {
-          phases: ["A", "B", "C"], // 3 phases — now valid (arbitrary size)
+      styling: {
+        background: {
+          evolutionPhases: {
+            phases: ["A", "B", "C"], // 3 phases — now valid (arbitrary size)
+          },
         },
       },
     });
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.background?.evolutionPhases?.phases).toEqual(["A", "B", "C"]);
+      expect(result.data.styling?.background?.evolutionPhases?.phases).toEqual(["A", "B", "C"]);
     }
   });
 
   // AC 5: rejects empty array (min 1 constraint)
-  it("rejects background.evolutionPhases.phases as empty array (min 1 required)", () => {
+  it("rejects styling.background.evolutionPhases.phases as empty array (min 1 required)", () => {
     const result = RenderConfigSchema.safeParse({
-      background: {
-        evolutionPhases: {
-          phases: [], // empty — invalid (min 1)
+      styling: {
+        background: {
+          evolutionPhases: {
+            phases: [], // empty — invalid (min 1)
+          },
         },
       },
     });
     expect(result.success).toBe(false);
   });
 
-  it("accepts background sub-objects without label overrides (labels remain optional)", () => {
+  it("accepts styling.background sub-objects without label overrides (labels remain optional)", () => {
     const result = RenderConfigSchema.safeParse({
-      background: {
-        evolutionXAxis: { show: false },
-        valueChainYAxis: { show: true },
-        evolutionPhases: { showPhaseDividerAndLabel: false },
+      styling: {
+        background: {
+          evolutionXAxis: { show: false },
+          valueChainYAxis: { show: true },
+          evolutionPhases: { showPhaseDividerAndLabel: false },
+        },
       },
     });
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.background?.evolutionXAxis?.xAxis).toBeUndefined();
-      expect(result.data.background?.valueChainYAxis?.yAxis).toBeUndefined();
-      expect(result.data.background?.evolutionPhases?.phases).toBeUndefined();
+      expect(result.data.styling?.background?.evolutionXAxis?.xAxis).toBeUndefined();
+      expect(result.data.styling?.background?.valueChainYAxis?.yAxis).toBeUndefined();
+      expect(result.data.styling?.background?.evolutionPhases?.phases).toBeUndefined();
     }
   });
 
-  it("accepts background.evolutionXAxis.show=false", () => {
+  it("accepts styling.background.evolutionXAxis.show=false", () => {
     const result = RenderConfigSchema.safeParse({
-      background: { evolutionXAxis: { show: false } },
+      styling: { background: { evolutionXAxis: { show: false } } },
     });
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.background?.evolutionXAxis?.show).toBe(false);
+      expect(result.data.styling?.background?.evolutionXAxis?.show).toBe(false);
     }
   });
 
-  it("accepts background.valueChainYAxis.show=false", () => {
+  it("accepts styling.background.valueChainYAxis.show=false", () => {
     const result = RenderConfigSchema.safeParse({
-      background: { valueChainYAxis: { show: false } },
+      styling: { background: { valueChainYAxis: { show: false } } },
     });
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.background?.valueChainYAxis?.show).toBe(false);
+      expect(result.data.styling?.background?.valueChainYAxis?.show).toBe(false);
     }
   });
 
-  it("accepts background.evolutionPhases.showPhaseDividerAndLabel=false", () => {
+  it("accepts styling.background.evolutionPhases.showPhaseDividerAndLabel=false", () => {
     const result = RenderConfigSchema.safeParse({
-      background: { evolutionPhases: { showPhaseDividerAndLabel: false } },
+      styling: { background: { evolutionPhases: { showPhaseDividerAndLabel: false } } },
     });
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.background?.evolutionPhases?.showPhaseDividerAndLabel).toBe(false);
+      expect(result.data.styling?.background?.evolutionPhases?.showPhaseDividerAndLabel).toBe(false);
     }
   });
 
@@ -312,106 +333,106 @@ describe("RenderConfigSchema", () => {
       { evolutionXAxis: { show: false }, evolutionPhases: { showPhaseDividerAndLabel: false } },
     ];
     for (const bg of combos) {
-      const result = RenderConfigSchema.safeParse({ background: bg });
+      const result = RenderConfigSchema.safeParse({ styling: { background: bg } });
       expect(result.success).toBe(true);
     }
   });
 
-  it("accepts background.color as valid hex", () => {
+  it("accepts styling.background.color as valid hex", () => {
     const result = RenderConfigSchema.safeParse({
-      background: { color: "#1a1a1a" },
+      styling: { background: { color: "#1a1a1a" } },
     });
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.background?.color).toBe("#1a1a1a");
+      expect(result.data.styling?.background?.color).toBe("#1a1a1a");
     }
   });
 
-  it("rejects background.color as invalid hex", () => {
+  it("rejects styling.background.color as invalid hex", () => {
     expect(
-      RenderConfigSchema.safeParse({ background: { color: "red" } }).success
+      RenderConfigSchema.safeParse({ styling: { background: { color: "red" } } }).success
     ).toBe(false);
     expect(
-      RenderConfigSchema.safeParse({ background: { color: "#xyz" } }).success
+      RenderConfigSchema.safeParse({ styling: { background: { color: "#xyz" } } }).success
     ).toBe(false);
   });
 
-  // ── theme ──────────────────────────────────────────────────
+  // ── theme (under styling) ─────────────────────────────────
 
   it("accepts valid theme values", () => {
-    expect(RenderConfigSchema.safeParse({ theme: "default" }).success).toBe(true);
-    expect(RenderConfigSchema.safeParse({ theme: "dark" }).success).toBe(true);
-    expect(RenderConfigSchema.safeParse({ theme: "highContrast" }).success).toBe(true);
+    expect(RenderConfigSchema.safeParse({ styling: { theme: "default" } }).success).toBe(true);
+    expect(RenderConfigSchema.safeParse({ styling: { theme: "dark" } }).success).toBe(true);
+    expect(RenderConfigSchema.safeParse({ styling: { theme: "highContrast" } }).success).toBe(true);
   });
 
   it("rejects unknown theme values", () => {
-    expect(RenderConfigSchema.safeParse({ theme: "neon" }).success).toBe(false);
+    expect(RenderConfigSchema.safeParse({ styling: { theme: "neon" } }).success).toBe(false);
   });
 
-  // ── strokeWidth ────────────────────────────────────────────
+  // ── strokeWidth (under spatial) ───────────────────────────
 
-  it("defaults strokeWidth to 1", () => {
-    const result = RenderConfigSchema.safeParse({});
+  it("defaults spatial.strokeWidth to 1 when spatial group is provided", () => {
+    const result = RenderConfigSchema.safeParse({ spatial: {} });
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.strokeWidth).toBe(1);
+      expect(result.data.spatial?.strokeWidth).toBe(1);
     }
   });
 
-  it("accepts strokeWidth boundary values", () => {
-    expect(RenderConfigSchema.safeParse({ strokeWidth: 0.25 }).success).toBe(true);
-    expect(RenderConfigSchema.safeParse({ strokeWidth: 8 }).success).toBe(true);
+  it("accepts spatial.strokeWidth boundary values", () => {
+    expect(RenderConfigSchema.safeParse({ spatial: { strokeWidth: 0.25 } }).success).toBe(true);
+    expect(RenderConfigSchema.safeParse({ spatial: { strokeWidth: 8 } }).success).toBe(true);
   });
 
-  it("rejects strokeWidth below minimum", () => {
-    expect(RenderConfigSchema.safeParse({ strokeWidth: 0.1 }).success).toBe(false);
+  it("rejects spatial.strokeWidth below minimum", () => {
+    expect(RenderConfigSchema.safeParse({ spatial: { strokeWidth: 0.1 } }).success).toBe(false);
   });
 
-  it("rejects strokeWidth above maximum", () => {
-    expect(RenderConfigSchema.safeParse({ strokeWidth: 10 }).success).toBe(false);
+  it("rejects spatial.strokeWidth above maximum", () => {
+    expect(RenderConfigSchema.safeParse({ spatial: { strokeWidth: 10 } }).success).toBe(false);
   });
 
   // ── Invalid inputs ─────────────────────────────────────────
 
-  it("rejects negative width", () => {
-    const result = RenderConfigSchema.safeParse({ width: -100 });
+  it("rejects negative width in spatial", () => {
+    const result = RenderConfigSchema.safeParse({ spatial: { width: -100 } });
     expect(result.success).toBe(false);
   });
 
-  it("rejects zero height", () => {
-    const result = RenderConfigSchema.safeParse({ height: 0 });
+  it("rejects zero height in spatial", () => {
+    const result = RenderConfigSchema.safeParse({ spatial: { height: 0 } });
     expect(result.success).toBe(false);
   });
 
-  it("accepts valid hex colors for background.color (3, 6, 8 digit)", () => {
+  it("accepts valid hex colors for styling.background.color (3, 6, 8 digit)", () => {
     expect(
-      RenderConfigSchema.safeParse({ background: { color: "#fff" } }).success
+      RenderConfigSchema.safeParse({ styling: { background: { color: "#fff" } } }).success
     ).toBe(true);
     expect(
-      RenderConfigSchema.safeParse({ background: { color: "#ff00aa" } }).success
+      RenderConfigSchema.safeParse({ styling: { background: { color: "#ff00aa" } } }).success
     ).toBe(true);
     expect(
-      RenderConfigSchema.safeParse({ background: { color: "#ff00aa80" } }).success
+      RenderConfigSchema.safeParse({ styling: { background: { color: "#ff00aa80" } } }).success
     ).toBe(true);
   });
 
   it("rejects labelScale above 5", () => {
-    const result = RenderConfigSchema.safeParse({ labelScale: 6 });
+    const result = RenderConfigSchema.safeParse({ typography: { labelScale: 6 } });
     expect(result.success).toBe(false);
   });
 
   it("rejects labelScale of 0 (not positive)", () => {
-    const result = RenderConfigSchema.safeParse({ labelScale: 0 });
+    const result = RenderConfigSchema.safeParse({ typography: { labelScale: 0 } });
     expect(result.success).toBe(false);
   });
 
   it("rejects negative labelScale", () => {
-    const result = RenderConfigSchema.safeParse({ labelScale: -1 });
+    const result = RenderConfigSchema.safeParse({ typography: { labelScale: -1 } });
     expect(result.success).toBe(false);
   });
 
-  it("rejects nodeRadii._default above 50", () => {
-    const result = RenderConfigSchema.safeParse({ nodeRadii: { _default: 51 } });
+  it("rejects spatial.nodeRadii._default above 50", () => {
+    const result = RenderConfigSchema.safeParse({ spatial: { nodeRadii: { _default: 51 } } });
     expect(result.success).toBe(false);
   });
 
@@ -422,9 +443,9 @@ describe("RenderConfigSchema", () => {
     expect(result.success).toBe(false);
   });
 
-  it("rejects invalid evolveStyles keys", () => {
+  it("rejects invalid evolveStyles keys under styling", () => {
     const result = RenderConfigSchema.safeParse({
-      evolveStyles: { unknown: { stroke: "#000" } },
+      styling: { evolveStyles: { unknown: { stroke: "#000" } } },
     });
     expect(result.success).toBe(false);
   });
@@ -432,7 +453,7 @@ describe("RenderConfigSchema", () => {
   it("rejects evolveStyles with an invalid evolution type key (strict closed enum)", () => {
     // 'genesis', 'custom', 'product', 'commodity' are phase names, not evolveType values
     const result = RenderConfigSchema.safeParse({
-      evolveStyles: { genesis: { stroke: "#000" } },
+      styling: { evolveStyles: { genesis: { stroke: "#000" } } },
     });
     expect(result.success).toBe(false);
   });
@@ -441,6 +462,245 @@ describe("RenderConfigSchema", () => {
     expect(RenderConfigSchema.safeParse("string").success).toBe(false);
     expect(RenderConfigSchema.safeParse(42).success).toBe(false);
     expect(RenderConfigSchema.safeParse(null).success).toBe(false);
+  });
+});
+
+// ── AC 16: Partial groups with missing leaf fields auto-filled by Zod defaults ──
+
+describe("AC 16: Partial groups — missing leaf fields auto-filled by Zod defaults", () => {
+  // ── spatial ────────────────────────────────────────────────
+  it("spatial: only width → height, strokeWidth, nodeRadii get defaults", () => {
+    const result = RenderConfigSchema.safeParse({ spatial: { width: 1200 } });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.spatial?.width).toBe(1200);
+      expect(result.data.spatial?.height).toBe(800);
+      expect(result.data.spatial?.strokeWidth).toBe(1);
+      expect(result.data.spatial?.nodeRadii).toEqual({ _default: 5 });
+      expect(result.data.spatial?.coordinateSpace).toBeUndefined();
+    }
+  });
+
+  it("spatial: only strokeWidth → width, height, nodeRadii get defaults", () => {
+    const result = RenderConfigSchema.safeParse({ spatial: { strokeWidth: 2.5 } });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.spatial?.width).toBe(1600);
+      expect(result.data.spatial?.height).toBe(800);
+      expect(result.data.spatial?.strokeWidth).toBe(2.5);
+      expect(result.data.spatial?.nodeRadii).toEqual({ _default: 5 });
+    }
+  });
+
+  it("spatial: only nodeRadii → width, height, strokeWidth get defaults", () => {
+    const result = RenderConfigSchema.safeParse({ spatial: { nodeRadii: { _default: 10 } } });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.spatial?.width).toBe(1600);
+      expect(result.data.spatial?.height).toBe(800);
+      expect(result.data.spatial?.strokeWidth).toBe(1);
+      expect(result.data.spatial?.nodeRadii).toEqual({ _default: 10 });
+    }
+  });
+
+  it("spatial: empty object → all defaults applied", () => {
+    const result = RenderConfigSchema.safeParse({ spatial: {} });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.spatial?.width).toBe(1600);
+      expect(result.data.spatial?.height).toBe(800);
+      expect(result.data.spatial?.strokeWidth).toBe(1);
+      expect(result.data.spatial?.nodeRadii).toEqual({ _default: 5 });
+    }
+  });
+
+  // ── typography ─────────────────────────────────────────────
+  it("typography: only fontFamily → labelScale gets default 1.0", () => {
+    const result = RenderConfigSchema.safeParse({
+      typography: { fontFamily: "Roboto, sans-serif" },
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.typography?.fontFamily).toBe("Roboto, sans-serif");
+      expect(result.data.typography?.labelScale).toBe(1.0);
+    }
+  });
+
+  it("typography: only labelScale → fontFamily gets default 'Inter, sans-serif'", () => {
+    const result = RenderConfigSchema.safeParse({
+      typography: { labelScale: 2.0 },
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.typography?.fontFamily).toBe("Inter, sans-serif");
+      expect(result.data.typography?.labelScale).toBe(2.0);
+    }
+  });
+
+  it("typography: empty object → all defaults applied", () => {
+    const result = RenderConfigSchema.safeParse({ typography: {} });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.typography?.fontFamily).toBe("Inter, sans-serif");
+      expect(result.data.typography?.labelScale).toBe(1.0);
+    }
+  });
+
+  // ── styling ────────────────────────────────────────────────
+  it("styling: only theme → palette, evolveStyles, background remain optional/undefined", () => {
+    const result = RenderConfigSchema.safeParse({
+      styling: { theme: "dark" },
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.styling?.theme).toBe("dark");
+      expect(result.data.styling?.palette).toBeUndefined();
+      expect(result.data.styling?.evolveStyles).toBeUndefined();
+      expect(result.data.styling?.background).toBeUndefined();
+    }
+  });
+
+  it("styling: only background → theme gets default 'default'", () => {
+    const result = RenderConfigSchema.safeParse({
+      styling: { background: { color: "#333333" } },
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.styling?.theme).toBe("default");
+      expect(result.data.styling?.background?.color).toBe("#333333");
+    }
+  });
+
+  it("styling: empty object → theme defaults to 'default'", () => {
+    const result = RenderConfigSchema.safeParse({ styling: {} });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.styling?.theme).toBe("default");
+    }
+  });
+
+  // ── legend ─────────────────────────────────────────────────
+  it("legend: only show → position and legendOverflow get defaults", () => {
+    const result = RenderConfigSchema.safeParse({
+      legend: { show: false },
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.legend?.show).toBe(false);
+      expect(result.data.legend?.position).toBe("bottom-right");
+      expect(result.data.legend?.legendOverflow).toBe("allow");
+    }
+  });
+
+  it("legend: only position → show and legendOverflow get defaults", () => {
+    const result = RenderConfigSchema.safeParse({
+      legend: { position: "top-left" },
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.legend?.show).toBe(true);
+      expect(result.data.legend?.position).toBe("top-left");
+      expect(result.data.legend?.legendOverflow).toBe("allow");
+    }
+  });
+
+  it("legend: empty object → all defaults applied", () => {
+    const result = RenderConfigSchema.safeParse({ legend: {} });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.legend?.show).toBe(true);
+      expect(result.data.legend?.position).toBe("bottom-right");
+      expect(result.data.legend?.legendOverflow).toBe("allow");
+    }
+  });
+
+  // ── axes ───────────────────────────────────────────────────
+  it("axes: only locale → axisLabels remains optional/undefined", () => {
+    const result = RenderConfigSchema.safeParse({
+      axes: { locale: "fr" },
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.axes?.locale).toBe("fr");
+      expect(result.data.axes?.axisLabels).toBeUndefined();
+    }
+  });
+
+  it("axes: empty object → locale defaults to 'en'", () => {
+    const result = RenderConfigSchema.safeParse({ axes: {} });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.axes?.locale).toBe("en");
+    }
+  });
+
+  // ── filters ────────────────────────────────────────────────
+  it("filters: only layers → excludeComponentTypes remains optional/undefined", () => {
+    const result = RenderConfigSchema.safeParse({
+      filters: { layers: { title: false } },
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.filters?.layers?.title).toBe(false);
+      expect(result.data.filters?.excludeComponentTypes).toBeUndefined();
+    }
+  });
+
+  it("filters: empty object → all sub-fields remain optional/undefined", () => {
+    const result = RenderConfigSchema.safeParse({ filters: {} });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.filters?.layers).toBeUndefined();
+      expect(result.data.filters?.excludeComponentTypes).toBeUndefined();
+    }
+  });
+
+  // ── Cross-group partial: multiple partial groups in one call ──
+  it("multiple partial groups: each group fills its own defaults independently", () => {
+    const result = RenderConfigSchema.safeParse({
+      spatial: { width: 1200 },
+      typography: { labelScale: 1.5 },
+      styling: { theme: "dark" },
+      legend: { show: false },
+      axes: { locale: "fr" },
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      // spatial defaults
+      expect(result.data.spatial?.width).toBe(1200);
+      expect(result.data.spatial?.height).toBe(800);
+      expect(result.data.spatial?.strokeWidth).toBe(1);
+      expect(result.data.spatial?.nodeRadii).toEqual({ _default: 5 });
+      // typography defaults
+      expect(result.data.typography?.fontFamily).toBe("Inter, sans-serif");
+      expect(result.data.typography?.labelScale).toBe(1.5);
+      // styling defaults
+      expect(result.data.styling?.theme).toBe("dark");
+      expect(result.data.styling?.palette).toBeUndefined();
+      // legend defaults
+      expect(result.data.legend?.show).toBe(false);
+      expect(result.data.legend?.position).toBe("bottom-right");
+      expect(result.data.legend?.legendOverflow).toBe("allow");
+      // axes defaults
+      expect(result.data.axes?.locale).toBe("fr");
+      expect(result.data.axes?.axisLabels).toBeUndefined();
+    }
+  });
+
+  // ── Omitted groups are undefined, not defaulted ─────────────
+  it("omitted groups remain undefined — only provided groups get defaults", () => {
+    const result = RenderConfigSchema.safeParse({ typography: { labelScale: 2.0 } });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.spatial).toBeUndefined();
+      expect(result.data.styling).toBeUndefined();
+      expect(result.data.filters).toBeUndefined();
+      expect(result.data.legend).toBeUndefined();
+      expect(result.data.axes).toBeUndefined();
+      // Only typography is present with defaults
+      expect(result.data.typography?.fontFamily).toBe("Inter, sans-serif");
+      expect(result.data.typography?.labelScale).toBe(2.0);
+    }
   });
 });
 
@@ -463,66 +723,70 @@ describe("WardleyMapSchema with renderConfig", () => {
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data.renderConfig).toBeDefined();
-      expect(result.data.renderConfig!.width).toBeUndefined();
+      expect(result.data.renderConfig!.spatial).toBeUndefined();
     }
   });
 
-  it("parses a map with partial renderConfig (only width override)", () => {
+  it("parses a map with partial renderConfig (only spatial.width override)", () => {
     const result = WardleyMapSchema.safeParse({
       ...baseMap,
-      renderConfig: { width: 1920 },
+      renderConfig: { spatial: { width: 1920 } },
     });
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.renderConfig!.width).toBe(1920);
-      expect(result.data.renderConfig!.height).toBeUndefined();
-      expect(result.data.renderConfig!.background).toBeUndefined();
+      expect(result.data.renderConfig!.spatial?.width).toBe(1920);
+      // height gets its Zod default when spatial group is provided
+      expect(result.data.renderConfig!.spatial?.height).toBe(800);
+      expect(result.data.renderConfig!.styling).toBeUndefined();
     }
   });
 
-  it("parses a map with full renderConfig using new nested structure", () => {
+  it("parses a map with full renderConfig using nested structure", () => {
     const result = WardleyMapSchema.safeParse({
       ...baseMap,
       renderConfig: {
-        width: 1920,
-        height: 1080,
-        theme: "dark",
-        background: {
-          color: "#000000",
-          evolutionXAxis: { show: false },
-          valueChainYAxis: { show: false },
-          evolutionPhases: { showPhaseDividerAndLabel: true },
+        spatial: {
+          width: 1920,
+          height: 1080,
+          nodeRadii: { _default: 10 },
         },
-        fontFamily: "Monospace",
-        labelScale: 2,
-        nodeRadii: { _default: 10 },
+        styling: {
+          theme: "dark",
+          background: {
+            color: "#000000",
+            evolutionXAxis: { show: false },
+            valueChainYAxis: { show: false },
+            evolutionPhases: { showPhaseDividerAndLabel: true },
+          },
+          palette: { _default: "#000000", "user-need": "#ff0000" },
+          evolveStyles: {
+            natural: { stroke: "#00ff00" },
+            ecosystem: { strokeDasharray: "5 5" },
+          },
+        },
+        typography: { fontFamily: "Monospace", labelScale: 2 },
         avoidCollisions: true,
         filters: { excludeComponentTypes: ["note"] },
-        typeColors: { _default: "#000000", "user-need": "#ff0000" },
-        evolveStyles: {
-          natural: { stroke: "#00ff00" },
-          ecosystem: { strokeDasharray: "5 5" },
-        },
       },
     });
     expect(result.success).toBe(true);
     if (result.success) {
       const rc = result.data.renderConfig!;
-      expect(rc.width).toBe(1920);
-      expect(rc.theme).toBe("dark");
-      expect(rc.background?.color).toBe("#000000");
-      expect(rc.background?.evolutionXAxis?.show).toBe(false);
-      expect(rc.background?.evolutionPhases?.showPhaseDividerAndLabel).toBe(true);
+      expect(rc.spatial?.width).toBe(1920);
+      expect(rc.styling?.theme).toBe("dark");
+      expect(rc.styling?.background?.color).toBe("#000000");
+      expect(rc.styling?.background?.evolutionXAxis?.show).toBe(false);
+      expect(rc.styling?.background?.evolutionPhases?.showPhaseDividerAndLabel).toBe(true);
       expect(rc.filters?.excludeComponentTypes).toEqual(["note"]);
-      expect(rc.typeColors).toEqual({ _default: "#000000", "user-need": "#ff0000" });
-      expect(rc.evolveStyles?.natural?.stroke).toBe("#00ff00");
+      expect(rc.styling?.palette).toEqual({ _default: "#000000", "user-need": "#ff0000" });
+      expect(rc.styling?.evolveStyles?.natural?.stroke).toBe("#00ff00");
     }
   });
 
   it("rejects a map with invalid renderConfig", () => {
     const result = WardleyMapSchema.safeParse({
       ...baseMap,
-      renderConfig: { width: -1 },
+      renderConfig: { spatial: { width: -1 } },
     });
     expect(result.success).toBe(false);
   });
@@ -531,14 +795,14 @@ describe("WardleyMapSchema with renderConfig", () => {
     const result = WardleyMapSchema.safeParse({
       ...baseMap,
       context: "Test context",
-      renderConfig: { background: { color: "#aabbcc" } },
+      renderConfig: { styling: { background: { color: "#aabbcc" } } },
     });
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data.title).toBe("Test Map");
       expect(result.data.context).toBe("Test context");
       expect(result.data.components).toHaveLength(1);
-      expect(result.data.renderConfig!.background?.color).toBe("#aabbcc");
+      expect(result.data.renderConfig!.styling?.background?.color).toBe("#aabbcc");
     }
   });
 });
@@ -632,33 +896,33 @@ describe("renderConfig consolidation (legend + background toggles)", () => {
     expect(result.success).toBe(false);
   });
 
-  it("background.valueChainYAxis.show=false is accepted", () => {
+  it("styling.background.valueChainYAxis.show=false is accepted", () => {
     const result = RenderConfigSchema.safeParse({
-      background: { valueChainYAxis: { show: false } },
+      styling: { background: { valueChainYAxis: { show: false } } },
     });
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.background?.valueChainYAxis?.show).toBe(false);
+      expect(result.data.styling?.background?.valueChainYAxis?.show).toBe(false);
     }
   });
 
-  it("background.evolutionXAxis.show=false is accepted", () => {
+  it("styling.background.evolutionXAxis.show=false is accepted", () => {
     const result = RenderConfigSchema.safeParse({
-      background: { evolutionXAxis: { show: false } },
+      styling: { background: { evolutionXAxis: { show: false } } },
     });
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.background?.evolutionXAxis?.show).toBe(false);
+      expect(result.data.styling?.background?.evolutionXAxis?.show).toBe(false);
     }
   });
 
-  it("background.evolutionPhases.showPhaseDividerAndLabel=false is accepted", () => {
+  it("styling.background.evolutionPhases.showPhaseDividerAndLabel=false is accepted", () => {
     const result = RenderConfigSchema.safeParse({
-      background: { evolutionPhases: { showPhaseDividerAndLabel: false } },
+      styling: { background: { evolutionPhases: { showPhaseDividerAndLabel: false } } },
     });
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.background?.evolutionPhases?.showPhaseDividerAndLabel).toBe(false);
+      expect(result.data.styling?.background?.evolutionPhases?.showPhaseDividerAndLabel).toBe(false);
     }
   });
 
@@ -680,13 +944,13 @@ describe("renderConfig consolidation (legend + background toggles)", () => {
     }
   });
 
-  it("locale at top-level of renderConfig", () => {
+  it("locale inside axes group of renderConfig", () => {
     const result = RenderConfigSchema.safeParse({
-      locale: "fr",
+      axes: { locale: "fr" },
     });
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.locale).toBe("fr");
+      expect(result.data.axes?.locale).toBe("fr");
     }
   });
 });
@@ -902,19 +1166,21 @@ describe("RenderConfigSchema — filters field integration", () => {
     }
   });
 
-  it("filters.layers has no 'axes' key — axes controlled by background.*", () => {
-    // Can set filters.layers AND background.evolutionXAxis simultaneously — no conflict
+  it("filters.layers has no 'axes' key — axes controlled by styling.background.*", () => {
+    // Can set filters.layers AND styling.background.evolutionXAxis simultaneously — no conflict
     const result = RenderConfigSchema.safeParse({
       filters: { layers: { title: false, nodes: true } },
-      background: {
-        evolutionXAxis: { show: false },
-        evolutionPhases: { showPhaseDividerAndLabel: false },
+      styling: {
+        background: {
+          evolutionXAxis: { show: false },
+          evolutionPhases: { showPhaseDividerAndLabel: false },
+        },
       },
     });
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data.filters?.layers?.title).toBe(false);
-      expect(result.data.background?.evolutionXAxis?.show).toBe(false);
+      expect(result.data.styling?.background?.evolutionXAxis?.show).toBe(false);
       // No 'axes' in filters.layers
       expect((result.data.filters?.layers as any)?.axes).toBeUndefined();
     }
@@ -979,8 +1245,8 @@ describe("resolveTheme", () => {
     expect(rc.showEvolutionXAxis).toBe(true);
     expect(rc.showValueChainYAxis).toBe(true);
     expect(rc.showPhaseDividerAndLabel).toBe(true);
-    expect(rc.fontFamily).toBe("Inter, sans-serif");
-    expect(rc.labelScale).toBe(1.0);
+    expect(rc.typography.fontFamily).toBe("Inter, sans-serif");
+    expect(rc.typography.labelScale).toBe(1.0);
     expect(rc.nodeRadii._default).toBe(5);
     expect(rc.avoidCollisions).toBe(true);
     expect(rc.excludeComponentTypes).toEqual([]);
@@ -999,50 +1265,50 @@ describe("resolveTheme", () => {
   });
 
   it("resolves \"dark\" theme with distinct baseline values", () => {
-    const rc = resolveTheme({ theme: "dark" });
+    const rc = resolveTheme({ styling: { theme: "dark" } });
     expect(rc.theme).toBe("dark");
     // dark baseline differs from default: navy background, heavier stroke
     expect(rc.background.color).toBe("#1a1a2e");
     expect(rc.strokeWidth).toBe(1.5);
     // non-overridden fields inherit from dark baseline (same as default for these)
     expect(rc.showEvolutionXAxis).toBe(true);
-    expect(rc.fontFamily).toBe("Inter, sans-serif");
+    expect(rc.typography.fontFamily).toBe("Inter, sans-serif");
   });
 
   it("resolves \"highContrast\" theme with distinct baseline values", () => {
-    const rc = resolveTheme({ theme: "highContrast" });
+    const rc = resolveTheme({ styling: { theme: "highContrast" } });
     expect(rc.theme).toBe("highContrast");
     // highContrast baseline: pure black bg, accessible font, heavy strokes
     expect(rc.background.color).toBe("#000000");
-    expect(rc.fontFamily).toBe("Arial, sans-serif");
+    expect(rc.typography.fontFamily).toBe("Arial, sans-serif");
     expect(rc.strokeWidth).toBe(2);
   });
 
   it("applies width override", () => {
-    const rc = resolveTheme({ width: 1920 });
+    const rc = resolveTheme({ spatial: { width: 1920 } });
     expect(rc.width).toBe(1920);
     expect(rc.height).toBe(800);
   });
 
   it("applies height override", () => {
-    const rc = resolveTheme({ height: 1080 });
+    const rc = resolveTheme({ spatial: { height: 1080 } });
     expect(rc.height).toBe(1080);
     expect(rc.width).toBe(1600);
   });
 
-  it("applies background.color as backgroundColor", () => {
-    const rc = resolveTheme({ background: { color: "#1a1a1a" } });
+  it("applies styling.background.color as backgroundColor", () => {
+    const rc = resolveTheme({ styling: { background: { color: "#1a1a1a" } } });
     expect(rc.background.color).toBe("#1a1a1a");
     expect(rc.showEvolutionXAxis).toBe(true);
   });
 
   it("applies fontFamily override", () => {
-    const rc = resolveTheme({ fontFamily: "Roboto, sans-serif" });
-    expect(rc.fontFamily).toBe("Roboto, sans-serif");
+    const rc = resolveTheme({ typography: { fontFamily: "Roboto, sans-serif" } });
+    expect(rc.typography.fontFamily).toBe("Roboto, sans-serif");
   });
 
   it("applies strokeWidth override", () => {
-    const rc = resolveTheme({ strokeWidth: 2 });
+    const rc = resolveTheme({ spatial: { strokeWidth: 2 } });
     expect(rc.strokeWidth).toBe(2);
   });
 
@@ -1051,8 +1317,8 @@ describe("resolveTheme", () => {
     expect(rc.excludeComponentTypes).toEqual(["note"]);
   });
 
-  it("applies typeColors override", () => {
-    const rc = resolveTheme({ typeColors: { _default: "#000000", component: "#ff0000" } });
+  it("applies palette override", () => {
+    const rc = resolveTheme({ styling: { palette: { _default: "#000000", component: "#ff0000" } } });
     expect(rc.typeColors).toEqual({ _default: "#000000", component: "#ff0000" });
   });
 
@@ -1060,9 +1326,11 @@ describe("resolveTheme", () => {
 
   it("showEvolutionXAxis=false, showPhaseDividerAndLabel=true (combo 1)", () => {
     const rc = resolveTheme({
-      background: {
-        evolutionXAxis: { show: false },
-        evolutionPhases: { showPhaseDividerAndLabel: true },
+      styling: {
+        background: {
+          evolutionXAxis: { show: false },
+          evolutionPhases: { showPhaseDividerAndLabel: true },
+        },
       },
     });
     expect(rc.showEvolutionXAxis).toBe(false);
@@ -1071,9 +1339,11 @@ describe("resolveTheme", () => {
 
   it("showEvolutionXAxis=true, showPhaseDividerAndLabel=false (combo 2)", () => {
     const rc = resolveTheme({
-      background: {
-        evolutionXAxis: { show: true },
-        evolutionPhases: { showPhaseDividerAndLabel: false },
+      styling: {
+        background: {
+          evolutionXAxis: { show: true },
+          evolutionPhases: { showPhaseDividerAndLabel: false },
+        },
       },
     });
     expect(rc.showEvolutionXAxis).toBe(true);
@@ -1082,9 +1352,11 @@ describe("resolveTheme", () => {
 
   it("showEvolutionXAxis=false, showPhaseDividerAndLabel=false (combo 3)", () => {
     const rc = resolveTheme({
-      background: {
-        evolutionXAxis: { show: false },
-        evolutionPhases: { showPhaseDividerAndLabel: false },
+      styling: {
+        background: {
+          evolutionXAxis: { show: false },
+          evolutionPhases: { showPhaseDividerAndLabel: false },
+        },
       },
     });
     expect(rc.showEvolutionXAxis).toBe(false);
@@ -1093,9 +1365,11 @@ describe("resolveTheme", () => {
 
   it("showEvolutionXAxis=true, showPhaseDividerAndLabel=true (combo 4, default)", () => {
     const rc = resolveTheme({
-      background: {
-        evolutionXAxis: { show: true },
-        evolutionPhases: { showPhaseDividerAndLabel: true },
+      styling: {
+        background: {
+          evolutionXAxis: { show: true },
+          evolutionPhases: { showPhaseDividerAndLabel: true },
+        },
       },
     });
     expect(rc.showEvolutionXAxis).toBe(true);
@@ -1104,7 +1378,7 @@ describe("resolveTheme", () => {
 
   it("showValueChainYAxis toggle works independently", () => {
     const rc = resolveTheme({
-      background: { valueChainYAxis: { show: false } },
+      styling: { background: { valueChainYAxis: { show: false } } },
     });
     expect(rc.showValueChainYAxis).toBe(false);
     expect(rc.showEvolutionXAxis).toBe(true);
@@ -1121,14 +1395,14 @@ describe("resolveTheme", () => {
   });
 
   it("resolves axisLabels with fr locale override", () => {
-    const rc = resolveTheme({ locale: "fr" });
+    const rc = resolveTheme({ axes: { locale: "fr" } });
     expect(rc.axisLabels.xAxis).toBe("Évolution");
     expect(rc.axisLabels.yAxis).toBe("Chaîne de valeur");
     expect(rc.axisLabels.phases[0]).toBe("Genèse");
   });
 
-  it("applies individual axisLabel override on top of locale (colocalized in background.evolutionXAxis)", () => {
-    const rc = resolveTheme({ locale: "en", background: { evolutionXAxis: { xAxis: "Custom X" } } });
+  it("applies individual axisLabel override on top of locale (colocalized in styling.background.evolutionXAxis)", () => {
+    const rc = resolveTheme({ axes: { locale: "en" }, styling: { background: { evolutionXAxis: { xAxis: "Custom X" } } } });
     expect(rc.axisLabels.xAxis).toBe("Custom X");
     expect(rc.axisLabels.yAxis).toBe("Value Chain");
   });
@@ -1137,10 +1411,12 @@ describe("resolveTheme", () => {
   // Direction cue labels (evolutionStart/End) are now locale-only.
   it("direction cue labels use locale preset (evolutionStart/End not overridable via background.axisLabels)", () => {
     const rc = resolveTheme({
-      background: {
-        // axisLabels with evolutionStart/evolutionEnd fields are silently stripped (no-op)
-        axisLabels: {} as Record<string, unknown>,
-      } as Background,
+      styling: {
+        background: {
+          // axisLabels with evolutionStart/evolutionEnd fields are silently stripped (no-op)
+          axisLabels: {} as Record<string, unknown>,
+        } as Background,
+      },
     });
     // Locale default is used since overrides are no longer supported
     expect(rc.axisLabels.evolutionStart).toBe("Uncharted"); // en locale default
@@ -1148,8 +1424,8 @@ describe("resolveTheme", () => {
     expect(rc.axisLabels.xAxis).toBe("Evolution"); // unchanged
   });
 
-  it("colocalized: background.valueChainYAxis.yAxis overrides y-axis label", () => {
-    const rc = resolveTheme({ background: { valueChainYAxis: { yAxis: "Custom Y" } } });
+  it("colocalized: styling.background.valueChainYAxis.yAxis overrides y-axis label", () => {
+    const rc = resolveTheme({ styling: { background: { valueChainYAxis: { yAxis: "Custom Y" } } } });
     expect(rc.axisLabels.yAxis).toBe("Custom Y");
     expect(rc.axisLabels.xAxis).toBe("Evolution"); // unchanged
   });
@@ -1157,26 +1433,28 @@ describe("resolveTheme", () => {
   // Sub-AC 2: visibilityHigh/Low direction label overrides also removed from background.axisLabels.
   it("direction cue labels use locale preset (visibilityHigh/Low not overridable via background.axisLabels)", () => {
     const rc = resolveTheme({
-      background: {},
+      styling: { background: {} },
     });
     // Locale defaults used since overrides are no longer supported
     expect(rc.axisLabels.visibilityHigh).toBe("Visible"); // en locale default
     expect(rc.axisLabels.visibilityLow).toBe("Invisible"); // en locale default
   });
 
-  it("colocalized: background.evolutionPhases.phases overrides phase labels", () => {
+  it("colocalized: styling.background.evolutionPhases.phases overrides phase labels", () => {
     const rc = resolveTheme({
-      background: {
-        evolutionPhases: { phases: ["P1", "P2", "P3", "P4"] },
+      styling: {
+        background: {
+          evolutionPhases: { phases: ["P1", "P2", "P3", "P4"] },
+        },
       },
     });
     expect(rc.axisLabels.phases).toEqual(["P1", "P2", "P3", "P4"]);
   });
 
-  it("colocalized: fr locale with individual label override in evolutionXAxis", () => {
+  it("colocalized: fr locale with individual label override in styling.background.evolutionXAxis", () => {
     const rc = resolveTheme({
-      locale: "fr",
-      background: { evolutionXAxis: { xAxis: "Custom Évolution" } },
+      axes: { locale: "fr" },
+      styling: { background: { evolutionXAxis: { xAxis: "Custom Évolution" } } },
     });
     // Individual override takes precedence over fr locale preset
     expect(rc.axisLabels.xAxis).toBe("Custom Évolution");
@@ -1188,10 +1466,12 @@ describe("resolveTheme", () => {
   it("colocalized: all supported label overrides across axis sub-objects", () => {
     // Sub-AC 2: axisLabels direction label overrides removed — only xAxis, yAxis, phases remain overridable
     const rc = resolveTheme({
-      background: {
-        evolutionXAxis: { xAxis: "Evo" },
-        valueChainYAxis: { yAxis: "Chain" },
-        evolutionPhases: { phases: ["A", "B", "C", "D"] },
+      styling: {
+        background: {
+          evolutionXAxis: { xAxis: "Evo" },
+          valueChainYAxis: { yAxis: "Chain" },
+          evolutionPhases: { phases: ["A", "B", "C", "D"] },
+        },
       },
     });
     expect(rc.axisLabels.xAxis).toBe("Evo");
@@ -1242,9 +1522,8 @@ describe("resolveTheme", () => {
 
   it("applies overrides on top of dark theme baseline", () => {
     const rc = resolveTheme({
-      theme: "dark",
-      background: { color: "#000000" },
-      width: 1920,
+      styling: { theme: "dark", background: { color: "#000000" } },
+      spatial: { width: 1920 },
     });
     expect(rc.theme).toBe("dark");
     expect(rc.background.color).toBe("#000000");
@@ -1256,31 +1535,29 @@ describe("resolveTheme", () => {
   //   Level 1 (lowest) : theme baseline (selected by `theme` field)
   //   Level 2 (highest): explicit inline field overrides
 
-  it("[precedence] dark theme baseline backgroundColor overridden by inline background.color", () => {
+  it("[precedence] dark theme baseline backgroundColor overridden by inline styling.background.color", () => {
     // dark baseline = "#1a1a2e"; inline "#ff0000" must win
     const rc = resolveTheme({
-      theme: "dark",
-      background: { color: "#ff0000" },
+      styling: { theme: "dark", background: { color: "#ff0000" } },
     });
     expect(rc.background.color).toBe("#ff0000"); // inline wins
     expect(rc.strokeWidth).toBe(1.5);           // non-overridden field: dark baseline persists
   });
 
-  it("[precedence] highContrast theme baseline backgroundColor overridden by inline background.color", () => {
+  it("[precedence] highContrast theme baseline backgroundColor overridden by inline styling.background.color", () => {
     // highContrast baseline = "#000000"; inline "#aabbcc" must win
     const rc = resolveTheme({
-      theme: "highContrast",
-      background: { color: "#aabbcc" },
+      styling: { theme: "highContrast", background: { color: "#aabbcc" } },
     });
     expect(rc.background.color).toBe("#aabbcc"); // inline wins
-    expect(rc.fontFamily).toBe("Arial, sans-serif"); // non-overridden: highContrast baseline persists
+    expect(rc.typography.fontFamily).toBe("Arial, sans-serif"); // non-overridden: highContrast baseline persists
   });
 
-  it("[precedence] dark theme strokeWidth overridden by inline strokeWidth", () => {
+  it("[precedence] dark theme strokeWidth overridden by inline spatial.strokeWidth", () => {
     // dark baseline strokeWidth = 1.5; inline 0.5 must win
     const rc = resolveTheme({
-      theme: "dark",
-      strokeWidth: 0.5,
+      styling: { theme: "dark" },
+      spatial: { strokeWidth: 0.5 },
     });
     expect(rc.strokeWidth).toBe(0.5);           // inline wins
     expect(rc.background.color).toBe("#1a1a2e"); // non-overridden: dark baseline persists
@@ -1289,19 +1566,19 @@ describe("resolveTheme", () => {
   it("[precedence] highContrast theme fontFamily overridden by inline fontFamily", () => {
     // highContrast baseline fontFamily = "Arial, sans-serif"; inline "Roboto" must win
     const rc = resolveTheme({
-      theme: "highContrast",
-      fontFamily: "Roboto, sans-serif",
+      styling: { theme: "highContrast" },
+      typography: { fontFamily: "Roboto, sans-serif" },
     });
-    expect(rc.fontFamily).toBe("Roboto, sans-serif"); // inline wins
+    expect(rc.typography.fontFamily).toBe("Roboto, sans-serif"); // inline wins
     expect(rc.background.color).toBe("#000000");       // non-overridden: highContrast baseline persists
     expect(rc.strokeWidth).toBe(2);                   // non-overridden: highContrast baseline persists
   });
 
   it("[precedence] no inline override → theme baseline values apply intact", () => {
     // Verifies theme baseline is the source of truth when no overrides provided
-    const rcDefault = resolveTheme({ theme: "default" });
-    const rcDark    = resolveTheme({ theme: "dark" });
-    const rcHC      = resolveTheme({ theme: "highContrast" });
+    const rcDefault = resolveTheme({ styling: { theme: "default" } });
+    const rcDark    = resolveTheme({ styling: { theme: "dark" } });
+    const rcHC      = resolveTheme({ styling: { theme: "highContrast" } });
 
     // All three themes differ in backgroundColor — baseline is the sole differentiator
     expect(rcDefault.background.color).toBe("#ffffff");
@@ -1316,14 +1593,13 @@ describe("resolveTheme", () => {
   it("[precedence] simultaneous inline overrides on highContrast: all explicit fields win", () => {
     // 3 inline overrides on top of highContrast baseline — each must individually win
     const rc = resolveTheme({
-      theme: "highContrast",
-      background: { color: "#112233" },
-      fontFamily: "Georgia, serif",
-      strokeWidth: 0.75,
+      styling: { theme: "highContrast", background: { color: "#112233" } },
+      typography: { fontFamily: "Georgia, serif" },
+      spatial: { strokeWidth: 0.75 },
     });
     expect(rc.theme).toBe("highContrast");
     expect(rc.background.color).toBe("#112233");      // inline > highContrast baseline (#000000)
-    expect(rc.fontFamily).toBe("Georgia, serif");    // inline > highContrast baseline (Arial)
+    expect(rc.typography.fontFamily).toBe("Georgia, serif");    // inline > highContrast baseline (Arial)
     expect(rc.strokeWidth).toBe(0.75);               // inline > highContrast baseline (2)
     // un-overridden fields still come from the highContrast baseline
     expect(rc.nodeRadii._default).toBe(5);
@@ -1493,7 +1769,7 @@ describe("Default values sensible in English (AC 12)", () => {
   // ── Other sensible English defaults ────────────────────────
 
   it("fontFamily defaults to 'Inter, sans-serif'", () => {
-    expect(resolveTheme().fontFamily).toBe("Inter, sans-serif");
+    expect(resolveTheme().typography.fontFamily).toBe("Inter, sans-serif");
   });
 
   it("canvas defaults to classic Wardley Map dimensions (1600 × 800)", () => {
@@ -1529,7 +1805,7 @@ describe("Default values sensible in English (AC 12)", () => {
   });
 
   it("labelScale defaults to 1.0 (normal size)", () => {
-    expect(resolveTheme().labelScale).toBe(1.0);
+    expect(resolveTheme().typography.labelScale).toBe(1.0);
   });
 
   it("excludeComponentTypes defaults to empty array (all types visible)", () => {
@@ -1726,57 +2002,57 @@ describe("NodeRadiiSchema — schema validation", () => {
   });
 });
 
-describe("RenderConfigSchema — nodeRadii field integration", () => {
-  it("nodeRadii is optional (absent when not provided)", () => {
-    const result = RenderConfigSchema.safeParse({});
+describe("RenderConfigSchema — nodeRadii field integration (via spatial group)", () => {
+  it("spatial.nodeRadii gets default when spatial group is provided", () => {
+    const result = RenderConfigSchema.safeParse({ spatial: {} });
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.nodeRadii).toBeUndefined();
+      expect(result.data.spatial?.nodeRadii).toEqual({ _default: 5 });
     }
   });
 
-  it("accepts nodeRadii with _default only", () => {
-    const result = RenderConfigSchema.safeParse({ nodeRadii: { _default: 8 } });
+  it("accepts spatial.nodeRadii with _default only", () => {
+    const result = RenderConfigSchema.safeParse({ spatial: { nodeRadii: { _default: 8 } } });
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.nodeRadii?._default).toBe(8);
+      expect(result.data.spatial?.nodeRadii?._default).toBe(8);
     }
   });
 
-  it("accepts nodeRadii with per-type overrides", () => {
+  it("accepts spatial.nodeRadii with per-type overrides", () => {
     const result = RenderConfigSchema.safeParse({
-      nodeRadii: { _default: 5, anchor: 10, component: 4 },
+      spatial: { nodeRadii: { _default: 5, anchor: 10, component: 4 } },
     });
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.nodeRadii?._default).toBe(5);
-      expect(result.data.nodeRadii?.anchor).toBe(10);
-      expect(result.data.nodeRadii?.component).toBe(4);
+      expect(result.data.spatial?.nodeRadii?._default).toBe(5);
+      expect(result.data.spatial?.nodeRadii?.anchor).toBe(10);
+      expect(result.data.spatial?.nodeRadii?.component).toBe(4);
     }
   });
 
-  it("accepts nodeRadii with _default and per-type anchor", () => {
-    const result = RenderConfigSchema.safeParse({ nodeRadii: { _default: 5, anchor: 10 } });
+  it("accepts spatial.nodeRadii with _default and per-type anchor", () => {
+    const result = RenderConfigSchema.safeParse({ spatial: { nodeRadii: { _default: 5, anchor: 10 } } });
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.nodeRadii?._default).toBe(5);
-      expect(result.data.nodeRadii?.anchor).toBe(10);
+      expect(result.data.spatial?.nodeRadii?._default).toBe(5);
+      expect(result.data.spatial?.nodeRadii?.anchor).toBe(10);
     }
   });
 
-  it("rejects nodeRadii with value above 50", () => {
-    const result = RenderConfigSchema.safeParse({ nodeRadii: { component: 51 } });
+  it("rejects spatial.nodeRadii with value above 50", () => {
+    const result = RenderConfigSchema.safeParse({ spatial: { nodeRadii: { component: 51 } } });
     expect(result.success).toBe(false);
   });
 
-  it("rejects nodeRadii with unknown key (strict schema)", () => {
-    const result = RenderConfigSchema.safeParse({ nodeRadii: { invalidType: 5 } });
+  it("rejects spatial.nodeRadii with unknown key (strict schema)", () => {
+    const result = RenderConfigSchema.safeParse({ spatial: { nodeRadii: { invalidType: 5 } } });
     expect(result.success).toBe(false);
   });
 
-  it("rejects nodeRadii with unknown key when _default is present (TypeStyleMap strict)", () => {
+  it("rejects spatial.nodeRadii with unknown key when _default is present (TypeStyleMap strict)", () => {
     // Verifies the TypeStyleMap pattern: strict schema rejects unknown keys even with valid _default
-    const result = RenderConfigSchema.safeParse({ nodeRadii: { _default: 5, invalidKey: 10 } });
+    const result = RenderConfigSchema.safeParse({ spatial: { nodeRadii: { _default: 5, invalidKey: 10 } } });
     expect(result.success).toBe(false);
   });
 });
@@ -1789,12 +2065,12 @@ describe("resolveTheme — nodeRadii resolution", () => {
   });
 
   it("nodeRadii._default is passed through to resolved config", () => {
-    const rc = resolveTheme({ nodeRadii: { _default: 10 } });
+    const rc = resolveTheme({ spatial: { nodeRadii: { _default: 10 } } });
     expect(rc.nodeRadii._default).toBe(10);
   });
 
   it("nodeRadii per-type anchor is merged with baseline _default", () => {
-    const rc = resolveTheme({ nodeRadii: { _default: 5, anchor: 15 } });
+    const rc = resolveTheme({ spatial: { nodeRadii: { _default: 5, anchor: 15 } } });
     expect(rc.nodeRadii._default).toBe(5);
     expect(rc.nodeRadii.anchor).toBe(15);
     // Other types unset
@@ -1802,7 +2078,7 @@ describe("resolveTheme — nodeRadii resolution", () => {
   });
 
   it("nodeRadii with mixed _default and per-type is passed through correctly", () => {
-    const rc = resolveTheme({ nodeRadii: { _default: 7, anchor: 12, component: 4 } });
+    const rc = resolveTheme({ spatial: { nodeRadii: { _default: 7, anchor: 12, component: 4 } } });
     expect(rc.nodeRadii._default).toBe(7);
     expect(rc.nodeRadii.anchor).toBe(12);
     expect(rc.nodeRadii.component).toBe(4);
@@ -1811,7 +2087,7 @@ describe("resolveTheme — nodeRadii resolution", () => {
   });
 
   it("nodeRadii caller overrides spread over baseline: _default from caller wins", () => {
-    const rc = resolveTheme({ nodeRadii: { _default: 8, anchor: 12 } });
+    const rc = resolveTheme({ spatial: { nodeRadii: { _default: 8, anchor: 12 } } });
     // _default from caller replaces baseline's _default: 5
     expect(rc.nodeRadii._default).toBe(8);
     // Per-type from caller
@@ -1839,8 +2115,8 @@ describe("i18n precedence — explicit label strings override locale (AC 6)", ()
   // ── Contradictory: fr locale vs explicit English xAxis ────────
   it("fr locale + explicit English xAxis → English wins for xAxis, fr elsewhere", () => {
     const rc = resolveTheme({
-      locale: "fr",
-      background: { evolutionXAxis: { xAxis: "Evolution" } },
+      axes: { locale: "fr" },
+      styling: { background: { evolutionXAxis: { xAxis: "Evolution" } } },
     });
     expect(rc.axisLabels.xAxis).toBe("Evolution");         // explicit English wins
     expect(rc.axisLabels.yAxis).toBe("Chaîne de valeur"); // fr preset still active
@@ -1851,7 +2127,7 @@ describe("i18n precedence — explicit label strings override locale (AC 6)", ()
   // They now always use the locale preset.
   it("fr locale → evolutionStart/End use fr locale preset (not overridable via background.axisLabels)", () => {
     const rc = resolveTheme({
-      locale: "fr",
+      axes: { locale: "fr" },
     });
     expect(rc.axisLabels.evolutionStart).toBe("Inexploré");       // fr locale preset
     expect(rc.axisLabels.evolutionEnd).toBe("Industrialisé");     // fr locale preset
@@ -1860,8 +2136,8 @@ describe("i18n precedence — explicit label strings override locale (AC 6)", ()
 
   it("fr locale + explicit English yAxis → explicit wins, fr phases unchanged", () => {
     const rc = resolveTheme({
-      locale: "fr",
-      background: { valueChainYAxis: { yAxis: "Value Chain" } },
+      axes: { locale: "fr" },
+      styling: { background: { valueChainYAxis: { yAxis: "Value Chain" } } },
     });
     expect(rc.axisLabels.yAxis).toBe("Value Chain");       // explicit English wins
     expect(rc.axisLabels.phases[0]).toBe("Genèse");        // fr preset still active
@@ -1871,7 +2147,7 @@ describe("i18n precedence — explicit label strings override locale (AC 6)", ()
   // Sub-AC 2: visibilityHigh/Low are no longer overridable via background.axisLabels.
   it("fr locale → visibilityHigh/Low use fr locale preset (not overridable via background.axisLabels)", () => {
     const rc = resolveTheme({
-      locale: "fr",
+      axes: { locale: "fr" },
     });
     expect(rc.axisLabels.visibilityHigh).toBe("Visible");      // fr locale preset (same as en)
     expect(rc.axisLabels.visibilityLow).toBe("Invisible");     // fr locale preset (same as en)
@@ -1880,8 +2156,8 @@ describe("i18n precedence — explicit label strings override locale (AC 6)", ()
 
   it("fr locale + explicit English phases → explicit wins, fr axis labels unchanged", () => {
     const rc = resolveTheme({
-      locale: "fr",
-      background: { evolutionPhases: { phases: ["Genesis", "Custom-Built", "Product (+Rental)", "Commodity (+Utility)"] } },
+      axes: { locale: "fr" },
+      styling: { background: { evolutionPhases: { phases: ["Genesis", "Custom-Built", "Product (+Rental)", "Commodity (+Utility)"] } } },
     });
     expect(rc.axisLabels.phases).toEqual(["Genesis", "Custom-Built", "Product (+Rental)", "Commodity (+Utility)"]);
     expect(rc.axisLabels.xAxis).toBe("Évolution");  // fr preset still active
@@ -1890,8 +2166,8 @@ describe("i18n precedence — explicit label strings override locale (AC 6)", ()
   // ── Contradictory: en locale vs explicit French strings ────────
   it("en locale + explicit French xAxis → French string wins", () => {
     const rc = resolveTheme({
-      locale: "en",
-      background: { evolutionXAxis: { xAxis: "Évolution" } },
+      axes: { locale: "en" },
+      styling: { background: { evolutionXAxis: { xAxis: "Évolution" } } },
     });
     expect(rc.axisLabels.xAxis).toBe("Évolution");        // explicit French wins
     expect(rc.axisLabels.yAxis).toBe("Value Chain");      // en preset for unset field
@@ -1899,8 +2175,8 @@ describe("i18n precedence — explicit label strings override locale (AC 6)", ()
 
   it("en locale + explicit French phases → French phases win", () => {
     const rc = resolveTheme({
-      locale: "en",
-      background: { evolutionPhases: { phases: ["Genèse", "Sur mesure", "Produit (+location)", "Commodité (+utilité)"] } },
+      axes: { locale: "en" },
+      styling: { background: { evolutionPhases: { phases: ["Genèse", "Sur mesure", "Produit (+location)", "Commodité (+utilité)"] } } },
     });
     expect(rc.axisLabels.phases).toEqual(["Genèse", "Sur mesure", "Produit (+location)", "Commodité (+utilité)"]);
     expect(rc.axisLabels.xAxis).toBe("Evolution");  // en preset still active for unset fields
@@ -1910,12 +2186,14 @@ describe("i18n precedence — explicit label strings override locale (AC 6)", ()
   // Sub-AC 2: only xAxis, yAxis, phases are overridable; direction cue labels are locale-only.
   it("fr locale + xAxis/yAxis/phases explicitly set to English → explicit wins for those 3", () => {
     const rc = resolveTheme({
-      locale: "fr",
-      background: {
-        evolutionXAxis: { xAxis: "Evolution" },
-        valueChainYAxis: { yAxis: "Value Chain" },
-        evolutionPhases: { phases: ["Genesis", "Custom-Built", "Product (+Rental)", "Commodity (+Utility)"] },
-        // axisLabels with direction fields stripped by Sub-AC 2
+      axes: { locale: "fr" },
+      styling: {
+        background: {
+          evolutionXAxis: { xAxis: "Evolution" },
+          valueChainYAxis: { yAxis: "Value Chain" },
+          evolutionPhases: { phases: ["Genesis", "Custom-Built", "Product (+Rental)", "Commodity (+Utility)"] },
+          // axisLabels with direction fields stripped by Sub-AC 2
+        },
       },
     });
     // 3 overridable fields use explicit values
@@ -1932,12 +2210,14 @@ describe("i18n precedence — explicit label strings override locale (AC 6)", ()
   // Sub-AC 2: direction cue labels not overridable; only xAxis/yAxis/phases can be set explicitly.
   it("en locale + xAxis/yAxis/phases explicitly set to French → explicit wins for those 3", () => {
     const rc = resolveTheme({
-      locale: "en",
-      background: {
-        evolutionXAxis: { xAxis: "Évolution" },
-        valueChainYAxis: { yAxis: "Chaîne de valeur" },
-        evolutionPhases: { phases: ["Genèse", "Sur mesure", "Produit (+location)", "Commodité (+utilité)"] },
-        // axisLabels with direction fields stripped by Sub-AC 2
+      axes: { locale: "en" },
+      styling: {
+        background: {
+          evolutionXAxis: { xAxis: "Évolution" },
+          valueChainYAxis: { yAxis: "Chaîne de valeur" },
+          evolutionPhases: { phases: ["Genèse", "Sur mesure", "Produit (+location)", "Commodité (+utilité)"] },
+          // axisLabels with direction fields stripped by Sub-AC 2
+        },
       },
     });
     expect(rc.axisLabels.xAxis).toBe("Évolution");
@@ -1952,8 +2232,8 @@ describe("i18n precedence — explicit label strings override locale (AC 6)", ()
   it("unknown locale + explicit labels → explicit wins, unknown locale falls back to English for unset", () => {
     const rc = resolveTheme({
       // @ts-expect-error intentionally passing invalid locale to test fallback behaviour
-      locale: "de",
-      background: { evolutionXAxis: { xAxis: "Entwicklung" } },
+      axes: { locale: "de" },
+      styling: { background: { evolutionXAxis: { xAxis: "Entwicklung" } } },
     });
     expect(rc.axisLabels.xAxis).toBe("Entwicklung");     // explicit wins even over unknown locale
     expect(rc.axisLabels.yAxis).toBe("Value Chain");     // en fallback for unset fields (de not in presets)
@@ -1988,8 +2268,8 @@ describe("i18n precedence — explicit label strings override locale (AC 6)", ()
   it("locale acts as fallback only: explicit xAxis wins, all other fields use locale", () => {
     // Sub-AC 2: direction cue labels are not overridable; only xAxis/yAxis/phases remain overridable
     const rc = resolveTheme({
-      locale: "fr",
-      background: { evolutionXAxis: { xAxis: "Starting Point" } }, // explicit overrides fr locale for xAxis
+      axes: { locale: "fr" },
+      styling: { background: { evolutionXAxis: { xAxis: "Starting Point" } } }, // explicit overrides fr locale for xAxis
     });
     expect(rc.axisLabels.xAxis).toBe("Starting Point");           // explicit wins
     expect(rc.axisLabels.evolutionStart).toBe("Inexploré");       // fr locale (not overridable)
@@ -2119,19 +2399,17 @@ describe("RenderConfigSchema — legend {x,y} canvas bounds validation", () => {
 
   // ── Custom canvas dimensions — bounds scale with width/height ─────────────
 
-  it("respects custom width: accepts x=500 when width=800 and height=600", () => {
+  it("respects custom width: accepts x=500 when spatial.width=800 and spatial.height=600", () => {
     const result = RenderConfigSchema.safeParse({
-      width: 800,
-      height: 600,
+      spatial: { width: 800, height: 600 },
       legend: { position: { x: 500, y: 300 } },
     });
     expect(result.success).toBe(true);
   });
 
-  it("respects custom width: rejects x=1600 when width=800 (exceeds custom width)", () => {
+  it("respects custom width: rejects x=1600 when spatial.width=800 (exceeds custom width)", () => {
     const result = RenderConfigSchema.safeParse({
-      width: 800,
-      height: 600,
+      spatial: { width: 800, height: 600 },
       legend: { position: { x: 1600, y: 300 } },
     });
     expect(result.success).toBe(false);
@@ -2142,10 +2420,9 @@ describe("RenderConfigSchema — legend {x,y} canvas bounds validation", () => {
     }
   });
 
-  it("respects custom height: rejects y=800 when height=600 (exceeds custom height)", () => {
+  it("respects custom height: rejects y=800 when spatial.height=600 (exceeds custom height)", () => {
     const result = RenderConfigSchema.safeParse({
-      width: 1600,
-      height: 600,
+      spatial: { width: 1600, height: 600 },
       legend: { position: { x: 100, y: 800 } },
     });
     expect(result.success).toBe(false);
@@ -2168,7 +2445,7 @@ describe("RenderConfigSchema — legend {x,y} canvas bounds validation", () => {
   // ── Absence of legend — no error raised ──────────────────────────────────
 
   it("accepts config with no legend field (no bounds check triggered)", () => {
-    const result = RenderConfigSchema.safeParse({ width: 1600, height: 800 });
+    const result = RenderConfigSchema.safeParse({ spatial: { width: 1600, height: 800 } });
     expect(result.success).toBe(true);
   });
 
@@ -2205,7 +2482,7 @@ describe("resolveTheme — 3-level precedence chain (AC 5)", () => {
   it("[L1<L2] dark theme strokeWidth(1.5) beaten by explicit top-level strokeWidth", () => {
     // L1: dark baseline → strokeWidth = 1.5
     // L2: explicit renderConfig.strokeWidth = 0.5 → must win
-    const rc = resolveTheme({ theme: "dark", strokeWidth: 0.5 });
+    const rc = resolveTheme({ styling: { theme: "dark" }, spatial: { strokeWidth: 0.5 } });
     expect(rc.strokeWidth).toBe(0.5);            // L2 wins over dark baseline L1 (1.5)
     expect(rc.background.color).toBe("#1a1a2e"); // L1 dark baseline persists for non-overridden fields
   });
@@ -2213,8 +2490,8 @@ describe("resolveTheme — 3-level precedence chain (AC 5)", () => {
   it("[L1<L2] highContrast fontFamily(Arial) beaten by explicit top-level fontFamily", () => {
     // L1: highContrast baseline → fontFamily = "Arial, sans-serif"
     // L2: explicit renderConfig.fontFamily = "Roboto, sans-serif" → must win
-    const rc = resolveTheme({ theme: "highContrast", fontFamily: "Roboto, sans-serif" });
-    expect(rc.fontFamily).toBe("Roboto, sans-serif"); // L2 wins over L1 baseline
+    const rc = resolveTheme({ styling: { theme: "highContrast" }, typography: { fontFamily: "Roboto, sans-serif" } });
+    expect(rc.typography.fontFamily).toBe("Roboto, sans-serif"); // L2 wins over L1 baseline
     expect(rc.strokeWidth).toBe(2);                   // L1 highContrast baseline persists (not overridden)
     expect(rc.background.color).toBe("#000000");      // L1 highContrast baseline persists (not overridden)
   });
@@ -2222,7 +2499,7 @@ describe("resolveTheme — 3-level precedence chain (AC 5)", () => {
   it("[L1<L2] locale top-level field overrides English theme baseline defaults", () => {
     // L1: no locale → English defaults from theme baseline
     // L2: explicit locale="fr" → French labels must win over all L1 English defaults
-    const rcFr = resolveTheme({ locale: "fr" });
+    const rcFr = resolveTheme({ axes: { locale: "fr" } });
     expect(rcFr.axisLabels.xAxis).toBe("Évolution");         // L2 fr locale wins over L1 "Evolution"
     expect(rcFr.axisLabels.yAxis).toBe("Chaîne de valeur");  // L2 fr locale wins over L1 "Value Chain"
     expect(rcFr.axisLabels.phases[0]).toBe("Genèse");        // L2 fr locale wins over L1 "Genesis"
@@ -2234,8 +2511,8 @@ describe("resolveTheme — 3-level precedence chain (AC 5)", () => {
     // L2: locale="fr" would set xAxis → "Évolution" (French)
     // L3: background.evolutionXAxis.xAxis="Custom X" → must beat locale preset
     const rc = resolveTheme({
-      locale: "fr",                                           // L2: French locale preset
-      background: { evolutionXAxis: { xAxis: "Custom X" } }, // L3: explicit nested override
+      axes: { locale: "fr" },                                           // L2: French locale preset
+      styling: { background: { evolutionXAxis: { xAxis: "Custom X" } } }, // L3: explicit nested override
     });
     expect(rc.axisLabels.xAxis).toBe("Custom X");           // L3 wins over L2 locale "Évolution"
     expect(rc.axisLabels.yAxis).toBe("Chaîne de valeur");   // L2 fr locale applies to non-overridden
@@ -2246,8 +2523,8 @@ describe("resolveTheme — 3-level precedence chain (AC 5)", () => {
     // L2: locale="fr" would set yAxis → "Chaîne de valeur"
     // L3: background.valueChainYAxis.yAxis="My Chain" → must beat locale preset
     const rc = resolveTheme({
-      locale: "fr",
-      background: { valueChainYAxis: { yAxis: "My Chain" } }, // L3: nested override
+      axes: { locale: "fr" },
+      styling: { background: { valueChainYAxis: { yAxis: "My Chain" } } }, // L3: nested override
     });
     expect(rc.axisLabels.yAxis).toBe("My Chain");   // L3 wins over L2 "Chaîne de valeur"
     expect(rc.axisLabels.xAxis).toBe("Évolution");  // L2 fr locale applies to other labels
@@ -2258,7 +2535,7 @@ describe("resolveTheme — 3-level precedence chain (AC 5)", () => {
   it("[L2 locale applies] locale='fr' direction cue labels use fr preset (background.axisLabels override removed)", () => {
     // Sub-AC 2: background.axisLabels direction fields stripped; direction labels use L2 locale
     const rc = resolveTheme({
-      locale: "fr",
+      axes: { locale: "fr" },
       // background.axisLabels.evolutionStart would be stripped — L2 locale applies
     });
     expect(rc.axisLabels.evolutionStart).toBe("Inexploré");   // L2 fr locale (no L3 override possible)
@@ -2270,9 +2547,11 @@ describe("resolveTheme — 3-level precedence chain (AC 5)", () => {
     // L2: locale="fr" would set phases → ["Genèse", ...]
     // L3: background.evolutionPhases.phases=[...] → must beat locale preset
     const rc = resolveTheme({
-      locale: "fr",
-      background: {
-        evolutionPhases: { phases: ["P1", "P2", "P3", "P4"] }, // L3: explicit nested override
+      axes: { locale: "fr" },
+      styling: {
+        background: {
+          evolutionPhases: { phases: ["P1", "P2", "P3", "P4"] }, // L3: explicit nested override
+        },
       },
     });
     expect(rc.axisLabels.phases).toEqual(["P1", "P2", "P3", "P4"]); // L3 wins over L2 French phases
@@ -2289,11 +2568,10 @@ describe("resolveTheme — 3-level precedence chain (AC 5)", () => {
     //
     // Expected: xAxis uses L3 "My X", other labels use L2 fr locale
     const rc = resolveTheme({
-      theme: "default",                          // L1: selects default baseline
-      locale: "fr",                              // L2: French locale preset for axis labels
-      background: {
+      styling: { theme: "default", background: {
         evolutionXAxis: { xAxis: "My X" },       // L3: explicit nested override — beats L2
-      },
+      } },
+      axes: { locale: "fr" },                              // L2: French locale preset for axis labels
     });
 
     // L3 wins for the explicitly-overridden field
@@ -2322,9 +2600,11 @@ describe("resolveTheme — 3-level precedence chain (AC 5)", () => {
     //   L2 (fr locale):     "Chaîne de valeur" ← beats L1
     //   L3 (not set):       —                  ← L2 is the winner
     const rc = resolveTheme({
-      locale: "fr",                                           // L2: French locale
-      background: {
-        evolutionXAxis: { xAxis: "Custom Axis" },            // L3: override xAxis only
+      axes: { locale: "fr" },                                           // L2: French locale
+      styling: {
+        background: {
+          evolutionXAxis: { xAxis: "Custom Axis" },            // L3: override xAxis only
+        },
       },
     });
 
@@ -2346,18 +2626,17 @@ describe("resolveTheme — 3-level precedence chain (AC 5)", () => {
     //   L2: locale="fr" → French labels (L2 > L1)
     //   L3: background.evolutionXAxis.xAxis="X Override" (L3 > L2 > L1)
     const rc = resolveTheme({
-      theme: "dark",                              // L1: dark baseline
-      strokeWidth: 3,                             // L2: explicit visual override
-      fontFamily: "Georgia, serif",               // L2: explicit visual override
-      locale: "fr",                               // L2: locale for i18n
-      background: {
+      styling: { theme: "dark", background: {
         evolutionXAxis: { xAxis: "X Override" },  // L3: explicit label override
-      },
+      } },
+      spatial: { strokeWidth: 3 },                // L2: explicit visual override
+      typography: { fontFamily: "Georgia, serif" }, // L2: explicit visual override
+      axes: { locale: "fr" },                               // L2: locale for i18n
     });
 
     // Visual: L2 beats L1
     expect(rc.strokeWidth).toBe(3);                    // L2 (3) > L1 dark baseline (1.5)
-    expect(rc.fontFamily).toBe("Georgia, serif");      // L2 > L1 dark baseline
+    expect(rc.typography.fontFamily).toBe("Georgia, serif");      // L2 > L1 dark baseline
     expect(rc.background.color).toBe("#1a1a2e");       // L1 dark baseline (no L2/L3 override)
 
     // i18n: L3 beats L2 for xAxis, L2 beats L1 for other labels
@@ -2370,14 +2649,16 @@ describe("resolveTheme — 3-level precedence chain (AC 5)", () => {
 
   it("[deterministic] same config always produces identical resolved output (idempotent)", () => {
     const config = {
-      theme: "dark" as const,
-      strokeWidth: 2,
-      fontFamily: "Roboto, sans-serif",
-      locale: "fr" as const,
-      background: {
-        color: "#112233",
-        evolutionXAxis: { xAxis: "Evo Override" },
+      styling: {
+        theme: "dark" as const,
+        background: {
+          color: "#112233",
+          evolutionXAxis: { xAxis: "Evo Override" },
+        },
       },
+      spatial: { strokeWidth: 2 },
+      typography: { fontFamily: "Roboto, sans-serif" },
+      axes: { locale: "fr" as const },
     };
 
     // Call resolveTheme multiple times with identical input
@@ -2394,7 +2675,7 @@ describe("resolveTheme — 3-level precedence chain (AC 5)", () => {
 
     // Verify exact values to confirm correct level wins
     expect(rc1.strokeWidth).toBe(2);                     // L2 wins over dark L1 (1.5)
-    expect(rc1.fontFamily).toBe("Roboto, sans-serif");   // L2 wins
+    expect(rc1.typography.fontFamily).toBe("Roboto, sans-serif");   // L2 wins
     expect(rc1.axisLabels.xAxis).toBe("Evo Override");   // L3 wins over fr L2 preset
     expect(rc1.axisLabels.yAxis).toBe("Chaîne de valeur"); // L2 fr locale wins
     expect(rc1.background.color).toBe("#112233");         // L3 nested override > dark L1 baseline
@@ -2402,16 +2683,16 @@ describe("resolveTheme — 3-level precedence chain (AC 5)", () => {
 
   it("[deterministic] each theme consistently resolves to its own distinct baseline", () => {
     // Same theme → same baseline, every time
-    const default1 = resolveTheme({ theme: "default" });
-    const default2 = resolveTheme({ theme: "default" });
-    const dark1    = resolveTheme({ theme: "dark" });
-    const dark2    = resolveTheme({ theme: "dark" });
-    const hc1      = resolveTheme({ theme: "highContrast" });
-    const hc2      = resolveTheme({ theme: "highContrast" });
+    const default1 = resolveTheme({ styling: { theme: "default" } });
+    const default2 = resolveTheme({ styling: { theme: "default" } });
+    const dark1    = resolveTheme({ styling: { theme: "dark" } });
+    const dark2    = resolveTheme({ styling: { theme: "dark" } });
+    const hc1      = resolveTheme({ styling: { theme: "highContrast" } });
+    const hc2      = resolveTheme({ styling: { theme: "highContrast" } });
 
     expect(default1.background.color).toBe(default2.background.color);
     expect(dark1.strokeWidth).toBe(dark2.strokeWidth);
-    expect(hc1.fontFamily).toBe(hc2.fontFamily);
+    expect(hc1.typography.fontFamily).toBe(hc2.typography.fontFamily);
 
     // Themes produce distinct baseline values
     expect(default1.background.color).toBe("#ffffff");   // default L1 baseline
@@ -2427,8 +2708,8 @@ describe("resolveTheme — 3-level precedence chain (AC 5)", () => {
 
   it("[isolation] changing only `theme` (L1) changes only theme-specific fields, not L2 overrides", () => {
     // Both configs apply same L2 override (width=1920), only theme differs
-    const rcDefault = resolveTheme({ theme: "default", width: 1920 });
-    const rcDark    = resolveTheme({ theme: "dark",    width: 1920 });
+    const rcDefault = resolveTheme({ styling: { theme: "default" }, spatial: { width: 1920 } });
+    const rcDark    = resolveTheme({ styling: { theme: "dark" },    spatial: { width: 1920 } });
 
     // Theme-specific fields differ (L1 baseline changed)
     expect(rcDefault.background.color).not.toBe(rcDark.background.color);
@@ -2440,8 +2721,8 @@ describe("resolveTheme — 3-level precedence chain (AC 5)", () => {
 
   it("[isolation] changing only `locale` (L2) changes only axis label fields, not visual fields", () => {
     // Both configs use dark theme + explicit strokeWidth; only locale differs
-    const rcEn = resolveTheme({ theme: "dark", strokeWidth: 2 });
-    const rcFr = resolveTheme({ theme: "dark", strokeWidth: 2, locale: "fr" });
+    const rcEn = resolveTheme({ styling: { theme: "dark" }, spatial: { strokeWidth: 2 } });
+    const rcFr = resolveTheme({ styling: { theme: "dark" }, spatial: { strokeWidth: 2 }, axes: { locale: "fr" } });
 
     // Axis labels differ (locale L2 change)
     expect(rcEn.axisLabels.xAxis).not.toBe(rcFr.axisLabels.xAxis);
@@ -2454,8 +2735,8 @@ describe("resolveTheme — 3-level precedence chain (AC 5)", () => {
 
   it("[isolation] adding L3 nested override changes only the targeted field", () => {
     // Two configs identical except one adds explicit xAxis override (L3)
-    const rcBase    = resolveTheme({ locale: "fr" });
-    const rcCustomX = resolveTheme({ locale: "fr", background: { evolutionXAxis: { xAxis: "Custom" } } });
+    const rcBase    = resolveTheme({ axes: { locale: "fr" } });
+    const rcCustomX = resolveTheme({ axes: { locale: "fr" }, styling: { background: { evolutionXAxis: { xAxis: "Custom" } } } });
 
     // Only xAxis differs (the added L3 override)
     expect(rcBase.axisLabels.xAxis).toBe("Évolution"); // L2 fr locale without L3
@@ -2490,12 +2771,12 @@ describe("resolveTheme — 3-level precedence chain (AC 5)", () => {
 describe("resolveTheme — 3-level precedence chain (AC 5)", () => {
   // ── Level 1 only: theme baseline provides all defaults ────────────────────
   it("Level 1 only: no overrides — theme baseline provides all field defaults", () => {
-    const rc = resolveTheme({ theme: "default" });
+    const rc = resolveTheme({ styling: { theme: "default" } });
     // Scalar fields from theme baseline
     expect(rc.background.color).toBe("#ffffff");         // Level 1: theme baseline
-    expect(rc.fontFamily).toBe("Inter, sans-serif");    // Level 1: theme baseline
+    expect(rc.typography.fontFamily).toBe("Inter, sans-serif");    // Level 1: theme baseline
     expect(rc.strokeWidth).toBe(1);                     // Level 1: theme baseline
-    expect(rc.labelScale).toBe(1.0);                    // Level 1: theme baseline
+    expect(rc.typography.labelScale).toBe(1.0);                    // Level 1: theme baseline
     expect(rc.width).toBe(1600);                        // Level 1: theme baseline
     expect(rc.height).toBe(800);                        // Level 1: theme baseline
     // Boolean display defaults from theme baseline
@@ -2511,19 +2792,19 @@ describe("resolveTheme — 3-level precedence chain (AC 5)", () => {
   it("Level 2 wins over Level 1: explicit fontFamily overrides theme baseline", () => {
     // Theme says "Inter, sans-serif" (Level 1)
     // Caller says "Arial" (Level 2) → Level 2 wins
-    const rc = resolveTheme({ theme: "default", fontFamily: "Arial" });
-    expect(rc.fontFamily).toBe("Arial");               // Level 2 wins over Level 1
+    const rc = resolveTheme({ styling: { theme: "default" }, typography: { fontFamily: "Arial" } });
+    expect(rc.typography.fontFamily).toBe("Arial");               // Level 2 wins over Level 1
     expect(rc.strokeWidth).toBe(1);                    // Level 1 still applies for unset fields
   });
 
   it("Level 2 wins over Level 1: explicit strokeWidth overrides theme baseline", () => {
-    const rc = resolveTheme({ theme: "default", strokeWidth: 3 });
+    const rc = resolveTheme({ styling: { theme: "default" }, spatial: { strokeWidth: 3 } });
     expect(rc.strokeWidth).toBe(3);                    // Level 2 wins
-    expect(rc.fontFamily).toBe("Inter, sans-serif");   // Level 1 for unset fields
+    expect(rc.typography.fontFamily).toBe("Inter, sans-serif");   // Level 1 for unset fields
   });
 
   it("Level 2 wins over Level 1: explicit width/height override theme baseline dimensions", () => {
-    const rc = resolveTheme({ theme: "default", width: 2560, height: 1440 });
+    const rc = resolveTheme({ styling: { theme: "default" }, spatial: { width: 2560, height: 1440 } });
     expect(rc.width).toBe(2560);   // Level 2 wins over Level 1 (1600)
     expect(rc.height).toBe(1440);  // Level 2 wins over Level 1 (800)
   });
@@ -2532,18 +2813,18 @@ describe("resolveTheme — 3-level precedence chain (AC 5)", () => {
   it("Level 3 wins over Level 1: background.color overrides theme baseline backgroundColor", () => {
     // Theme says "#ffffff" (Level 1)
     // background.color says "#1a1a1a" (Level 3) → Level 3 wins
-    const rc = resolveTheme({ theme: "default", background: { color: "#1a1a1a" } });
+    const rc = resolveTheme({ styling: { theme: "default", background: { color: "#1a1a1a" } } });
     expect(rc.background.color).toBe("#1a1a1a");        // Level 3 wins over Level 1
   });
 
   it("Level 3 wins over Level 1: background.evolutionXAxis.show=false overrides theme default=true", () => {
-    const rc = resolveTheme({ theme: "default", background: { evolutionXAxis: { show: false } } });
+    const rc = resolveTheme({ styling: { theme: "default", background: { evolutionXAxis: { show: false } } } });
     expect(rc.showEvolutionXAxis).toBe(false);          // Level 3 wins over Level 1 (true)
     expect(rc.showValueChainYAxis).toBe(true);          // Level 1 still applies for unset fields
   });
 
   it("Level 3 wins over Level 1: background.evolutionPhases.showPhaseDividerAndLabel=false overrides theme default=true", () => {
-    const rc = resolveTheme({ theme: "default", background: { evolutionPhases: { showPhaseDividerAndLabel: false } } });
+    const rc = resolveTheme({ styling: { theme: "default", background: { evolutionPhases: { showPhaseDividerAndLabel: false } } } });
     expect(rc.showPhaseDividerAndLabel).toBe(false);    // Level 3 wins over Level 1 (true)
     expect(rc.showEvolutionXAxis).toBe(true);           // Level 1 still applies for unset fields
   });
@@ -2552,7 +2833,7 @@ describe("resolveTheme — 3-level precedence chain (AC 5)", () => {
   it("i18n: Level 2 (fr locale) wins over Level 1 (en baseline)", () => {
     // Level 1: English baseline → xAxis = "Evolution"
     // Level 2: locale: "fr" → xAxis = "Évolution" ← wins over Level 1
-    const rc = resolveTheme({ locale: "fr" });
+    const rc = resolveTheme({ axes: { locale: "fr" } });
     expect(rc.axisLabels.xAxis).toBe("Évolution");     // Level 2 wins over Level 1
     expect(rc.axisLabels.phases[0]).toBe("Genèse");    // Level 2 wins over Level 1
   });
@@ -2561,8 +2842,8 @@ describe("resolveTheme — 3-level precedence chain (AC 5)", () => {
     // Level 2: locale "fr" → xAxis = "Évolution"
     // Level 3: background.evolutionXAxis.xAxis = "My Axis" ← wins over Level 2
     const rc = resolveTheme({
-      locale: "fr",
-      background: { evolutionXAxis: { xAxis: "My Axis" } },
+      axes: { locale: "fr" },
+      styling: { background: { evolutionXAxis: { xAxis: "My Axis" } } },
     });
     expect(rc.axisLabels.xAxis).toBe("My Axis");       // Level 3 wins over Level 2
     expect(rc.axisLabels.phases[0]).toBe("Genèse");    // Level 2 still applies for unset fields
@@ -2573,13 +2854,12 @@ describe("resolveTheme — 3-level precedence chain (AC 5)", () => {
     // Level 2: locale "fr" → xAxis = "Évolution" (wins over Level 1)
     // Level 3: explicit xAxis = "Custom Label" → wins over both Level 1 and Level 2
     const rc = resolveTheme({
-      theme: "default",   // Level 1: en baseline ("Evolution")
-      locale: "fr",       // Level 2: fr preset would give "Évolution"
-      background: {
+      styling: { theme: "default", background: {
         evolutionXAxis: {
           xAxis: "Custom Label",  // Level 3: explicit string — must win
         },
-      },
+      } },
+      axes: { locale: "fr" },       // Level 2: fr preset would give "Évolution"
     });
     // Level 3 wins for the explicitly set field
     expect(rc.axisLabels.xAxis).toBe("Custom Label");
@@ -2590,11 +2870,13 @@ describe("resolveTheme — 3-level precedence chain (AC 5)", () => {
 
   it("i18n: Level 3 wins even when it contradicts the active locale — phases override fr while locale stays fr", () => {
     const rc = resolveTheme({
-      locale: "fr",  // Level 2: all labels in French
-      background: {
-        evolutionPhases: {
-          // Level 3: explicit English phase names override fr locale for phases only
-          phases: ["Genesis", "Custom-Built", "Product (+Rental)", "Commodity (+Utility)"],
+      axes: { locale: "fr" },  // Level 2: all labels in French
+      styling: {
+        background: {
+          evolutionPhases: {
+            // Level 3: explicit English phase names override fr locale for phases only
+            phases: ["Genesis", "Custom-Built", "Product (+Rental)", "Commodity (+Utility)"],
+          },
         },
       },
     });
@@ -2610,17 +2892,16 @@ describe("resolveTheme — 3-level precedence chain (AC 5)", () => {
     // This test verifies that fields at different precedence levels resolve independently
     // and do not interfere with each other.
     const rc = resolveTheme({
-      theme: "default",                   // Level 1: all theme defaults as baseline
-      fontFamily: "Roboto, sans-serif",   // Level 2: overrides theme fontFamily
-      strokeWidth: 2,                     // Level 2: overrides theme strokeWidth
-      locale: "fr",                       // Level 2: overrides en for axis labels
-      background: {
+      styling: { theme: "default", background: {
         color: "#f0f0f0",                 // Level 3: overrides theme backgroundColor
         evolutionXAxis: {
           show: false,                    // Level 3: overrides theme showEvolutionXAxis
           xAxis: "Mon Évolution",         // Level 3: overrides fr locale "Évolution"
         },
-      },
+      } },
+      typography: { fontFamily: "Roboto, sans-serif" }, // Level 2: overrides theme fontFamily
+      spatial: { strokeWidth: 2 },                      // Level 2: overrides theme strokeWidth
+      axes: { locale: "fr" },                       // Level 2: overrides en for axis labels
     });
 
     // Level 3 fields (nested background overrides)
@@ -2629,13 +2910,13 @@ describe("resolveTheme — 3-level precedence chain (AC 5)", () => {
     expect(rc.axisLabels.xAxis).toBe("Mon Évolution");       // Level 3 explicit string
 
     // Level 2 fields (top-level explicit fields)
-    expect(rc.fontFamily).toBe("Roboto, sans-serif");        // Level 2 fontFamily
+    expect(rc.typography.fontFamily).toBe("Roboto, sans-serif");        // Level 2 fontFamily
     expect(rc.strokeWidth).toBe(2);                          // Level 2 strokeWidth
     expect(rc.axisLabels.yAxis).toBe("Chaîne de valeur");   // Level 2 fr locale (no Level 3 override)
     expect(rc.axisLabels.phases[0]).toBe("Genèse");          // Level 2 fr locale (no Level 3 override)
 
     // Level 1 fields (theme baseline, no override at any higher level)
-    expect(rc.labelScale).toBe(1.0);                         // Level 1 theme baseline
+    expect(rc.typography.labelScale).toBe(1.0);                         // Level 1 theme baseline
     expect(rc.nodeRadii._default).toBe(5);                   // Level 1 theme baseline
     expect(rc.avoidCollisions).toBe(true);                   // Level 1 theme baseline
     expect(rc.showValueChainYAxis).toBe(true);               // Level 1 theme baseline (no override)
@@ -2709,41 +2990,41 @@ describe("Sub-AC 10c: CoordinateSpaceSchema — coordinate space declaration", (
 describe("Sub-AC 10c: RenderConfigSchema — canvas dimension boundary conditions", () => {
   // ── coordinateSpace field in RenderConfigSchema ────────────────────────────
 
-  it("accepts renderConfig with coordinateSpace: {} (empty, all defaults)", () => {
-    const result = RenderConfigSchema.safeParse({ coordinateSpace: {} });
+  it("accepts renderConfig with spatial.coordinateSpace: {} (empty, all defaults)", () => {
+    const result = RenderConfigSchema.safeParse({ spatial: { coordinateSpace: {} } });
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.coordinateSpace?.units).toBe("px");
-      expect(result.data.coordinateSpace?.origin).toBe("top-left");
+      expect(result.data.spatial?.coordinateSpace?.units).toBe("px");
+      expect(result.data.spatial?.coordinateSpace?.origin).toBe("top-left");
     }
   });
 
-  it("accepts renderConfig with coordinateSpace: { units: 'px', origin: 'top-left' }", () => {
+  it("accepts renderConfig with spatial.coordinateSpace: { units: 'px', origin: 'top-left' }", () => {
     const result = RenderConfigSchema.safeParse({
-      coordinateSpace: { units: "px", origin: "top-left" },
+      spatial: { coordinateSpace: { units: "px", origin: "top-left" } },
     });
     expect(result.success).toBe(true);
   });
 
-  it("rejects renderConfig with coordinateSpace: { units: 'em' } — invalid units", () => {
+  it("rejects renderConfig with spatial.coordinateSpace: { units: 'em' } — invalid units", () => {
     const result = RenderConfigSchema.safeParse({
-      coordinateSpace: { units: "em" },
+      spatial: { coordinateSpace: { units: "em" } },
     });
     expect(result.success).toBe(false);
   });
 
   it("renderConfig without coordinateSpace field parses successfully (field is optional)", () => {
-    const result = RenderConfigSchema.safeParse({ width: 800, height: 600 });
+    const result = RenderConfigSchema.safeParse({ spatial: { width: 800, height: 600 } });
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.coordinateSpace).toBeUndefined();
+      expect(result.data.spatial?.coordinateSpace).toBeUndefined();
     }
   });
 
   // ── Width/height boundary conditions (px-space canvas dimensions) ──────────
 
-  it("rejects width exceeding 10000 px — upper bound for canvas px-space dimensions", () => {
-    const result = RenderConfigSchema.safeParse({ width: 10001 });
+  it("rejects spatial.width exceeding 10000 px — upper bound for canvas px-space dimensions", () => {
+    const result = RenderConfigSchema.safeParse({ spatial: { width: 10001 } });
     expect(result.success).toBe(false);
     if (!result.success) {
       // Error message should mention the constraint
@@ -2753,8 +3034,8 @@ describe("Sub-AC 10c: RenderConfigSchema — canvas dimension boundary condition
     }
   });
 
-  it("rejects height exceeding 10000 px — upper bound for canvas px-space dimensions", () => {
-    const result = RenderConfigSchema.safeParse({ height: 10001 });
+  it("rejects spatial.height exceeding 10000 px — upper bound for canvas px-space dimensions", () => {
+    const result = RenderConfigSchema.safeParse({ spatial: { height: 10001 } });
     expect(result.success).toBe(false);
     if (!result.success) {
       expect(
@@ -2763,59 +3044,63 @@ describe("Sub-AC 10c: RenderConfigSchema — canvas dimension boundary condition
     }
   });
 
-  it("accepts width: 10000 (boundary, exactly at max)", () => {
-    const result = RenderConfigSchema.safeParse({ width: 10000 });
+  it("accepts spatial.width: 10000 (boundary, exactly at max)", () => {
+    const result = RenderConfigSchema.safeParse({ spatial: { width: 10000 } });
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.width).toBe(10000);
+      expect(result.data.spatial?.width).toBe(10000);
     }
   });
 
-  it("accepts height: 10000 (boundary, exactly at max)", () => {
-    const result = RenderConfigSchema.safeParse({ height: 10000 });
+  it("accepts spatial.height: 10000 (boundary, exactly at max)", () => {
+    const result = RenderConfigSchema.safeParse({ spatial: { height: 10000 } });
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.height).toBe(10000);
+      expect(result.data.spatial?.height).toBe(10000);
     }
   });
 
-  it("rejects width: 0 — canvas px-space dimensions must be positive", () => {
-    const result = RenderConfigSchema.safeParse({ width: 0 });
+  it("rejects spatial.width: 0 — canvas px-space dimensions must be positive", () => {
+    const result = RenderConfigSchema.safeParse({ spatial: { width: 0 } });
     expect(result.success).toBe(false);
   });
 
-  it("rejects height: -50 — canvas px-space dimensions must be positive", () => {
-    const result = RenderConfigSchema.safeParse({ height: -50 });
+  it("rejects spatial.height: -50 — canvas px-space dimensions must be positive", () => {
+    const result = RenderConfigSchema.safeParse({ spatial: { height: -50 } });
     expect(result.success).toBe(false);
   });
 
-  it("accepts width: 1 and height: 1 — minimum valid positive canvas dimensions", () => {
-    const result = RenderConfigSchema.safeParse({ width: 1, height: 1 });
+  it("accepts spatial.width: 1 and spatial.height: 1 — minimum valid positive canvas dimensions", () => {
+    const result = RenderConfigSchema.safeParse({ spatial: { width: 1, height: 1 } });
     expect(result.success).toBe(true);
   });
 
   // ── Combined coordinateSpace + canvas dimensions ───────────────────────────
 
-  it("accepts coordinateSpace with valid canvas dimensions together", () => {
+  it("accepts spatial.coordinateSpace with valid canvas dimensions together", () => {
     const result = RenderConfigSchema.safeParse({
-      width: 1600,
-      height: 800,
-      coordinateSpace: { units: "px", origin: "top-left" },
+      spatial: {
+        width: 1600,
+        height: 800,
+        coordinateSpace: { units: "px", origin: "top-left" },
+      },
     });
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.width).toBe(1600);
-      expect(result.data.height).toBe(800);
-      expect(result.data.coordinateSpace?.units).toBe("px");
-      expect(result.data.coordinateSpace?.origin).toBe("top-left");
+      expect(result.data.spatial?.width).toBe(1600);
+      expect(result.data.spatial?.height).toBe(800);
+      expect(result.data.spatial?.coordinateSpace?.units).toBe("px");
+      expect(result.data.spatial?.coordinateSpace?.origin).toBe("top-left");
     }
   });
 
   it("rejects invalid coordinateSpace.units even when width/height are valid", () => {
     const result = RenderConfigSchema.safeParse({
-      width: 1600,
-      height: 800,
-      coordinateSpace: { units: "vw" },  // invalid units
+      spatial: {
+        width: 1600,
+        height: 800,
+        coordinateSpace: { units: "vw" },  // invalid units
+      },
     });
     expect(result.success).toBe(false);
   });
@@ -2852,32 +3137,34 @@ describe("Sub-AC 10c: CoordinateSpaceSchema — round-trip JSON serialisation", 
     expect(reparsed).toEqual(parsed);
   });
 
-  it("round-trips RenderConfigSchema with coordinateSpace field through JSON", () => {
+  it("round-trips RenderConfigSchema with spatial.coordinateSpace field through JSON", () => {
     const input = {
-      width: 1600,
-      height: 800,
-      coordinateSpace: { units: "px" as const, origin: "top-left" as const },
-      strokeWidth: 2,
+      spatial: {
+        width: 1600,
+        height: 800,
+        coordinateSpace: { units: "px" as const, origin: "top-left" as const },
+        strokeWidth: 2,
+      },
     };
     const parsed = RenderConfigSchema.parse(input);
     const json = JSON.stringify(parsed);
     const reparsed = RenderConfigSchema.parse(JSON.parse(json));
-    expect(reparsed.width).toBe(1600);
-    expect(reparsed.height).toBe(800);
-    expect(reparsed.coordinateSpace?.units).toBe("px");
-    expect(reparsed.coordinateSpace?.origin).toBe("top-left");
-    expect(reparsed.strokeWidth).toBe(2);
+    expect(reparsed.spatial?.width).toBe(1600);
+    expect(reparsed.spatial?.height).toBe(800);
+    expect(reparsed.spatial?.coordinateSpace?.units).toBe("px");
+    expect(reparsed.spatial?.coordinateSpace?.origin).toBe("top-left");
+    expect(reparsed.spatial?.strokeWidth).toBe(2);
   });
 
   it("round-trips RenderConfigSchema without coordinateSpace field through JSON (field stays absent)", () => {
-    const input = { width: 800, height: 400, strokeWidth: 1 };
+    const input = { spatial: { width: 800, height: 400, strokeWidth: 1 } };
     const parsed = RenderConfigSchema.parse(input);
     const json = JSON.stringify(parsed);
     const reparsed = RenderConfigSchema.parse(JSON.parse(json));
-    expect(reparsed.width).toBe(800);
-    expect(reparsed.height).toBe(400);
+    expect(reparsed.spatial?.width).toBe(800);
+    expect(reparsed.spatial?.height).toBe(400);
     // coordinateSpace was absent in input and remains absent after round-trip
-    expect(reparsed.coordinateSpace).toBeUndefined();
+    expect(reparsed.spatial?.coordinateSpace).toBeUndefined();
   });
 });
 
@@ -3672,7 +3959,7 @@ describe("resolveTypeStyle", () => {
     // resolveTheme merges them: { _default: 5, anchor: 20 }.
     // resolveTypeStyle must return the author's type-specific key for "anchor",
     // and fall back to _default (shared by theme + author) for unspecified types.
-    const resolved = resolveTheme({ nodeRadii: { _default: 5, anchor: 20 } });
+    const resolved = resolveTheme({ spatial: { nodeRadii: { _default: 5, anchor: 20 } } });
 
     // authorial type-specific key wins
     expect(resolveTypeStyle(resolved.nodeRadii, "anchor")).toBe(20);
@@ -3684,7 +3971,7 @@ describe("resolveTypeStyle", () => {
   it("author _default overrides theme-baseline _default; type-specific keys win over both", () => {
     // Author supplies their own _default (3) AND a type-specific key (anchor=20).
     // Theme baseline has _default=5; merged map should have _default=3 (author wins).
-    const resolved = resolveTheme({ nodeRadii: { _default: 3, anchor: 20 } });
+    const resolved = resolveTheme({ spatial: { nodeRadii: { _default: 3, anchor: 20 } } });
 
     // authorial type-specific key beats everything
     expect(resolveTypeStyle(resolved.nodeRadii, "anchor")).toBe(20);
@@ -3841,9 +4128,11 @@ describe("Cross-category conflict resolution (resolveConflict precedence rules)"
     // If the author explicitly provides evolveStyles, those MUST be preserved exactly —
     // theme selection is a viewer-preference category, evolveStyles is an author-intent category.
     const resolved = resolveTheme({
-      theme: "dark",
-      evolveStyles: {
-        natural: { stroke: "#000000", strokeDasharray: "4 2" },
+      styling: {
+        theme: "dark",
+        evolveStyles: {
+          natural: { stroke: "#000000", strokeDasharray: "4 2" },
+        },
       },
     });
     // Author-intent evolveStyles survive unmodified — dark theme cannot override them
@@ -3859,8 +4148,7 @@ describe("Cross-category conflict resolution (resolveConflict precedence rules)"
     // theme: "dark" sets baseline background.color = "#1a1a2e".
     // An explicit background.color MUST override that — same-category explicit always wins.
     const resolved = resolveTheme({
-      theme: "dark",
-      background: { color: "#ffffff" },
+      styling: { theme: "dark", background: { color: "#ffffff" } },
     });
     expect(resolved.background.color).toBe("#ffffff"); // explicit wins over dark baseline
     // But dark theme strokeWidth baseline still applies (no explicit strokeWidth given)
@@ -3872,8 +4160,8 @@ describe("Cross-category conflict resolution (resolveConflict precedence rules)"
     // locale: "fr" resolves xAxis to "Évolution" (French preset).
     // An explicit xAxis string in background.evolutionXAxis.xAxis is Level 3 and MUST win.
     const resolved = resolveTheme({
-      locale: "fr",
-      background: { evolutionXAxis: { xAxis: "Custom Axis Label" } },
+      axes: { locale: "fr" },
+      styling: { background: { evolutionXAxis: { xAxis: "Custom Axis Label" } } },
     });
     expect(resolved.axisLabels.xAxis).toBe("Custom Axis Label"); // explicit wins over French locale
     // locale still applies for other labels not explicitly overridden
@@ -3886,7 +4174,7 @@ describe("Cross-category conflict resolution (resolveConflict precedence rules)"
     // Providing coordinateSpace: { width: 1200 } must NOT bleed into resolved.width —
     // they are resolved independently from different config paths.
     const resolved = resolveTheme({
-      coordinateSpace: { width: 1200 },
+      spatial: { coordinateSpace: { width: 1200 } },
     });
     // resolved.width uses baseline (1600) — no explicit top-level width given
     expect(resolved.width).toBe(1600);
@@ -3901,14 +4189,14 @@ describe("Cross-category conflict resolution (resolveConflict precedence rules)"
     // highContrast theme inherits nodeRadii: { _default: 5 } from the default baseline.
     // Explicit nodeRadii is MERGED (spread) over the baseline — explicit keys win.
     const resolved = resolveTheme({
-      theme: "highContrast",
-      nodeRadii: { _default: 12, "user-need": 14 },
+      styling: { theme: "highContrast" },
+      spatial: { nodeRadii: { _default: 12, "user-need": 14 } },
     });
     expect(resolved.nodeRadii._default).toBe(12);               // explicit _default overrides baseline 5
     expect(resolved.nodeRadii["user-need"]).toBe(14);           // per-type explicit value present
     // highContrast theme's other distinctives still apply
     expect(resolved.strokeWidth).toBe(2);                        // highContrast baseline strokeWidth
-    expect(resolved.fontFamily).toBe("Arial, sans-serif");       // highContrast font override
+    expect(resolved.typography.fontFamily).toBe("Arial, sans-serif");       // highContrast font override
   });
 
   // ── Conflict 6: dark theme strokeWidth (1.5 baseline) vs explicit strokeWidth override ──
@@ -3916,8 +4204,8 @@ describe("Cross-category conflict resolution (resolveConflict precedence rules)"
     // theme: "dark" sets strokeWidth baseline = 1.5.
     // An explicit top-level strokeWidth is Level 2 and MUST win over Level 1 baseline.
     const resolved = resolveTheme({
-      theme: "dark",
-      strokeWidth: 3,
+      styling: { theme: "dark" },
+      spatial: { strokeWidth: 3 },
     });
     expect(resolved.strokeWidth).toBe(3); // explicit wins over dark baseline 1.5
     // Dark theme background is still applied (theme wins for its own category)
@@ -3930,8 +4218,7 @@ describe("Cross-category conflict resolution (resolveConflict precedence rules)"
     // Providing explicit typeColors MUST fully replace the baseline (not merge) —
     // this ensures the author's color vocabulary is applied exactly.
     const resolved = resolveTheme({
-      theme: "dark",
-      typeColors: { _default: "#cccccc", component: "#ff0000" },
+      styling: { theme: "dark", palette: { _default: "#cccccc", component: "#ff0000" } },
     });
     expect(resolved.typeColors._default).toBe("#cccccc");
     expect(resolved.typeColors["component"]).toBe("#ff0000");
@@ -3945,8 +4232,10 @@ describe("Cross-category conflict resolution (resolveConflict precedence rules)"
     // background.evolutionXAxis.xAxis is an axis label string — a content/i18n category.
     // These are orthogonal: disabling axis visibility MUST NOT suppress label resolution.
     const resolved = resolveTheme({
-      background: {
-        evolutionXAxis: { show: false, xAxis: "Hidden Axis Label" },
+      styling: {
+        background: {
+          evolutionXAxis: { show: false, xAxis: "Hidden Axis Label" },
+        },
       },
     });
     // Visibility toggle is applied (axis is hidden)
@@ -3975,23 +4264,25 @@ describe("AC 5 — phaseLabels arbitrary size vs. evolveStyles closed enum (deco
   it("3-element phases accepted by schema and resolves correctly while evolveStyles enum is unchanged", () => {
     // phaseLabels with 3 elements: a map with an unusual 3-zone layout
     const result = RenderConfigSchema.safeParse({
-      background: {
-        evolutionPhases: {
-          phases: ["Early", "Transition", "Mature"], // 3 phases — valid (not locked to 4)
+      styling: {
+        background: {
+          evolutionPhases: {
+            phases: ["Early", "Transition", "Mature"], // 3 phases — valid (not locked to 4)
+          },
         },
-      },
-      evolveStyles: {
-        natural: { stroke: "#dc2626" },
-        late: { stroke: "#999999" },
+        evolveStyles: {
+          natural: { stroke: "#dc2626" },
+          late: { stroke: "#999999" },
+        },
       },
     });
     expect(result.success).toBe(true);
     if (result.success) {
       // phaseLabels carries the 3-element array unchanged
-      expect(result.data.background?.evolutionPhases?.phases).toEqual(["Early", "Transition", "Mature"]);
+      expect(result.data.styling?.background?.evolutionPhases?.phases).toEqual(["Early", "Transition", "Mature"]);
       // evolveStyles closed enum is unaffected — natural/late still valid
-      expect(result.data.evolveStyles?.natural?.stroke).toBe("#dc2626");
-      expect(result.data.evolveStyles?.late?.stroke).toBe("#999999");
+      expect(result.data.styling?.evolveStyles?.natural?.stroke).toBe("#dc2626");
+      expect(result.data.styling?.evolveStyles?.late?.stroke).toBe("#999999");
     }
 
     // Verify EvolveTypeEnum still has exactly the 4 canonical values — the closed enum is stable
@@ -4001,13 +4292,15 @@ describe("AC 5 — phaseLabels arbitrary size vs. evolveStyles closed enum (deco
   it("3-element phases flows through resolveTheme — resolved axisLabels.phases has 3 elements", () => {
     // phaseLabels with 3 elements must survive resolveTheme unmodified
     const resolved = resolveTheme({
-      background: {
-        evolutionPhases: {
-          phases: ["Genesis", "Custom-Built", "Commodity"], // 3 phases (skipping Product)
+      styling: {
+        background: {
+          evolutionPhases: {
+            phases: ["Genesis", "Custom-Built", "Commodity"], // 3 phases (skipping Product)
+          },
         },
-      },
-      evolveStyles: {
-        natural: { stroke: "#aa0000" },
+        evolveStyles: {
+          natural: { stroke: "#aa0000" },
+        },
       },
     });
     // 3-element phases array is preserved in resolved config
@@ -4025,24 +4318,26 @@ describe("AC 5 — phaseLabels arbitrary size vs. evolveStyles closed enum (deco
   it("5-element phases accepted by schema while evolveStyles closed enum remains 4-key", () => {
     // phaseLabels with 5 elements: a map with an extended phase taxonomy
     const result = RenderConfigSchema.safeParse({
-      background: {
-        evolutionPhases: {
-          phases: ["Genesis", "Custom-Built", "Product", "Commodity", "Utility"], // 5 phases
+      styling: {
+        background: {
+          evolutionPhases: {
+            phases: ["Genesis", "Custom-Built", "Product", "Commodity", "Utility"], // 5 phases
+          },
         },
-      },
-      evolveStyles: {
-        _default: { stroke: "#888888", strokeDasharray: "4,2" },
-        forced: { stroke: "#9333ea" },
+        evolveStyles: {
+          _default: { stroke: "#888888", strokeDasharray: "4,2" },
+          forced: { stroke: "#9333ea" },
+        },
       },
     });
     expect(result.success).toBe(true);
     if (result.success) {
       // 5-element array accepted and stored
-      expect(result.data.background?.evolutionPhases?.phases).toHaveLength(5);
-      expect(result.data.background?.evolutionPhases?.phases?.[4]).toBe("Utility");
+      expect(result.data.styling?.background?.evolutionPhases?.phases).toHaveLength(5);
+      expect(result.data.styling?.background?.evolutionPhases?.phases?.[4]).toBe("Utility");
       // evolveStyles closed enum: _default and forced are valid; enum is unchanged
-      expect(result.data.evolveStyles?._default?.stroke).toBe("#888888");
-      expect(result.data.evolveStyles?.forced?.stroke).toBe("#9333ea");
+      expect(result.data.styling?.evolveStyles?._default?.stroke).toBe("#888888");
+      expect(result.data.styling?.evolveStyles?.forced?.stroke).toBe("#9333ea");
     }
 
     // EvolveTypeEnum is still the stable 4-value closed set
@@ -4055,9 +4350,11 @@ describe("AC 5 — phaseLabels arbitrary size vs. evolveStyles closed enum (deco
   it("5-element phases flows through resolveTheme — resolved axisLabels.phases has 5 elements", () => {
     // 5-element phases must survive resolveTheme unmodified
     const resolved = resolveTheme({
-      background: {
-        evolutionPhases: {
-          phases: ["P1", "P2", "P3", "P4", "P5"], // 5 custom phase labels
+      styling: {
+        background: {
+          evolutionPhases: {
+            phases: ["P1", "P2", "P3", "P4", "P5"], // 5 custom phase labels
+          },
         },
       },
     });
@@ -4140,18 +4437,14 @@ describe("FieldMetadata shape", () => {
 
 describe("RENDER_CONFIG_FIELD_TAXONOMY — author-intent fields", () => {
   const authorIntentFields = [
-    "width",
-    "height",
-    "coordinateSpace",
-    "background",
-    "fontFamily",
-    "nodeRadii",
-    "avoidCollisions",
-    "typeColors",
-    "evolveStyles",
-    "legend",
+    "spatial",
+    "typography",
+    "styling",
     "filters",
-    "strokeWidth",
+    "legend",
+    "avoidCollisions",
+    "methods",
+    "configIntent",
   ] as const;
 
   for (const field of authorIntentFields) {
@@ -4163,7 +4456,7 @@ describe("RENDER_CONFIG_FIELD_TAXONOMY — author-intent fields", () => {
 });
 
 describe("RENDER_CONFIG_FIELD_TAXONOMY — viewer-preference fields", () => {
-  const viewerPrefFields = ["theme", "locale", "labelScale"] as const;
+  const viewerPrefFields = ["axes"] as const;
 
   for (const field of viewerPrefFields) {
     it(`${field} is classified as viewer-preference`, () => {
@@ -4173,20 +4466,20 @@ describe("RENDER_CONFIG_FIELD_TAXONOMY — viewer-preference fields", () => {
   }
 });
 
-describe("RENDER_CONFIG_FIELD_TAXONOMY — coordinate-system fields are non-overridable", () => {
-  it("width is author-intent and non-overridable (coordinate-system-defining)", () => {
-    expect(RENDER_CONFIG_FIELD_TAXONOMY.width.category).toBe("author-intent");
-    expect(RENDER_CONFIG_FIELD_TAXONOMY.width.overridable).toBe(false);
+describe("RENDER_CONFIG_FIELD_TAXONOMY — spatial group is non-overridable", () => {
+  it("spatial is author-intent and non-overridable (contains coordinate-system-defining fields)", () => {
+    expect(RENDER_CONFIG_FIELD_TAXONOMY.spatial.category).toBe("author-intent");
+    expect(RENDER_CONFIG_FIELD_TAXONOMY.spatial.overridable).toBe(false);
   });
 
-  it("height is author-intent and non-overridable (coordinate-system-defining)", () => {
-    expect(RENDER_CONFIG_FIELD_TAXONOMY.height.category).toBe("author-intent");
-    expect(RENDER_CONFIG_FIELD_TAXONOMY.height.overridable).toBe(false);
+  it("styling is author-intent and non-overridable", () => {
+    expect(RENDER_CONFIG_FIELD_TAXONOMY.styling.category).toBe("author-intent");
+    expect(RENDER_CONFIG_FIELD_TAXONOMY.styling.overridable).toBe(false);
   });
 
-  it("coordinateSpace is author-intent and non-overridable", () => {
-    expect(RENDER_CONFIG_FIELD_TAXONOMY.coordinateSpace.category).toBe("author-intent");
-    expect(RENDER_CONFIG_FIELD_TAXONOMY.coordinateSpace.overridable).toBe(false);
+  it("typography is author-intent and non-overridable", () => {
+    expect(RENDER_CONFIG_FIELD_TAXONOMY.typography.category).toBe("author-intent");
+    expect(RENDER_CONFIG_FIELD_TAXONOMY.typography.overridable).toBe(false);
   });
 
 });
@@ -4288,72 +4581,56 @@ describe("TYPE_STYLE_MAP_TAXONOMY", () => {
 // ── getRenderConfigFieldCategory helper ─────────────────────
 
 describe("getRenderConfigFieldCategory", () => {
-  it("returns 'viewer-preference' for theme", () => {
-    expect(getRenderConfigFieldCategory("theme")).toBe("viewer-preference");
+  it("returns 'viewer-preference' for axes", () => {
+    expect(getRenderConfigFieldCategory("axes")).toBe("viewer-preference");
   });
 
-  it("returns 'viewer-preference' for locale", () => {
-    expect(getRenderConfigFieldCategory("locale")).toBe("viewer-preference");
+  it("returns 'author-intent' for typography (compound group)", () => {
+    expect(getRenderConfigFieldCategory("typography")).toBe("author-intent");
   });
 
-  it("returns 'viewer-preference' for labelScale", () => {
-    expect(getRenderConfigFieldCategory("labelScale")).toBe("viewer-preference");
+  it("returns 'author-intent' for spatial", () => {
+    expect(getRenderConfigFieldCategory("spatial")).toBe("author-intent");
   });
 
-  it("returns 'author-intent' for width", () => {
-    expect(getRenderConfigFieldCategory("width")).toBe("author-intent");
+  it("returns 'author-intent' for styling", () => {
+    expect(getRenderConfigFieldCategory("styling")).toBe("author-intent");
   });
 
-  it("returns 'author-intent' for coordinateSpace", () => {
-    expect(getRenderConfigFieldCategory("coordinateSpace")).toBe("author-intent");
-  });
-
-  it("returns 'author-intent' for background (compound field)", () => {
-    expect(getRenderConfigFieldCategory("background")).toBe("author-intent");
+  it("returns 'author-intent' for legend (compound field)", () => {
+    expect(getRenderConfigFieldCategory("legend")).toBe("author-intent");
   });
 });
 
 // ── isViewerOverridable helper ───────────────────────────────
 
 describe("isViewerOverridable", () => {
-  it("returns true for theme", () => {
-    expect(isViewerOverridable("theme")).toBe(true);
+  it("returns true for axes", () => {
+    expect(isViewerOverridable("axes")).toBe(true);
   });
 
-  it("returns true for locale", () => {
-    expect(isViewerOverridable("locale")).toBe(true);
+  it("returns false for typography (compound group, author-intent)", () => {
+    expect(isViewerOverridable("typography")).toBe(false);
   });
 
-  it("returns true for labelScale", () => {
-    expect(isViewerOverridable("labelScale")).toBe(true);
+  it("returns false for spatial", () => {
+    expect(isViewerOverridable("spatial")).toBe(false);
   });
 
-  it("returns false for width", () => {
-    expect(isViewerOverridable("width")).toBe(false);
+  it("returns false for styling", () => {
+    expect(isViewerOverridable("styling")).toBe(false);
   });
 
-  it("returns false for height", () => {
-    expect(isViewerOverridable("height")).toBe(false);
+  it("returns false for legend", () => {
+    expect(isViewerOverridable("legend")).toBe(false);
   });
 
-  it("returns false for coordinateSpace", () => {
-    expect(isViewerOverridable("coordinateSpace")).toBe(false);
+  it("returns false for filters", () => {
+    expect(isViewerOverridable("filters")).toBe(false);
   });
 
-  it("returns false for fontFamily (author brand decision)", () => {
-    expect(isViewerOverridable("fontFamily")).toBe(false);
-  });
-
-  it("returns false for strokeWidth (author visual design)", () => {
-    expect(isViewerOverridable("strokeWidth")).toBe(false);
-  });
-
-  it("returns false for typeColors (author visual design)", () => {
-    expect(isViewerOverridable("typeColors")).toBe(false);
-  });
-
-  it("returns false for nodeRadii (author visual design)", () => {
-    expect(isViewerOverridable("nodeRadii")).toBe(false);
+  it("returns false for avoidCollisions (author design decision)", () => {
+    expect(isViewerOverridable("avoidCollisions")).toBe(false);
   });
 });
 
@@ -4362,26 +4639,24 @@ describe("isViewerOverridable", () => {
 describe("getViewerOverridableFields", () => {
   it("returns exactly the viewer-preference fields", () => {
     const fields = getViewerOverridableFields();
-    expect(fields).toContain("theme");
-    expect(fields).toContain("locale");
-    expect(fields).toContain("labelScale");
+    expect(fields).toContain("axes");
   });
 
   it("does not contain any author-intent fields", () => {
     const fields = getViewerOverridableFields();
     const authorIntentFields = [
-      "width", "height", "coordinateSpace", "background",
-      "fontFamily", "nodeRadii", "avoidCollisions", "typeColors",
-      "evolveStyles", "legend", "filters", "strokeWidth",
+      "spatial", "typography", "styling",
+      "avoidCollisions", "legend", "filters",
+      "methods", "configIntent",
     ];
     for (const field of authorIntentFields) {
       expect(fields).not.toContain(field);
     }
   });
 
-  it("returns exactly 3 fields (theme, locale, labelScale)", () => {
+  it("returns exactly 1 field (axes)", () => {
     const fields = getViewerOverridableFields();
-    expect(fields).toHaveLength(3);
+    expect(fields).toHaveLength(1);
   });
 
   it("is consistent with RENDER_CONFIG_FIELD_TAXONOMY.overridable flags", () => {
@@ -4448,8 +4723,10 @@ describe("Phase vocabulary flexibility (Sub-AC 7d)", () => {
     const customPhases = ["Idea", "Prototype", "Product", "Scale", "Commodity"];
     // Step 1: validate through schema
     const parsed = RenderConfigSchema.safeParse({
-      background: {
-        evolutionPhases: { phases: customPhases },
+      styling: {
+        background: {
+          evolutionPhases: { phases: customPhases },
+        },
       },
     });
     expect(parsed.success).toBe(true);
@@ -4476,9 +4753,11 @@ describe("Phase vocabulary flexibility (Sub-AC 7d)", () => {
   // ── 3. Backward-compatibility: evolutionPhases present but no phases key ──
   it("backward-compat: background.evolutionPhases without phases key still resolves defaults", () => {
     const rc = resolveTheme({
-      background: {
-        evolutionPhases: { showPhaseDividerAndLabel: true },
-        // no phases key
+      styling: {
+        background: {
+          evolutionPhases: { showPhaseDividerAndLabel: true },
+          // no phases key
+        },
       },
     });
     expect(rc.axisLabels.phases).toEqual(AXIS_LABELS_EN.phases);
@@ -4487,9 +4766,11 @@ describe("Phase vocabulary flexibility (Sub-AC 7d)", () => {
   // ── 4. Custom vocabulary overrides fr locale phases ────────────
   it("custom phases override fr locale phase names (explicit > locale preset)", () => {
     const rc = resolveTheme({
-      locale: "fr",
-      background: {
-        evolutionPhases: { phases: ["Alpha", "Beta", "Gamma"] },
+      axes: { locale: "fr" },
+      styling: {
+        background: {
+          evolutionPhases: { phases: ["Alpha", "Beta", "Gamma"] },
+        },
       },
     });
     // Custom phases win over French locale defaults
@@ -4502,8 +4783,10 @@ describe("Phase vocabulary flexibility (Sub-AC 7d)", () => {
   // ── 5. Single-element vocabulary is valid ─────────────────────
   it("single-element custom vocabulary round-trips correctly", () => {
     const parsed = RenderConfigSchema.safeParse({
-      background: {
-        evolutionPhases: { phases: ["Unified"] },
+      styling: {
+        background: {
+          evolutionPhases: { phases: ["Unified"] },
+        },
       },
     });
     expect(parsed.success).toBe(true);
@@ -4528,8 +4811,10 @@ describe("Phase vocabulary flexibility (Sub-AC 7d)", () => {
   // ── 7. Empty override rejected at schema level ─────────────────
   it("schema rejects phases:[] (empty vocabulary violates min-1 constraint)", () => {
     const result = RenderConfigSchema.safeParse({
-      background: {
-        evolutionPhases: { phases: [] },
+      styling: {
+        background: {
+          evolutionPhases: { phases: [] },
+        },
       },
     });
     expect(result.success).toBe(false);
@@ -4558,20 +4843,21 @@ describe("Phase vocabulary flexibility (Sub-AC 7d)", () => {
   it("schema backward-compat: config with only show-toggles (no phases) is valid", () => {
     // Simulates a v1-style config payload that predates the phases field
     const legacyConfig = {
-      width: 1600,
-      height: 900,
-      theme: "default",
-      background: {
-        evolutionXAxis: { show: true },
-        valueChainYAxis: { show: true },
-        evolutionPhases: { showPhaseDividerAndLabel: true },
+      spatial: { width: 1600, height: 900 },
+      styling: {
+        theme: "default",
+        background: {
+          evolutionXAxis: { show: true },
+          valueChainYAxis: { show: true },
+          evolutionPhases: { showPhaseDividerAndLabel: true },
+        },
       },
     };
     const result = RenderConfigSchema.safeParse(legacyConfig);
     expect(result.success).toBe(true);
     if (!result.success) return;
     // No phases in input → phases should be undefined in parsed output
-    expect(result.data.background?.evolutionPhases?.phases).toBeUndefined();
+    expect(result.data.styling?.background?.evolutionPhases?.phases).toBeUndefined();
     // resolveTheme must still give valid English defaults
     const rc = resolveTheme(result.data);
     expect(rc.axisLabels.phases).toEqual(AXIS_LABELS_EN.phases);
@@ -4702,5 +4988,171 @@ describe("cardinality-independence — phase label count vs evolveStyles lookup 
     const noDefault = { natural: { stroke: "#dc2626" } };
     expect(resolveTypeStyle(noDefault, "forced")).toBeUndefined();
     expect(resolveTypeStyle(noDefault, "late")).toBeUndefined();
+  });
+});
+
+// ── 3-decimal coordinate precision normalization ─────────────────────────────
+// AC 15: 2-decimal values accepted and normalized to 3 decimals (0.21 → 0.210)
+
+describe("3-decimal coordinate precision normalization", () => {
+  describe("round3 helper", () => {
+    it("preserves already-3-decimal values", () => {
+      expect(round3(0.210)).toBe(0.21);
+      expect(round3(0.333)).toBe(0.333);
+      expect(round3(0.175)).toBe(0.175);
+    });
+
+    it("normalizes 2-decimal to 3-decimal precision", () => {
+      // 0.21 === 0.210 in IEEE 754, but round3 ensures exact 3-decimal representation
+      expect(round3(0.21)).toBe(0.21);
+      expect(round3(0.75)).toBe(0.75);
+      expect(round3(0.50)).toBe(0.5);
+    });
+
+    it("normalizes 1-decimal to 3-decimal precision", () => {
+      expect(round3(0.1)).toBe(0.1);
+      expect(round3(0.9)).toBe(0.9);
+    });
+
+    it("truncates beyond 3 decimals", () => {
+      expect(round3(0.1234)).toBe(0.123);
+      expect(round3(0.9999)).toBe(1.0);
+      expect(round3(0.1235)).toBe(0.124);
+      expect(round3(0.33333)).toBe(0.333);
+    });
+
+    it("handles exact boundaries", () => {
+      expect(round3(0)).toBe(0);
+      expect(round3(1)).toBe(1);
+    });
+  });
+
+  describe("EvolutionSchema transform", () => {
+    it("accepts 2-decimal evolution value and normalizes to 3 decimals", () => {
+      const result = EvolutionSchema.safeParse(0.21);
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data).toBe(0.21); // 0.210 in 3-decimal representation
+      }
+    });
+
+    it("truncates 4+ decimal evolution value to 3 decimals", () => {
+      const result = EvolutionSchema.safeParse(0.1234);
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data).toBe(0.123);
+      }
+    });
+
+    it("rounds up when 4th decimal >= 5", () => {
+      const result = EvolutionSchema.safeParse(0.1235);
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data).toBe(0.124);
+      }
+    });
+  });
+
+  describe("Component position precision normalization", () => {
+    it("normalizes 2-decimal evolution scalar in component position", () => {
+      const map = WardleyMapSchema.safeParse({
+        title: "Precision Test",
+        components: [
+          {
+            id: "c1",
+            label: { name: "Comp" },
+            type: "component",
+            position: {
+              evolution: { scalar: 0.21 },
+              visibility: { scalar: 0.95 },
+            },
+          },
+        ],
+        relations: [],
+      });
+      expect(map.success).toBe(true);
+      if (map.success) {
+        expect(map.data.components[0].position.evolution.scalar).toBe(0.21);
+      }
+    });
+
+    it("normalizes 2-decimal visibility scalar in component position", () => {
+      const map = WardleyMapSchema.safeParse({
+        title: "Precision Test",
+        components: [
+          {
+            id: "c1",
+            label: { name: "Comp" },
+            type: "component",
+            position: {
+              evolution: { scalar: 0.5 },
+              visibility: { scalar: 0.33 },
+            },
+          },
+        ],
+        relations: [],
+      });
+      expect(map.success).toBe(true);
+      if (map.success) {
+        expect(map.data.components[0].position.visibility.scalar).toBe(0.33);
+      }
+    });
+
+    it("truncates 4+ decimal position values to 3 decimals", () => {
+      const map = WardleyMapSchema.safeParse({
+        title: "Precision Test",
+        components: [
+          {
+            id: "c1",
+            label: { name: "Comp" },
+            type: "component",
+            position: {
+              evolution: { scalar: 0.12345 },
+              visibility: { scalar: 0.67891 },
+            },
+          },
+        ],
+        relations: [],
+      });
+      expect(map.success).toBe(true);
+      if (map.success) {
+        expect(map.data.components[0].position.evolution.scalar).toBe(0.123);
+        expect(map.data.components[0].position.visibility.scalar).toBe(0.679);
+      }
+    });
+  });
+
+  describe("CanvasCoordinateSpace range precision normalization", () => {
+    it("normalizes 2-decimal evolutionRange values to 3 decimals", () => {
+      const result = CanvasCoordinateSpaceSchema.safeParse({
+        evolutionRange: [0.12, 0.89],
+      });
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.evolutionRange).toEqual([0.12, 0.89]);
+      }
+    });
+
+    it("normalizes 2-decimal visibilityRange values to 3 decimals", () => {
+      const result = CanvasCoordinateSpaceSchema.safeParse({
+        visibilityRange: [0.05, 0.95],
+      });
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.visibilityRange).toEqual([0.05, 0.95]);
+      }
+    });
+
+    it("truncates 4+ decimal range values to 3 decimals", () => {
+      const result = CanvasCoordinateSpaceSchema.safeParse({
+        evolutionRange: [0.1234, 0.8765],
+        visibilityRange: [0.0001, 0.9999],
+      });
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.evolutionRange).toEqual([0.123, 0.877]);
+        expect(result.data.visibilityRange).toEqual([0, 1]);
+      }
+    });
   });
 });

@@ -54,6 +54,9 @@ function makeConfig(overrides: Record<string, unknown> = {}): RenderConfig {
   return RenderConfigSchema.parse(overrides);
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const cfg = (viewer: any, author: any, opts?: any) => resolveConfig(viewer, author, opts);
+
 // ─────────────────────────────────────────────────────────────────────────────
 // 1. Unrecognized-type diagnostics: evolveStyles
 // ─────────────────────────────────────────────────────────────────────────────
@@ -63,10 +66,10 @@ describe("unrecognized-type diagnostics — evolveStyles (closed EvolveTypeEnum)
     // 'genesis' is NOT in EvolveTypeEnum (natural | ecosystem | forced | late)
     // EvolveStylesMapSchema uses .strict() → unrecognized key causes ZodError
     expect(() =>
-      resolveConfig(
+      cfg(
         {},
         {
-          evolveStyles: { genesis: { stroke: "#dc2626" } } as never,
+          styling: { evolveStyles: { genesis: { stroke: "#dc2626" } } },
         },
       ),
     ).toThrow(ZodError);
@@ -75,9 +78,9 @@ describe("unrecognized-type diagnostics — evolveStyles (closed EvolveTypeEnum)
   it("ZodError for unrecognized evolveStyles key names the offending key", () => {
     let zodErr: ZodError | null = null;
     try {
-      resolveConfig(
+      cfg(
         {},
-        { evolveStyles: { product: { stroke: "#000" } } as never },
+        { styling: { evolveStyles: { product: { stroke: "#000" } } } },
       );
     } catch (err) {
       if (err instanceof ZodError) zodErr = err;
@@ -91,10 +94,10 @@ describe("unrecognized-type diagnostics — evolveStyles (closed EvolveTypeEnum)
   it("resolveConfig throws ZodError when evolveStyles contains unrecognized key 'custom'", () => {
     // 'custom' is also not in the EvolveTypeEnum
     expect(() =>
-      resolveConfig(
+      cfg(
         {},
         {
-          evolveStyles: { custom: { stroke: "#888" } } as never,
+          styling: { evolveStyles: { custom: { stroke: "#888" } } },
         },
       ),
     ).toThrow(ZodError);
@@ -103,14 +106,16 @@ describe("unrecognized-type diagnostics — evolveStyles (closed EvolveTypeEnum)
   it("resolveConfig accepts all valid EvolveTypeEnum keys without throwing", () => {
     // All four valid keys: natural, ecosystem, forced, late
     expect(() =>
-      resolveConfig(
+      cfg(
         {},
         {
-          evolveStyles: {
-            natural: { stroke: "#ef4444" },
-            ecosystem: { stroke: "#3b82f6" },
-            forced: { stroke: "#22c55e" },
-            late: { stroke: "#f59e0b" },
+          styling: {
+            evolveStyles: {
+              natural: { stroke: "#ef4444" },
+              ecosystem: { stroke: "#3b82f6" },
+              forced: { stroke: "#22c55e" },
+              late: { stroke: "#f59e0b" },
+            },
           },
         },
       ),
@@ -120,10 +125,12 @@ describe("unrecognized-type diagnostics — evolveStyles (closed EvolveTypeEnum)
   it("resolveConfig accepts _default without any per-type key (optional _default)", () => {
     // _default is optional for evolveStyles (non-breaking evolution)
     expect(() =>
-      resolveConfig(
+      cfg(
         {},
         {
-          evolveStyles: { _default: { stroke: "#666", strokeDasharray: "4,2" } },
+          styling: {
+            evolveStyles: { _default: { stroke: "#666", strokeDasharray: "4,2" } },
+          },
         },
       ),
     ).not.toThrow();
@@ -131,7 +138,7 @@ describe("unrecognized-type diagnostics — evolveStyles (closed EvolveTypeEnum)
 
   it("resolveConfig accepts empty evolveStyles without throwing", () => {
     expect(() =>
-      resolveConfig({}, { evolveStyles: {} }),
+      cfg({}, { styling: { evolveStyles: {} } }),
     ).not.toThrow();
   });
 });
@@ -144,10 +151,10 @@ describe("unrecognized-type diagnostics — nodeRadii (strict KNOWN_RENDERABLE_T
   it("resolveConfig throws ZodError when nodeRadii contains unrecognized key 'unknown-component'", () => {
     // nodeRadii schema uses typeStyleMapSchema with .strict() → unknown keys rejected
     expect(() =>
-      resolveConfig(
+      cfg(
         {},
         {
-          nodeRadii: { _default: 5, "unknown-component": 8 } as never,
+          spatial: { nodeRadii: { _default: 5, "unknown-component": 8 } },
         },
       ),
     ).toThrow(ZodError);
@@ -156,9 +163,9 @@ describe("unrecognized-type diagnostics — nodeRadii (strict KNOWN_RENDERABLE_T
   it("ZodError for unrecognized nodeRadii key contains the key name in error info", () => {
     let zodErr: ZodError | null = null;
     try {
-      resolveConfig(
+      cfg(
         {},
-        { nodeRadii: { _default: 5, "mystery-type": 12 } as never },
+        { spatial: { nodeRadii: { _default: 5, "mystery-type": 12 } } },
       );
     } catch (err) {
       if (err instanceof ZodError) zodErr = err;
@@ -171,13 +178,15 @@ describe("unrecognized-type diagnostics — nodeRadii (strict KNOWN_RENDERABLE_T
   it("resolveConfig accepts valid nodeRadii with known renderable type keys", () => {
     // Known renderable types: component, user-need, pipeline, note, anchor
     expect(() =>
-      resolveConfig(
+      cfg(
         {},
         {
-          nodeRadii: {
-            _default: 5,
-            component: 6,
-            anchor: 4,
+          spatial: {
+            nodeRadii: {
+              _default: 5,
+              component: 6,
+              anchor: 4,
+            },
           },
         },
       ),
@@ -187,11 +196,11 @@ describe("unrecognized-type diagnostics — nodeRadii (strict KNOWN_RENDERABLE_T
   it("resolveConfig requires _default in nodeRadii (requireDefault:true)", () => {
     // nodeRadii requires _default (unlike evolveStyles which makes it optional)
     expect(() =>
-      resolveConfig(
+      cfg(
         {},
         {
-          nodeRadii: { component: 6 } as never, // missing required _default
-        },
+          spatial: { nodeRadii: { component: 6 } },
+        }, // missing required _default
       ),
     ).toThrow(ZodError);
   });
@@ -203,9 +212,9 @@ describe("unrecognized-type diagnostics — nodeRadii (strict KNOWN_RENDERABLE_T
 
 describe("constraint-violation diagnostics — inspectable ConstraintViolation objects", () => {
   it("checkConstraints returns inspectable violations for legend OOB (path, message, severity)", () => {
-    // legend.position.x=900 > coordinateSpace.width=800 — constraint fires
+    // legend.position.x=900 > spatial.coordinateSpace.width=800 — constraint fires
     const input: ConstraintCheckInput = {
-      coordinateSpace: { width: 800, height: 400 },
+      spatial: { coordinateSpace: { width: 800, height: 400 } },
       legend: { position: { x: 900, y: 100 } },
     };
     const { valid, results } = checkConstraints(input);
@@ -247,12 +256,14 @@ describe("constraint-violation diagnostics — inspectable ConstraintViolation o
   it("checkConstraints returns inspectable WARNING violations for phase/evolveStyles mismatch", () => {
     // 3 phases but only 2 explicit evolveStyles keys — advisory mismatch
     const input: ConstraintCheckInput = {
-      background: {
-        evolutionPhases: { phases: ["Genesis", "Custom", "Product"] },
-      },
-      evolveStyles: {
-        natural: { stroke: "#ef4444" },
-        ecosystem: { stroke: "#3b82f6" },
+      styling: {
+        background: {
+          evolutionPhases: { phases: ["Genesis", "Custom", "Product"] },
+        },
+        evolveStyles: {
+          natural: { stroke: "#ef4444" },
+          ecosystem: { stroke: "#3b82f6" },
+        },
       },
     };
     const { valid, ok, results } = checkConstraints(input, [
@@ -273,10 +284,12 @@ describe("constraint-violation diagnostics — inspectable ConstraintViolation o
   it("checkConstraints results map contains separate per-constraint diagnostics", () => {
     // Both legend OOB (error) and phase mismatch (warning) in one config
     const input: ConstraintCheckInput = {
-      coordinateSpace: { width: 500, height: 300 },
+      spatial: { coordinateSpace: { width: 500, height: 300 } },
       legend: { position: { x: 600, y: 100 } },           // x=600 > width=500
-      background: { evolutionPhases: { phases: ["A", "B", "C"] } },
-      evolveStyles: { natural: {} },                       // 3 phases, 1 key
+      styling: {
+        background: { evolutionPhases: { phases: ["A", "B", "C"] } },
+        evolveStyles: { natural: {} },                       // 3 phases, 1 key
+      },
     };
 
     const { results } = checkConstraints(input);
@@ -292,7 +305,7 @@ describe("constraint-violation diagnostics — inspectable ConstraintViolation o
     expect(phaseDiag.violations[0].severity).toBe("warning");
 
     // Diagnostics are independent per constraint slot
-    expect(results.size).toBe(3); // one entry per constraint
+    expect(results.size).toBe(5); // one entry per constraint in the graph
   });
 });
 
@@ -304,12 +317,12 @@ describe("end-to-end resolveConfig diagnostic flow — Zod + constraint graph in
   it("resolveConfig passes Zod AND constraint graph for fully valid config", () => {
     // Valid types, valid cross-field relationships
     expect(() =>
-      resolveConfig(
-        { theme: "dark" },
+      cfg(
+        {},
         {
-          coordinateSpace: { width: 1600, height: 800 } as CoordinateSpace,
+          spatial: { coordinateSpace: { width: 1600, height: 800 } as CoordinateSpace },
           legend: { position: { x: 100, y: 100 } } as Legend, // within bounds
-          evolveStyles: { natural: { stroke: "#ef4444" } },
+          styling: { evolveStyles: { natural: { stroke: "#ef4444" } } },
           filters: { layers: { nodes: true, evolvesTo: true, labels: true } },
         },
       ),
@@ -320,10 +333,10 @@ describe("end-to-end resolveConfig diagnostic flow — Zod + constraint graph in
     // An unknown evolveStyles key is caught by Zod first — ZodError, not ConstraintViolationError
     let thrownError: unknown = null;
     try {
-      resolveConfig(
+      cfg(
         {},
         {
-          evolveStyles: { "phase-1": { stroke: "#000" } } as never, // unknown key
+          styling: { evolveStyles: { "phase-1": { stroke: "#000" } } }, // unknown key
         },
         { violationPolicy: "throw" },
       );
@@ -338,10 +351,10 @@ describe("end-to-end resolveConfig diagnostic flow — Zod + constraint graph in
     // Config passes Zod (x=900 ≤ Zod max 1600) but fails constraint (x=900 > cs.width=800)
     let thrownError: unknown = null;
     try {
-      resolveConfig(
+      cfg(
         {},
         {
-          coordinateSpace: { width: 800, height: 800 } as CoordinateSpace,
+          spatial: { coordinateSpace: { width: 800, height: 800 } as CoordinateSpace },
           legend: { position: { x: 900, y: 100 } } as Legend,
         },
         { violationPolicy: "throw" },
@@ -363,10 +376,10 @@ describe("end-to-end resolveConfig diagnostic flow — Zod + constraint graph in
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     try {
       // Passes Zod, fails constraint (OOB legend) — warn policy → no throw
-      const { config: result } = resolveConfig(
+      const { config: result } = cfg(
         {},
         {
-          coordinateSpace: { width: 600, height: 400 } as CoordinateSpace,
+          spatial: { coordinateSpace: { width: 600, height: 400 } as CoordinateSpace },
           legend: { position: { x: 700, y: 50 } } as Legend, // x=700 > width=600, ≤ Zod max 1600
         },
         { violationPolicy: "warn" },
@@ -385,10 +398,10 @@ describe("end-to-end resolveConfig diagnostic flow — Zod + constraint graph in
 
   it("resolveConfig with violationPolicy:'clip' auto-corrects legend OOB without throwing", () => {
     // Constraint clip: legend.x clamped to coordinateSpace.width
-    const { config: result } = resolveConfig(
+    const { config: result } = cfg(
       {},
       {
-        coordinateSpace: { width: 400, height: 300 } as CoordinateSpace,
+        spatial: { coordinateSpace: { width: 400, height: 300 } as CoordinateSpace },
         legend: { position: { x: 500, y: 50 } } as Legend, // x=500 > width=400, ≤ Zod default 1600
       },
       { violationPolicy: "clip" },
@@ -407,11 +420,11 @@ describe("representative diagnostic scenarios — combined unrecognized types + 
   it("scenario: evolveStyles with unknown key is Zod-rejected before any constraint fires", () => {
     // Even if there were ALSO a constraint violation, Zod rejects first
     expect(() =>
-      resolveConfig(
+      cfg(
         {},
         {
           // Unknown evolveStyles key → Zod rejects
-          evolveStyles: { "genesis-phase": { stroke: "#f00" } } as never,
+          styling: { evolveStyles: { "genesis-phase": { stroke: "#f00" } } },
           // Legend OOB would be a constraint violation — but Zod fires first
           legend: { position: { x: 9999, y: 0 } } as Legend,
         },
@@ -445,21 +458,23 @@ describe("representative diagnostic scenarios — combined unrecognized types + 
     // All known evolveStyles keys (matching 4 phases), no OOB legend, consistent layer toggles.
     // Uses all 4 EvolveTypeEnum keys so phaseStyleAlignmentConstraint finds parity (4 phases = 4 keys).
     const input: ConstraintCheckInput = {
-      coordinateSpace: { width: 1600, height: 800 },
+      spatial: { coordinateSpace: { width: 1600, height: 800 } },
       legend: { position: { x: 1600, y: 800 } }, // exactly at boundary → valid
-      evolveStyles: {
-        natural: { stroke: "#ef4444" },
-        ecosystem: { stroke: "#3b82f6" },
-        forced: { stroke: "#22c55e" },
-        late: { stroke: "#f59e0b" },
-        _default: { stroke: "#666" },
-      },
-      filters: { layers: { nodes: true, evolvesTo: true, labels: true } },
-      background: {
-        evolutionPhases: {
-          phases: ["Genesis", "Custom", "Product", "Commodity"],
+      styling: {
+        evolveStyles: {
+          natural: { stroke: "#ef4444" },
+          ecosystem: { stroke: "#3b82f6" },
+          forced: { stroke: "#22c55e" },
+          late: { stroke: "#f59e0b" },
+          _default: { stroke: "#666" },
+        },
+        background: {
+          evolutionPhases: {
+            phases: ["Genesis", "Custom", "Product", "Commodity"],
+          },
         },
       },
+      filters: { layers: { nodes: true, evolvesTo: true, labels: true } },
     };
 
     // No Zod error (valid types)
@@ -475,10 +490,12 @@ describe("representative diagnostic scenarios — combined unrecognized types + 
     // Phase mismatch is advisory only (warning severity)
     // Config passes Zod AND constraint graph (ok), but has a warning
     const input: ConstraintCheckInput = {
-      background: {
-        evolutionPhases: { phases: ["Genesis", "Custom", "Product"] }, // 3 phases
+      styling: {
+        background: {
+          evolutionPhases: { phases: ["Genesis", "Custom", "Product"] }, // 3 phases
+        },
+        evolveStyles: { natural: {}, ecosystem: {} }, // 2 keys — mismatch
       },
-      evolveStyles: { natural: {}, ecosystem: {} }, // 2 keys — mismatch
     };
 
     const { valid, ok } = checkConstraints(input, [
@@ -493,24 +510,24 @@ describe("representative diagnostic scenarios — combined unrecognized types + 
 // 6. resolveConfig { config, diagnostics } return value — unrecognized types
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe("resolveConfig { config, diagnostics } — unrecognized types in typeColors", () => {
-  it("diagnostics.unrecognizedTypes is empty for fully recognized typeColors", () => {
+describe("resolveConfig { config, diagnostics } — unrecognized types in palette", () => {
+  it("diagnostics.unrecognizedTypes is empty for fully recognized palette", () => {
     // All keys are recognized: _default + known renderable types
-    const { diagnostics } = resolveConfig(
+    const { diagnostics } = cfg(
       {},
       {
-        typeColors: { _default: "#374151", component: "#dc2626", anchor: "#2563eb" },
+        styling: { palette: { _default: "#374151", component: "#dc2626", anchor: "#2563eb" } },
       },
     );
     expect(diagnostics.unrecognizedTypes).toHaveLength(0);
   });
 
-  it("diagnostics.unrecognizedTypes captures future-type key in typeColors (catchall schema)", () => {
-    // typeColors uses .catchall() → 'future-type' passes Zod but appears in diagnostics
-    const { diagnostics } = resolveConfig(
+  it("diagnostics.unrecognizedTypes captures future-type key in palette (catchall schema)", () => {
+    // palette uses .catchall() → 'future-type' passes Zod but appears in diagnostics
+    const { diagnostics } = cfg(
       {},
       {
-        typeColors: { _default: "#374151", "future-type": "#f59e0b" } as never,
+        styling: { palette: { _default: "#374151", "future-type": "#f59e0b" } },
       },
     );
     // 'future-type' is not in KNOWN_RENDERABLE_TYPES → unrecognized
@@ -518,15 +535,17 @@ describe("resolveConfig { config, diagnostics } — unrecognized types in typeCo
   });
 
   it("diagnostics.unrecognizedTypes captures all unrecognized keys when multiple are present", () => {
-    const { diagnostics } = resolveConfig(
+    const { diagnostics } = cfg(
       {},
       {
-        typeColors: {
-          _default: "#374151",
-          "stale-type-a": "#ef4444",
-          "stale-type-b": "#3b82f6",
-          component: "#22c55e", // recognized — should NOT appear
-        } as never,
+        styling: {
+          palette: {
+            _default: "#374151",
+            "stale-type-a": "#ef4444",
+            "stale-type-b": "#3b82f6",
+            component: "#22c55e", // recognized — should NOT appear
+          },
+        },
       },
     );
     expect(diagnostics.unrecognizedTypes).toContain("stale-type-a");
@@ -537,12 +556,13 @@ describe("resolveConfig { config, diagnostics } — unrecognized types in typeCo
   });
 
   it("resolveConfig returns both config AND diagnostics as a two-field result", () => {
-    const result = resolveConfig({}, {});
+    const result = cfg({}, {});
     // Must have both properties
     expect(result).toHaveProperty("config");
     expect(result).toHaveProperty("diagnostics");
-    // config is a valid RenderConfig (strokeWidth defaults to 1)
-    expect(result.config.strokeWidth).toBe(1);
+    // config is a valid RenderConfig (spatial.strokeWidth defaults to 1)
+    // spatial is optional at top level — undefined when not provided
+    expect(result.config.spatial).toBeUndefined();
     // diagnostics has the three arrays
     expect(result.diagnostics).toHaveProperty("unrecognizedTypes");
     expect(result.diagnostics).toHaveProperty("constraintViolations");
@@ -550,7 +570,7 @@ describe("resolveConfig { config, diagnostics } — unrecognized types in typeCo
   });
 
   it("diagnostics.unrecognizedTypes is empty when no TypeStyleMap fields are set", () => {
-    const { diagnostics } = resolveConfig({}, { strokeWidth: 2 });
+    const { diagnostics } = cfg({}, { spatial: { strokeWidth: 2 } } as any);
     expect(diagnostics.unrecognizedTypes).toHaveLength(0);
   });
 });

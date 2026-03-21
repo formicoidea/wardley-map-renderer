@@ -38,6 +38,9 @@ import {
   type ResolveDiagnostics,
 } from "./resolve-diagnostics.js";
 import { resolveConfig, EMPTY_RENDER_DIAGNOSTICS } from "./resolve-conflict.js";
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const cfg = (viewer: any, author: any, opts?: any) => resolveConfig(viewer, author, opts);
 import { mapComponentType } from "./renderable-type.js";
 
 // ── 1. collectConfigDiagnostics — pure TypeStyleMap key inspector ──────────
@@ -187,39 +190,41 @@ describe("collectConfigDiagnostics — multi-field inspection", () => {
 
 describe("resolveConfig — diagnostics.unrecognizedTypes (string[] in RenderDiagnostics)", () => {
   it("returns empty unrecognizedTypes for a fully-recognized config", () => {
-    const { diagnostics } = resolveConfig(
+    const { diagnostics } = cfg(
       {},
-      { typeColors: { _default: "#000", component: "#f00" } },
+      { styling: { palette: { _default: "#000", component: "#f00" } } },
     );
     expect(diagnostics.unrecognizedTypes).toHaveLength(0);
   });
 
-  it("returns empty unrecognizedTypes when typeColors is absent", () => {
-    const { diagnostics } = resolveConfig({}, {});
+  it("returns empty unrecognizedTypes when palette is absent", () => {
+    const { diagnostics } = cfg({}, {});
     expect(diagnostics.unrecognizedTypes).toHaveLength(0);
   });
 
   it("populates unrecognizedTypes with the unrecognized key string when typeColors has unknown key", () => {
     // typeColors uses .catchall() — Zod accepts any key, but render vocab doesn't
-    const { diagnostics } = resolveConfig(
+    const { diagnostics } = cfg(
       {},
-      { typeColors: { _default: "#000", "future-type": "#f00" } },
+      { styling: { palette: { _default: "#000", "future-type": "#f00" } } } as never,
     );
     expect(diagnostics.unrecognizedTypes).toContain("future-type");
     expect(diagnostics.unrecognizedTypes).not.toContain("_default");
   });
 
   it("populates unrecognizedTypes with multiple unrecognized key strings", () => {
-    const { diagnostics } = resolveConfig(
+    const { diagnostics } = cfg(
       {},
       {
-        typeColors: {
-          _default: "#000",
-          component: "#f00",   // known
-          "stale-type": "#0f0", // unknown
-          "legacy-node": "#00f", // unknown
+        styling: {
+          palette: {
+            _default: "#000",
+            component: "#f00",   // known
+            "stale-type": "#0f0", // unknown
+            "legacy-node": "#00f", // unknown
+          },
         },
-      },
+      } as never,
     );
     expect(diagnostics.unrecognizedTypes).toContain("stale-type");
     expect(diagnostics.unrecognizedTypes).toContain("legacy-node");
@@ -229,20 +234,20 @@ describe("resolveConfig — diagnostics.unrecognizedTypes (string[] in RenderDia
 
   it("does not throw when unrecognized typeColors keys are present (graceful diagnostics)", () => {
     expect(() =>
-      resolveConfig(
+      cfg(
         {},
-        { typeColors: { _default: "#000", "unknown-key": "#fff" } },
+        { styling: { palette: { _default: "#000", "unknown-key": "#fff" } } } as never,
       ),
     ).not.toThrow();
   });
 
   it("diagnostics.constraintViolations is still empty [] from stub", () => {
-    const { diagnostics } = resolveConfig({}, {});
+    const { diagnostics } = cfg({}, {});
     expect(diagnostics.constraintViolations).toEqual([]);
   });
 
   it("diagnostics.warnings is still empty [] from stub", () => {
-    const { diagnostics } = resolveConfig({}, {});
+    const { diagnostics } = cfg({}, {});
     expect(diagnostics.warnings).toEqual([]);
   });
 });
@@ -250,9 +255,9 @@ describe("resolveConfig — diagnostics.unrecognizedTypes (string[] in RenderDia
 describe("resolveConfig — options.diagnosticsOut (richer UnrecognizedTypeEntry)", () => {
   it("populates diagnosticsOut.unrecognizedTypes with UnrecognizedTypeEntry objects", () => {
     const collector = createDiagnosticsCollector();
-    resolveConfig(
+    cfg(
       {},
-      { typeColors: { _default: "#000", "future-type": "#f00" } },
+      { styling: { palette: { _default: "#000", "future-type": "#f00" } } } as never,
       { diagnosticsOut: collector },
     );
     expect(collector.unrecognizedTypes).toHaveLength(1);
@@ -264,9 +269,9 @@ describe("resolveConfig — options.diagnosticsOut (richer UnrecognizedTypeEntry
 
   it("does not modify diagnosticsOut when config has no unrecognized types", () => {
     const collector = createDiagnosticsCollector();
-    resolveConfig(
+    cfg(
       {},
-      { typeColors: { _default: "#000", component: "#f00" } },
+      { styling: { palette: { _default: "#000", component: "#f00" } } },
       { diagnosticsOut: collector },
     );
     expect(collector.unrecognizedTypes).toHaveLength(0);
@@ -274,15 +279,17 @@ describe("resolveConfig — options.diagnosticsOut (richer UnrecognizedTypeEntry
 
   it("diagnosticsOut contains entries per field (typeColors field label)", () => {
     const collector = createDiagnosticsCollector();
-    resolveConfig(
+    cfg(
       {},
       {
-        typeColors: {
-          _default: "#000",
-          "unknown-a": "#f00",
-          "unknown-b": "#0f0",
+        styling: {
+          palette: {
+            _default: "#000",
+            "unknown-a": "#f00",
+            "unknown-b": "#0f0",
+          },
         },
-      },
+      } as never,
       { diagnosticsOut: collector },
     );
     const fields = collector.unrecognizedTypes.map((e) => e.field);
@@ -295,14 +302,14 @@ describe("resolveConfig — options.diagnosticsOut (richer UnrecognizedTypeEntry
     const collector1 = createDiagnosticsCollector();
     const collector2 = createDiagnosticsCollector();
 
-    resolveConfig(
+    cfg(
       {},
-      { typeColors: { _default: "#000", "type-x": "#f00" } },
+      { styling: { palette: { _default: "#000", "type-x": "#f00" } } } as never,
       { diagnosticsOut: collector1 },
     );
-    resolveConfig(
+    cfg(
       {},
-      { typeColors: { _default: "#000", component: "#00f" } }, // no unknown keys
+      { styling: { palette: { _default: "#000", component: "#00f" } } }, // no unknown keys
       { diagnosticsOut: collector2 },
     );
 
@@ -313,20 +320,20 @@ describe("resolveConfig — options.diagnosticsOut (richer UnrecognizedTypeEntry
 
   it("diagnosticsOut is optional — omitting it does not affect returned diagnostics", () => {
     // When diagnosticsOut is absent, behavior is unchanged
-    const { diagnostics, config } = resolveConfig(
+    const { diagnostics, config } = cfg(
       {},
-      { typeColors: { _default: "#000", "future-type": "#f00" } },
+      { styling: { palette: { _default: "#000", "future-type": "#f00" } } } as never,
       // no diagnosticsOut
     );
     expect(diagnostics.unrecognizedTypes).toContain("future-type");
-    expect(config.typeColors).toBeDefined();
+    expect(config.styling?.palette).toBeDefined();
   });
 
   it("both diagnosticsOut and diagnostics.unrecognizedTypes are populated simultaneously", () => {
     const collector = createDiagnosticsCollector();
-    const { diagnostics } = resolveConfig(
+    const { diagnostics } = cfg(
       {},
-      { typeColors: { _default: "#000", "phantom-type": "#aaa" } },
+      { styling: { palette: { _default: "#000", "phantom-type": "#aaa" } } } as never,
       { diagnosticsOut: collector },
     );
 

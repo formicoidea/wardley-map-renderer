@@ -48,8 +48,8 @@ export interface RenderContext {
  * Margins are fixed in pixels regardless of canvas size.
  */
 export function createRenderContext(map: WardleyMap): RenderContext {
-  const width = map.renderConfig?.width ?? 1600;
-  const height = map.renderConfig?.height ?? 800;
+  const width = map.renderConfig?.spatial?.width ?? 1600;
+  const height = map.renderConfig?.spatial?.height ?? 800;
 
   const plotLeft = AXIS_MARGIN_LEFT;
   const plotTop = AXIS_MARGIN_TOP;

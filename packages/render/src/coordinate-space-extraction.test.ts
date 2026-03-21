@@ -88,7 +88,7 @@ describe("CoordinateSpace extraction — default values from resolveTheme", () =
   });
 
   it("resolveTheme() with undefined coordinateSpace returns DEFAULT_COORDINATE_SPACE values", () => {
-    const resolved = resolveTheme({ coordinateSpace: undefined });
+    const resolved = resolveTheme({ spatial: { coordinateSpace: undefined } });
     expect(resolved.coordinateSpace).toEqual(DEFAULT_COORDINATE_SPACE);
   });
 
@@ -104,13 +104,13 @@ describe("CoordinateSpace extraction — default values from resolveTheme", () =
 describe("CoordinateSpace extraction — full explicit override via resolveTheme", () => {
   it("explicit coordinateSpace with non-default dimensions is preserved in resolved config", () => {
     const resolved = resolveTheme({
-      coordinateSpace: {
+      spatial: { coordinateSpace: {
         width: 800,
         height: 400,
         evolutionRange: [0, 1],
         visibilityRange: [0, 1],
         unit: "canvas-px",
-      },
+      } },
     });
     expect(resolved.coordinateSpace.width).toBe(800);
     expect(resolved.coordinateSpace.height).toBe(400);
@@ -118,18 +118,18 @@ describe("CoordinateSpace extraction — full explicit override via resolveTheme
 
   it("explicit evolutionRange override is preserved in resolved coordinateSpace", () => {
     const resolved = resolveTheme({
-      coordinateSpace: {
+      spatial: { coordinateSpace: {
         evolutionRange: [0.1, 0.9],
-      },
+      } },
     });
     expect(resolved.coordinateSpace.evolutionRange).toEqual([0.1, 0.9]);
   });
 
   it("explicit visibilityRange override is preserved in resolved coordinateSpace", () => {
     const resolved = resolveTheme({
-      coordinateSpace: {
+      spatial: { coordinateSpace: {
         visibilityRange: [0, 0.75],
-      },
+      } },
     });
     expect(resolved.coordinateSpace.visibilityRange).toEqual([0, 0.75]);
   });
@@ -140,7 +140,7 @@ describe("CoordinateSpace extraction — full explicit override via resolveTheme
 describe("CoordinateSpace extraction — partial override merges with defaults", () => {
   it("partial coordinateSpace {width: 800} fills height from defaults (800)", () => {
     const resolved = resolveTheme({
-      coordinateSpace: { width: 800 },
+      spatial: { coordinateSpace: { width: 800 } },
     });
     // Width overridden, height stays default
     expect(resolved.coordinateSpace.width).toBe(800);
@@ -149,7 +149,7 @@ describe("CoordinateSpace extraction — partial override merges with defaults",
 
   it("partial coordinateSpace {evolutionRange} keeps visibilityRange default", () => {
     const resolved = resolveTheme({
-      coordinateSpace: { evolutionRange: [0.2, 0.8] },
+      spatial: { coordinateSpace: { evolutionRange: [0.2, 0.8] } },
     });
     expect(resolved.coordinateSpace.evolutionRange).toEqual([0.2, 0.8]);
     expect(resolved.coordinateSpace.visibilityRange).toEqual(
@@ -159,7 +159,7 @@ describe("CoordinateSpace extraction — partial override merges with defaults",
 
   it("partial coordinateSpace {height: 400} keeps width default (1600)", () => {
     const resolved = resolveTheme({
-      coordinateSpace: { height: 400 },
+      spatial: { coordinateSpace: { height: 400 } },
     });
     expect(resolved.coordinateSpace.width).toBe(DEFAULT_COORDINATE_SPACE.width);
     expect(resolved.coordinateSpace.height).toBe(400);
@@ -167,7 +167,7 @@ describe("CoordinateSpace extraction — partial override merges with defaults",
 
   it("partial coordinateSpace {visibilityRange} keeps evolutionRange default", () => {
     const resolved = resolveTheme({
-      coordinateSpace: { visibilityRange: [0.1, 0.9] },
+      spatial: { coordinateSpace: { visibilityRange: [0.1, 0.9] } },
     });
     expect(resolved.coordinateSpace.visibilityRange).toEqual([0.1, 0.9]);
     expect(resolved.coordinateSpace.evolutionRange).toEqual(
@@ -191,14 +191,14 @@ describe("CoordinateSpace extraction — boundary: minimum canvas dimensions", (
 
   it("1×1 canvas propagates to resolved coordinateSpace via resolveTheme", () => {
     const resolved = resolveTheme({
-      coordinateSpace: { width: 1, height: 1 },
+      spatial: { coordinateSpace: { width: 1, height: 1 } },
     });
     expect(resolved.coordinateSpace.width).toBe(1);
     expect(resolved.coordinateSpace.height).toBe(1);
   });
 
   it("1×1 canvas in coordinateSpace is accepted by buildRenderContext without throwing", () => {
-    const map = makeMap({ coordinateSpace: { width: 1, height: 1 } });
+    const map = makeMap({ spatial: { coordinateSpace: { width: 1, height: 1 } } });
     expect(() => buildRenderContext(map)).not.toThrow();
   });
 });
@@ -218,7 +218,7 @@ describe("CoordinateSpace extraction — boundary: maximum canvas dimensions", (
 
   it("10000×10000 canvas propagates to resolved coordinateSpace via resolveTheme", () => {
     const resolved = resolveTheme({
-      coordinateSpace: { width: 10000, height: 10000 },
+      spatial: { coordinateSpace: { width: 10000, height: 10000 } },
     });
     expect(resolved.coordinateSpace.width).toBe(10000);
     expect(resolved.coordinateSpace.height).toBe(10000);
@@ -279,14 +279,14 @@ describe("CoordinateSpace extraction — integration: evoToX from evolutionRange
   });
 
   it("evo=0.5 with evolutionRange [0, 0.5] maps to plot.left + plot.width (right edge)", () => {
-    const map = makeMap({ coordinateSpace: { evolutionRange: [0, 0.5] } });
+    const map = makeMap({ spatial: { coordinateSpace: { evolutionRange: [0, 0.5] } } });
     const ctx = buildRenderContext(map);
     const x = ctx.evoToX(0.5);
     expect(x).toBeCloseTo(ctx.plot.left + ctx.plot.width, 1);
   });
 
   it("evo=0.25 with evolutionRange [0.25, 0.75] maps to plot.left (left edge)", () => {
-    const map = makeMap({ coordinateSpace: { evolutionRange: [0.25, 0.75] } });
+    const map = makeMap({ spatial: { coordinateSpace: { evolutionRange: [0.25, 0.75] } } });
     const ctx = buildRenderContext(map);
     const x = ctx.evoToX(0.25);
     expect(x).toBeCloseTo(ctx.plot.left, 1);
@@ -318,7 +318,7 @@ describe("CoordinateSpace extraction — integration: visToY from visibilityRang
   });
 
   it("vis=0.5 with visibilityRange [0, 0.5] maps to plot.top + plot.height (bottom edge)", () => {
-    const map = makeMap({ coordinateSpace: { visibilityRange: [0, 0.5] } });
+    const map = makeMap({ spatial: { coordinateSpace: { visibilityRange: [0, 0.5] } } });
     const ctx = buildRenderContext(map);
     const y = ctx.visToY(0.5);
     expect(y).toBeCloseTo(ctx.plot.top + ctx.plot.height, 1);
@@ -330,12 +330,12 @@ describe("CoordinateSpace extraction — integration: visToY from visibilityRang
 describe("CoordinateSpace extraction — integration: coordinateSpace in RenderContext", () => {
   it("buildRenderContext preserves coordinateSpace in resolvedConfig", () => {
     const map = makeMap({
-      coordinateSpace: {
+      spatial: { coordinateSpace: {
         width: 800,
         height: 400,
         evolutionRange: [0.1, 0.9],
         visibilityRange: [0, 0.8],
-      },
+      } },
     });
     const ctx = buildRenderContext(map);
 

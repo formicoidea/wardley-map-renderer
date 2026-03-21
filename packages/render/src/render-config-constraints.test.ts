@@ -30,10 +30,13 @@
 import { describe, it, expect, vi } from "vitest";
 import {
   evaluateConstraints,
+  validateRenderConfig,
   CONSTRAINT_CLIP_HANDLERS,
   ConstraintViolationError,
   type ConstraintPolicy,
   type ConstraintEvaluationOptions,
+  type RenderConfigValidationError,
+  type RenderConfigValidationResult,
 } from "./render-config-constraints.js";
 import {
   checkConstraints,
@@ -41,7 +44,7 @@ import {
   type ConstraintCheckInput,
 } from "./config-constraint-graph.js";
 import { resolveConfig } from "./resolve-conflict.js";
-import { RenderConfigSchema, type RenderConfig, type CoordinateSpace, type Legend, type EvolutionPhases } from "./schema.js";
+import { RenderConfigSchema, type RenderConfig, type RenderConfigInput, type CoordinateSpace, type Legend, type EvolutionPhases } from "./schema.js";
 
 // ── Test helpers ──────────────────────────────────────────────────────────────
 
@@ -70,9 +73,9 @@ function makeConfigWithCoordSpaceXOverflow(
   yVal: number,
 ): RenderConfig {
   return RenderConfigSchema.parse({
-    coordinateSpace: { width: csWidth, height: 800 },
+    spatial: { coordinateSpace: { width: csWidth, height: 800 } },
     legend: { position: { x: xVal, y: yVal } },
-    // NOTE: no top-level `width` — Zod uses default 1600 for bounds check
+    // NOTE: no spatial.width override — Zod uses default 1600 for bounds check
   });
 }
 
@@ -82,10 +85,12 @@ function makeConfigWithCoordSpaceXOverflow(
  */
 function makeNarrowedRangeConfigWithOOBLegend(): RenderConfig {
   return RenderConfigSchema.parse({
-    coordinateSpace: {
-      width: 600,
-      height: 300,
-      evolutionRange: [0.3, 0.9], // hides boundary 0.175 (< 0.3)
+    spatial: {
+      coordinateSpace: {
+        width: 600,
+        height: 300,
+        evolutionRange: [0.3, 0.9], // hides boundary 0.175 (< 0.3)
+      },
     },
     legend: { position: { x: 700, y: 100 } },
     // x=700 > coordinateSpace.width=600 → constraint fires
@@ -120,7 +125,7 @@ describe("legendBoundsValidation — individual constraint", () => {
 
   it("reports error violation when x > coordinateSpace.width", () => {
     const config: ConstraintCheckInput = {
-      coordinateSpace: { width: 800, height: 400 },
+      spatial: { coordinateSpace: { width: 800, height: 400 } },
       legend: { position: { x: 900, y: 100 } }, // x=900 > width=800
     };
     const result = checkConstraints(config, [EXECUTABLE_CONSTRAINT_GRAPH[0]]);
@@ -136,7 +141,7 @@ describe("legendBoundsValidation — individual constraint", () => {
 
   it("reports error violation when y > coordinateSpace.height", () => {
     const config: ConstraintCheckInput = {
-      coordinateSpace: { width: 1600, height: 400 },
+      spatial: { coordinateSpace: { width: 1600, height: 400 } },
       legend: { position: { x: 100, y: 500 } }, // y=500 > height=400
     };
     const result = checkConstraints(config, [EXECUTABLE_CONSTRAINT_GRAPH[0]]);
@@ -149,7 +154,7 @@ describe("legendBoundsValidation — individual constraint", () => {
 
   it("reports both x and y violations when both exceed bounds", () => {
     const config: ConstraintCheckInput = {
-      coordinateSpace: { width: 400, height: 200 },
+      spatial: { coordinateSpace: { width: 400, height: 200 } },
       legend: { position: { x: 500, y: 300 } }, // both out of bounds
     };
     const result = checkConstraints(config, [EXECUTABLE_CONSTRAINT_GRAPH[0]]);
@@ -172,7 +177,7 @@ describe("legendBoundsValidation — individual constraint", () => {
 
   it("passes when legend XY is at exactly the boundary (inclusive upper)", () => {
     const config: ConstraintCheckInput = {
-      coordinateSpace: { width: 800, height: 400 },
+      spatial: { coordinateSpace: { width: 800, height: 400 } },
       legend: { position: { x: 800, y: 400 } }, // exactly at max → valid
     };
     const result = checkConstraints(config, [EXECUTABLE_CONSTRAINT_GRAPH[0]]);
@@ -278,7 +283,7 @@ describe("evaluateConstraints — violationPolicy: throw", () => {
   it("ConstraintViolationError.violations contains all violations (full graph pass)", () => {
     // Both x and y OOB relative to coordinateSpace → 2 violations in one throw
     const config = RenderConfigSchema.parse({
-      coordinateSpace: { width: 600, height: 300 },
+      spatial: { coordinateSpace: { width: 600, height: 300 } },
       legend: { position: { x: 700, y: 400 } },
       // x=700 > 600 and y=400 > 300 → both fire
       // but Zod max is 1600/800 → Zod passes
@@ -334,7 +339,7 @@ describe("evaluateConstraints — violationPolicy: clip", () => {
 
   it("clips legend.position.y to coordinateSpace.height when y exceeds bounds", () => {
     const config = RenderConfigSchema.parse({
-      coordinateSpace: { width: 1600, height: 400 },
+      spatial: { coordinateSpace: { width: 1600, height: 400 } },
       legend: { position: { x: 100, y: 500 } },
       // y=500 > coordinateSpace.height=400 but ≤ Zod default 800 → Zod passes
     });
@@ -346,7 +351,7 @@ describe("evaluateConstraints — violationPolicy: clip", () => {
 
   it("clips both x and y when both exceed coordinateSpace bounds", () => {
     const config = RenderConfigSchema.parse({
-      coordinateSpace: { width: 600, height: 300 },
+      spatial: { coordinateSpace: { width: 600, height: 300 } },
       legend: { position: { x: 700, y: 400 } },
       // both OOB relative to coordinateSpace but ≤ Zod defaults
     });
@@ -378,8 +383,10 @@ describe("evaluateConstraints — violationPolicy: clip", () => {
   it("no clip handler for phaseStyleAlignment — falls back to warn (no throw)", () => {
     // phaseStyleAlignment violation passes Zod but fires constraint graph with warning
     const config = RenderConfigSchema.parse({
-      background: { evolutionPhases: { phases: ["A", "B", "C"] } },
-      evolveStyles: { natural: {}, ecosystem: {} },
+      styling: {
+        background: { evolutionPhases: { phases: ["A", "B", "C"] } },
+        evolveStyles: { natural: {}, ecosystem: {} },
+      },
     });
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     try {
@@ -434,14 +441,17 @@ describe("cross-constraint: coordinateSpace change cascades to BOTH legend AND p
   it("phaseStyleAlignment fires when both phases (3) and evolveStyles keys (2) are explicitly set", () => {
     // This passes Zod validation but fails the advisory constraint
     const config: ConstraintCheckInput = {
-      background: { evolutionPhases: { phases: ["Genesis", "Custom", "Product"] } },
-      evolveStyles: { natural: { stroke: "#111" }, ecosystem: { stroke: "#222" } },
+      styling: {
+        background: { evolutionPhases: { phases: ["Genesis", "Custom", "Product"] } },
+        evolveStyles: { natural: { stroke: "#111" }, ecosystem: { stroke: "#222" } },
+      },
     };
     const result = checkConstraints(config, [EXECUTABLE_CONSTRAINT_GRAPH[2]]);
     expect(result.valid).toBe(false); // has a violation
     expect(result.ok).toBe(true);    // only warning severity
     const violations = result.results.get("phaseStyleAlignment")!.violations;
     expect(violations[0].severity).toBe("warning");
+    expect(violations[0].path).toBe("styling.background.evolutionPhases.phases");
     expect(violations[0].message).toContain("3");  // 3 phases
     expect(violations[0].message).toContain("2");  // 2 explicit keys
   });
@@ -453,13 +463,13 @@ describe("resolveConfig integration — constraints run after merge", () => {
   it("no violationPolicy option → warn by default (non-breaking, no throw)", () => {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     try {
-      // coord space mismatch: coordinateSpace.width=800 but legend.x=900 (Zod passes, constraint fires)
+      // coord space mismatch: spatial.coordinateSpace.width=800 but legend.x=900 (Zod passes, constraint fires)
       const { config: result } = resolveConfig(
         {},
         {
-          coordinateSpace: { width: 800, height: 800 } as CoordinateSpace,
-          legend: { position: { x: 900, y: 100 } } as Legend,
-        },
+          spatial: { coordinateSpace: { width: 800, height: 800 } },
+          legend: { position: { x: 900, y: 100 } },
+        } as Partial<RenderConfig>,
         // no options → default warn
       );
       // Config returned unchanged (warn policy)
@@ -476,9 +486,9 @@ describe("resolveConfig integration — constraints run after merge", () => {
       resolveConfig(
         {},
         {
-          coordinateSpace: { width: 800, height: 800 } as CoordinateSpace,
-          legend: { position: { x: 900, y: 100 } } as Legend,
-        },
+          spatial: { coordinateSpace: { width: 800, height: 800 } },
+          legend: { position: { x: 900, y: 100 } },
+        } as Partial<RenderConfig>,
         { violationPolicy: "throw" },
       ),
     ).toThrowError(ConstraintViolationError);
@@ -490,9 +500,11 @@ describe("resolveConfig integration — constraints run after merge", () => {
       resolveConfig(
         {},
         {
-          background: { evolutionPhases: { phases: ["A", "B", "C"] } as EvolutionPhases },
-          evolveStyles: { natural: {}, ecosystem: {} },
-        },
+          styling: {
+            background: { evolutionPhases: { phases: ["A", "B", "C"] } },
+            evolveStyles: { natural: {}, ecosystem: {} },
+          },
+        } as unknown as Partial<RenderConfig>,
         { violationPolicy: "throw" },
       ),
     ).toThrowError(ConstraintViolationError);
@@ -502,10 +514,10 @@ describe("resolveConfig integration — constraints run after merge", () => {
     const { config: result } = resolveConfig(
       {},
       {
-        coordinateSpace: { width: 800, height: 400 } as CoordinateSpace,
-        legend: { position: { x: 1200, y: 50 } } as Legend,
-        // x=1200 > coordinateSpace.width=800 but ≤ Zod default 1600
-      },
+        spatial: { coordinateSpace: { width: 800, height: 400 } },
+        legend: { position: { x: 1200, y: 50 } },
+        // x=1200 > spatial.coordinateSpace.width=800 but ≤ Zod default 1600
+      } as Partial<RenderConfig>,
       { violationPolicy: "clip" },
     );
     const pos = result.legend!.position as { x: number; y: number };
@@ -517,12 +529,12 @@ describe("resolveConfig integration — constraints run after merge", () => {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     try {
       const { config: result } = resolveConfig(
-        { theme: "dark" },
-        { width: 1600, height: 800 },
+        { axes: { locale: "fr" } } as Partial<RenderConfig>,
+        { spatial: { width: 1600, height: 800 } } as Partial<RenderConfig>,
         { violationPolicy: "warn" },
       );
-      expect(result.theme).toBe("dark");
-      expect(result.width).toBe(1600);
+      expect(result.axes?.locale).toBe("fr");
+      expect(result.spatial?.width).toBe(1600);
       // No constraint violations → no warnings emitted
       expect(warnSpy).not.toHaveBeenCalled();
     } finally {
@@ -532,22 +544,23 @@ describe("resolveConfig integration — constraints run after merge", () => {
 
   it("resolveConfig applies 4-tier precedence AND constraint evaluation in order", () => {
     // Author sets small coordinateSpace + legend OOB; clip corrects post-merge
+    // axes is viewer-preference tier → viewer wins
     const { config: result } = resolveConfig(
-      { theme: "dark" },
+      { axes: { locale: "fr" } } as Partial<RenderConfig>,
       {
-        coordinateSpace: { width: 400, height: 200 } as CoordinateSpace,
-        legend: { position: { x: 500, y: 100 } } as Legend,
-        // x=500 > coordinateSpace.width=400 but ≤ Zod default 1600
-      },
+        spatial: { coordinateSpace: { width: 400, height: 200 } },
+        legend: { position: { x: 500, y: 100 } },
+        // x=500 > spatial.coordinateSpace.width=400 but ≤ Zod default 1600
+      } as Partial<RenderConfig>,
       { violationPolicy: "clip" },
     );
-    // Tier precedence: coordinateSpace from author
-    expect(result.coordinateSpace?.width).toBe(400);
+    // Tier precedence: coordinateSpace from author (platform-constraint tier)
+    expect(result.spatial?.coordinateSpace?.width).toBe(400);
     // Constraint clip: legend.x clamped to 400
     const pos = result.legend!.position as { x: number; y: number };
     expect(pos.x).toBe(400);
-    // Viewer preference preserved
-    expect(result.theme).toBe("dark");
+    // Viewer preference preserved (axes is viewer-preference tier)
+    expect(result.axes?.locale).toBe("fr");
   });
 });
 
@@ -571,7 +584,7 @@ describe("no-violation scenarios — valid config passes unchanged", () => {
 
   it("legend XY within coordinateSpace bounds — no violation", () => {
     const config: ConstraintCheckInput = {
-      coordinateSpace: { width: 1600, height: 800 },
+      spatial: { coordinateSpace: { width: 1600, height: 800 } },
       legend: { position: { x: 100, y: 700 } },
     };
     const { valid } = checkConstraints(config);
@@ -588,8 +601,10 @@ describe("no-violation scenarios — valid config passes unchanged", () => {
 
   it("4 phases with 4 evolveStyles keys — no phaseStyleAlignment violation", () => {
     const config: ConstraintCheckInput = {
-      background: { evolutionPhases: { phases: ["G", "C", "P", "Co"] } },
-      evolveStyles: { natural: {}, ecosystem: {}, forced: {}, late: {} },
+      styling: {
+        background: { evolutionPhases: { phases: ["G", "C", "P", "Co"] } },
+        evolveStyles: { natural: {}, ecosystem: {}, forced: {}, late: {} },
+      },
     };
     const result = checkConstraints(config, [EXECUTABLE_CONSTRAINT_GRAPH[2]]);
     expect(result.valid).toBe(true);
@@ -599,8 +614,8 @@ describe("no-violation scenarios — valid config passes unchanged", () => {
 // ── 9. CONSTRAINT_CLIP_HANDLERS and EXECUTABLE_CONSTRAINT_GRAPH structure ────
 
 describe("CONSTRAINT_CLIP_HANDLERS — introspectability", () => {
-  it("EXECUTABLE_CONSTRAINT_GRAPH has exactly 3 constraint entries", () => {
-    expect(EXECUTABLE_CONSTRAINT_GRAPH).toHaveLength(3);
+  it("EXECUTABLE_CONSTRAINT_GRAPH has exactly 5 constraint entries", () => {
+    expect(EXECUTABLE_CONSTRAINT_GRAPH).toHaveLength(5);
   });
 
   it("constraint IDs are the expected slot names", () => {
@@ -632,5 +647,180 @@ describe("CONSTRAINT_CLIP_HANDLERS — introspectability", () => {
     // Type-level check: resolveConfig({}, {}, { violationPolicy: 'clip' }) should compile
     const opts: ConstraintEvaluationOptions = { violationPolicy: "clip" };
     expect(opts.violationPolicy).toBe("clip");
+  });
+});
+
+// ── 10. validateRenderConfig — pure query returning typed errors ───────────────
+
+describe("validateRenderConfig — pure validation query", () => {
+  it("returns valid=true, ok=true, errors=[] for a default config", () => {
+    const config = makeConfig();
+    const result = validateRenderConfig(config);
+    expect(result.valid).toBe(true);
+    expect(result.ok).toBe(true);
+    expect(result.errors).toHaveLength(0);
+  });
+
+  it("returns typed errors with constraintId, path, message, severity for legend OOB", () => {
+    const config = makeConfigWithCoordSpaceXOverflow(800, 900, 100);
+    const result = validateRenderConfig(config);
+    expect(result.valid).toBe(false);
+    expect(result.ok).toBe(false);
+    expect(result.errors.length).toBeGreaterThanOrEqual(1);
+
+    const legendError = result.errors.find((e) => e.path === "legend.position.x");
+    expect(legendError).toBeDefined();
+    expect(legendError!.constraintId).toBe("legendBoundsValidation");
+    expect(legendError!.severity).toBe("error");
+    expect(legendError!.message).toContain("900");
+    expect(legendError!.message).toContain("800");
+  });
+
+  it("returns both x and y errors when both exceed coordinateSpace bounds", () => {
+    const config = RenderConfigSchema.parse({
+      spatial: { coordinateSpace: { width: 600, height: 300 } },
+      legend: { position: { x: 700, y: 400 } },
+    });
+    const result = validateRenderConfig(config);
+    expect(result.valid).toBe(false);
+    const paths = result.errors.map((e) => e.path);
+    expect(paths).toContain("legend.position.x");
+    expect(paths).toContain("legend.position.y");
+    // Both should have constraintId = legendBoundsValidation
+    const legendErrors = result.errors.filter((e) => e.constraintId === "legendBoundsValidation");
+    expect(legendErrors).toHaveLength(2);
+  });
+
+  it("returns layer dependency errors with correct constraintId and paths", () => {
+    const config = makeRawConfig({
+      filters: { layers: { nodes: false } },
+    });
+    const result = validateRenderConfig(config);
+    expect(result.valid).toBe(false);
+    expect(result.ok).toBe(false);
+
+    const layerErrors = result.errors.filter((e) => e.constraintId === "layerDependencies");
+    expect(layerErrors.length).toBeGreaterThanOrEqual(1);
+    // evolvesTo depends on nodes
+    const evolveError = layerErrors.find((e) => e.path === "filters.layers.evolvesTo");
+    expect(evolveError).toBeDefined();
+    expect(evolveError!.severity).toBe("error");
+  });
+
+  it("returns warning-severity errors for phaseStyleAlignment (ok=true, valid=false)", () => {
+    const config = RenderConfigSchema.parse({
+      styling: {
+        background: { evolutionPhases: { phases: ["A", "B", "C"] } },
+        evolveStyles: { natural: {}, ecosystem: {} },
+      },
+    });
+    const result = validateRenderConfig(config);
+    expect(result.valid).toBe(false);  // has violations
+    expect(result.ok).toBe(true);      // only warnings, no errors
+
+    const phaseErrors = result.errors.filter((e) => e.constraintId === "phaseStyleAlignment");
+    expect(phaseErrors).toHaveLength(1);
+    expect(phaseErrors[0].severity).toBe("warning");
+    expect(phaseErrors[0].path).toBe("styling.background.evolutionPhases.phases");
+  });
+
+  it("returns strokeWidthFontSizeRatio warning when ratio exceeds threshold", () => {
+    const config = makeRawConfig({
+      spatial: { strokeWidth: 8, nodeRadii: { _default: 10 } },
+      typography: { labelScale: 0.5 },
+    });
+    const result = validateRenderConfig(config);
+    const ratioErrors = result.errors.filter((e) => e.constraintId === "strokeWidthFontSizeRatio");
+    expect(ratioErrors).toHaveLength(1);
+    expect(ratioErrors[0].severity).toBe("warning");
+    expect(ratioErrors[0].path).toBe("spatial.strokeWidth");
+  });
+
+  it("returns nodeRadiiStrokeWidth error when default radius < strokeWidth", () => {
+    const config = makeRawConfig({
+      spatial: { strokeWidth: 8, nodeRadii: { _default: 3 } },
+    });
+    const result = validateRenderConfig(config);
+    const radiiErrors = result.errors.filter((e) => e.constraintId === "nodeRadiiStrokeWidth");
+    expect(radiiErrors).toHaveLength(1);
+    expect(radiiErrors[0].severity).toBe("error");
+    expect(radiiErrors[0].path).toBe("spatial.nodeRadii._default");
+  });
+
+  it("collects errors from multiple constraints in a single pass", () => {
+    // legend OOB + layer deps violation + nodeRadii < strokeWidth
+    const config = makeRawConfig({
+      spatial: {
+        coordinateSpace: { width: 500, height: 300 },
+        strokeWidth: 8,
+        nodeRadii: { _default: 3 },
+      },
+      legend: { position: { x: 600, y: 100 } },
+      filters: { layers: { nodes: false } },
+    });
+    const result = validateRenderConfig(config);
+    expect(result.valid).toBe(false);
+    expect(result.ok).toBe(false);
+
+    // Should have errors from at least 3 different constraints
+    const constraintIds = new Set(result.errors.map((e) => e.constraintId));
+    expect(constraintIds.has("legendBoundsValidation")).toBe(true);
+    expect(constraintIds.has("layerDependencies")).toBe(true);
+    expect(constraintIds.has("nodeRadiiStrokeWidth")).toBe(true);
+  });
+
+  it("never throws — returns errors instead", () => {
+    const config = makeRawConfig({
+      spatial: { coordinateSpace: { width: 100, height: 100 } },
+      legend: { position: { x: 9999, y: 9999 } },
+      filters: { layers: { nodes: false } },
+    });
+    // Should not throw even with many violations
+    expect(() => validateRenderConfig(config)).not.toThrow();
+    const result = validateRenderConfig(config);
+    expect(result.errors.length).toBeGreaterThan(0);
+  });
+
+  it("never emits console.warn", () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      const config = makeConfigWithCoordSpaceXOverflow(800, 900, 100);
+      validateRenderConfig(config);
+      expect(warnSpy).not.toHaveBeenCalled();
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
+  it("errors are in EXECUTABLE_CONSTRAINT_GRAPH declaration order", () => {
+    // Build config with violations in legendBounds (index 0) and layerDeps (index 1)
+    const config = makeRawConfig({
+      spatial: { coordinateSpace: { width: 500, height: 300 } },
+      legend: { position: { x: 600, y: 100 } },
+      filters: { layers: { nodes: false } },
+    });
+    const result = validateRenderConfig(config);
+    const constraintIds = result.errors.map((e) => e.constraintId);
+    const legendIdx = constraintIds.indexOf("legendBoundsValidation");
+    const layerIdx = constraintIds.indexOf("layerDependencies");
+    expect(legendIdx).toBeLessThan(layerIdx);
+  });
+
+  it("RenderConfigValidationError type has all required fields", () => {
+    const config = makeConfigWithCoordSpaceXOverflow(800, 900, 100);
+    const result = validateRenderConfig(config);
+    const err: RenderConfigValidationError = result.errors[0];
+    // Type-level check: all fields accessible
+    expect(typeof err.constraintId).toBe("string");
+    expect(typeof err.path).toBe("string");
+    expect(typeof err.message).toBe("string");
+    expect(["error", "warning"]).toContain(err.severity);
+  });
+
+  it("RenderConfigValidationResult type matches expected shape", () => {
+    const result: RenderConfigValidationResult = validateRenderConfig(makeConfig());
+    expect(typeof result.valid).toBe("boolean");
+    expect(typeof result.ok).toBe("boolean");
+    expect(Array.isArray(result.errors)).toBe(true);
   });
 });

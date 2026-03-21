@@ -110,19 +110,19 @@ export async function renderRoute(c: Context): Promise<Response> {
   // ── Extract renderConfig → renderOptions ────────────────
   const rc = map.renderConfig;
   const renderOptions = rc ? {
-    width: rc.width,
-    height: rc.height,
-    background: { color: rc.background?.color },
+    width: rc.spatial?.width,
+    height: rc.spatial?.height,
+    background: { color: rc.styling?.background?.color },
     // Map new nested background toggles → RenderOptions flags
-    showAxes: rc.background?.evolutionXAxis?.show,
-    showValueChain: rc.background?.valueChainYAxis?.show,
-    showPhaseLabels: rc.background?.evolutionPhases?.showPhaseDividerAndLabel,
-    fontFamily: rc.fontFamily,
-    labelScale: rc.labelScale,
+    showAxes: rc.styling?.background?.evolutionXAxis?.show,
+    showValueChain: rc.styling?.background?.valueChainYAxis?.show,
+    showPhaseLabels: rc.styling?.background?.evolutionPhases?.showPhaseDividerAndLabel,
+    fontFamily: rc.typography?.fontFamily,
+    labelScale: rc.typography?.labelScale,
     avoidCollisions: rc.avoidCollisions,
     excludeComponentTypes: rc.filters?.excludeComponentTypes,
-    typeColors: rc.typeColors,
-    evolveStyles: rc.evolveStyles,
+    typeColors: rc.styling?.palette,
+    evolveStyles: rc.styling?.evolveStyles,
   } : undefined;
 
   // ── Render via modular pipeline ─────────────────────────

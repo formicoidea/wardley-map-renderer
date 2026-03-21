@@ -77,7 +77,7 @@ describe("AC7: route accepts valid new-schema renderConfig", () => {
   it("accepts renderConfig with valid background.color", async () => {
     const res = await postSVG({
       ...BASE_MAP,
-      renderConfig: { background: { color: "#f5f5f5" } },
+      renderConfig: { styling: { background: { color: "#f5f5f5" } } },
     });
     expect(res.status).toBe(200);
   });
@@ -85,7 +85,7 @@ describe("AC7: route accepts valid new-schema renderConfig", () => {
   it("accepts renderConfig with 3-digit hex background.color", async () => {
     const res = await postSVG({
       ...BASE_MAP,
-      renderConfig: { background: { color: "#fff" } },
+      renderConfig: { styling: { background: { color: "#fff" } } },
     });
     expect(res.status).toBe(200);
   });
@@ -93,30 +93,30 @@ describe("AC7: route accepts valid new-schema renderConfig", () => {
   it("accepts renderConfig with 8-digit hex background.color (alpha)", async () => {
     const res = await postSVG({
       ...BASE_MAP,
-      renderConfig: { background: { color: "#ffffff80" } },
+      renderConfig: { styling: { background: { color: "#ffffff80" } } },
     });
     expect(res.status).toBe(200);
   });
 
   it("accepts renderConfig with valid theme: default", async () => {
-    const res = await postSVG({ ...BASE_MAP, renderConfig: { theme: "default" } });
+    const res = await postSVG({ ...BASE_MAP, renderConfig: { styling: { theme: "default" } } });
     expect(res.status).toBe(200);
   });
 
   it("accepts renderConfig with valid theme: dark", async () => {
-    const res = await postSVG({ ...BASE_MAP, renderConfig: { theme: "dark" } });
+    const res = await postSVG({ ...BASE_MAP, renderConfig: { styling: { theme: "dark" } } });
     expect(res.status).toBe(200);
   });
 
   it("accepts renderConfig with valid theme: highContrast", async () => {
-    const res = await postSVG({ ...BASE_MAP, renderConfig: { theme: "highContrast" } });
+    const res = await postSVG({ ...BASE_MAP, renderConfig: { styling: { theme: "highContrast" } } });
     expect(res.status).toBe(200);
   });
 
   it("accepts renderConfig with valid width and height", async () => {
     const res = await postSVG({
       ...BASE_MAP,
-      renderConfig: { width: 1920, height: 1080 },
+      renderConfig: { spatial: { width: 1920, height: 1080 } },
     });
     expect(res.status).toBe(200);
   });
@@ -124,15 +124,15 @@ describe("AC7: route accepts valid new-schema renderConfig", () => {
   it("accepts renderConfig with strokeWidth", async () => {
     const res = await postSVG({
       ...BASE_MAP,
-      renderConfig: { strokeWidth: 2.5 },
+      renderConfig: { spatial: { strokeWidth: 2.5 } },
     });
     expect(res.status).toBe(200);
   });
 
-  it("accepts renderConfig with fontFamily and labelScale", async () => {
+  it("accepts renderConfig with typography (fontFamily and labelScale)", async () => {
     const res = await postSVG({
       ...BASE_MAP,
-      renderConfig: { fontFamily: "Roboto, sans-serif", labelScale: 1.5 },
+      renderConfig: { typography: { fontFamily: "Roboto, sans-serif", labelScale: 1.5 } },
     });
     expect(res.status).toBe(200);
   });
@@ -161,10 +161,10 @@ describe("AC7: route accepts valid new-schema renderConfig", () => {
     expect(res.status).toBe(200);
   });
 
-  it("accepts renderConfig with top-level locale (fr)", async () => {
+  it("accepts renderConfig with axes.locale (fr)", async () => {
     const res = await postSVG({
       ...BASE_MAP,
-      renderConfig: { locale: "fr" },
+      renderConfig: { axes: { locale: "fr" } },
     });
     expect(res.status).toBe(200);
   });
@@ -173,9 +173,11 @@ describe("AC7: route accepts valid new-schema renderConfig", () => {
     const res = await postSVG({
       ...BASE_MAP,
       renderConfig: {
-        evolveStyles: {
-          natural: { stroke: "#00ff00", strokeDasharray: "4 2" },
-          forced: { stroke: "#ff0000" },
+        styling: {
+          evolveStyles: {
+            natural: { stroke: "#00ff00", strokeDasharray: "4 2" },
+            forced: { stroke: "#ff0000" },
+          },
         },
       },
     });
@@ -190,7 +192,7 @@ describe("AC7: background.evolutionPhases.showPhaseDividerAndLabel toggle", () =
     const res = await postSVG({
       ...BASE_MAP,
       renderConfig: {
-        background: { evolutionPhases: { showPhaseDividerAndLabel: true } },
+        styling: { background: { evolutionPhases: { showPhaseDividerAndLabel: true } } },
       },
     });
     expect(res.status).toBe(200);
@@ -200,7 +202,7 @@ describe("AC7: background.evolutionPhases.showPhaseDividerAndLabel toggle", () =
     const res = await postSVG({
       ...BASE_MAP,
       renderConfig: {
-        background: { evolutionPhases: { showPhaseDividerAndLabel: false } },
+        styling: { background: { evolutionPhases: { showPhaseDividerAndLabel: false } } },
       },
     });
     expect(res.status).toBe(200);
@@ -213,7 +215,7 @@ describe("AC7: background.evolutionPhases.showPhaseDividerAndLabel toggle", () =
     const res = await postSVG({
       ...BASE_MAP,
       renderConfig: {
-        background: { evolutionXAxis: { show: true } },
+        styling: { background: { evolutionXAxis: { show: true } } },
       },
     });
     expect(res.status).toBe(200);
@@ -223,7 +225,7 @@ describe("AC7: background.evolutionPhases.showPhaseDividerAndLabel toggle", () =
     const res = await postSVG({
       ...BASE_MAP,
       renderConfig: {
-        background: { evolutionXAxis: { show: false } },
+        styling: { background: { evolutionXAxis: { show: false } } },
       },
     });
     expect(res.status).toBe(200);
@@ -233,7 +235,7 @@ describe("AC7: background.evolutionPhases.showPhaseDividerAndLabel toggle", () =
     const res = await postSVG({
       ...BASE_MAP,
       renderConfig: {
-        background: { valueChainYAxis: { show: false } },
+        styling: { background: { valueChainYAxis: { show: false } } },
       },
     });
     expect(res.status).toBe(200);
@@ -244,10 +246,10 @@ describe("AC7: background.evolutionPhases.showPhaseDividerAndLabel toggle", () =
     const res = await postSVG({
       ...BASE_MAP,
       renderConfig: {
-        background: {
+        styling: { background: {
           evolutionXAxis: { show: true },
           evolutionPhases: { showPhaseDividerAndLabel: true },
-        },
+        } },
       },
     });
     expect(res.status).toBe(200);
@@ -257,10 +259,10 @@ describe("AC7: background.evolutionPhases.showPhaseDividerAndLabel toggle", () =
     const res = await postSVG({
       ...BASE_MAP,
       renderConfig: {
-        background: {
+        styling: { background: {
           evolutionXAxis: { show: true },
           evolutionPhases: { showPhaseDividerAndLabel: false },
-        },
+        } },
       },
     });
     expect(res.status).toBe(200);
@@ -270,10 +272,10 @@ describe("AC7: background.evolutionPhases.showPhaseDividerAndLabel toggle", () =
     const res = await postSVG({
       ...BASE_MAP,
       renderConfig: {
-        background: {
+        styling: { background: {
           evolutionXAxis: { show: false },
           evolutionPhases: { showPhaseDividerAndLabel: true },
-        },
+        } },
       },
     });
     expect(res.status).toBe(200);
@@ -283,10 +285,10 @@ describe("AC7: background.evolutionPhases.showPhaseDividerAndLabel toggle", () =
     const res = await postSVG({
       ...BASE_MAP,
       renderConfig: {
-        background: {
+        styling: { background: {
           evolutionXAxis: { show: false },
           evolutionPhases: { showPhaseDividerAndLabel: false },
-        },
+        } },
       },
     });
     expect(res.status).toBe(200);
@@ -299,7 +301,7 @@ describe("AC7: route rejects invalid new-schema renderConfig with 422", () => {
   it("rejects background.color as CSS named color → 422", async () => {
     const { status, body } = await postExpectError({
       ...BASE_MAP,
-      renderConfig: { background: { color: "red" } },
+      renderConfig: { styling: { background: { color: "red" } } },
     });
     expect(status).toBe(422);
     expect(body.type).toBeDefined();
@@ -316,7 +318,7 @@ describe("AC7: route rejects invalid new-schema renderConfig with 422", () => {
   it("rejects background.color as non-hex string → 422", async () => {
     const { status, body } = await postExpectError({
       ...BASE_MAP,
-      renderConfig: { background: { color: "#xyz" } },
+      renderConfig: { styling: { background: { color: "#xyz" } } },
     });
     expect(status).toBe(422);
     expect(body.errors.length).toBeGreaterThan(0);
@@ -325,7 +327,7 @@ describe("AC7: route rejects invalid new-schema renderConfig with 422", () => {
   it("rejects unknown theme → 422", async () => {
     const { status, body } = await postExpectError({
       ...BASE_MAP,
-      renderConfig: { theme: "neon" },
+      renderConfig: { styling: { theme: "neon" } },
     });
     expect(status).toBe(422);
     expect(body.errors.length).toBeGreaterThan(0);
@@ -334,7 +336,7 @@ describe("AC7: route rejects invalid new-schema renderConfig with 422", () => {
   it("rejects negative width → 422", async () => {
     const { status, body } = await postExpectError({
       ...BASE_MAP,
-      renderConfig: { width: -100 },
+      renderConfig: { spatial: { width: -100 } },
     });
     expect(status).toBe(422);
     expect(body.errors.length).toBeGreaterThan(0);
@@ -343,7 +345,7 @@ describe("AC7: route rejects invalid new-schema renderConfig with 422", () => {
   it("rejects zero height → 422", async () => {
     const { status, body } = await postExpectError({
       ...BASE_MAP,
-      renderConfig: { height: 0 },
+      renderConfig: { spatial: { height: 0 } },
     });
     expect(status).toBe(422);
     expect(body.errors.length).toBeGreaterThan(0);
@@ -352,7 +354,7 @@ describe("AC7: route rejects invalid new-schema renderConfig with 422", () => {
   it("rejects labelScale above 5 → 422", async () => {
     const { status, body } = await postExpectError({
       ...BASE_MAP,
-      renderConfig: { labelScale: 10 },
+      renderConfig: { typography: { labelScale: 10 } },
     });
     expect(status).toBe(422);
     expect(body.errors.length).toBeGreaterThan(0);
@@ -361,7 +363,7 @@ describe("AC7: route rejects invalid new-schema renderConfig with 422", () => {
   it("rejects strokeWidth below minimum (0.1) → 422", async () => {
     const { status, body } = await postExpectError({
       ...BASE_MAP,
-      renderConfig: { strokeWidth: 0.1 },
+      renderConfig: { spatial: { strokeWidth: 0.1 } },
     });
     expect(status).toBe(422);
     expect(body.errors.length).toBeGreaterThan(0);
@@ -370,7 +372,7 @@ describe("AC7: route rejects invalid new-schema renderConfig with 422", () => {
   it("rejects strokeWidth above maximum (8) → 422", async () => {
     const { status, body } = await postExpectError({
       ...BASE_MAP,
-      renderConfig: { strokeWidth: 100 },
+      renderConfig: { spatial: { strokeWidth: 100 } },
     });
     expect(status).toBe(422);
     expect(body.errors.length).toBeGreaterThan(0);
@@ -394,11 +396,11 @@ describe("AC7: route rejects invalid new-schema renderConfig with 422", () => {
     expect(body.errors.length).toBeGreaterThan(0);
   });
 
-  it("rejects invalid locale at top level → 422", async () => {
-    // locale moved to top-level of renderConfig (no longer nested inside axisLabels)
+  it("rejects invalid locale in axes → 422", async () => {
+    // locale is inside axes group
     const { status, body } = await postExpectError({
       ...BASE_MAP,
-      renderConfig: { locale: "de" },
+      renderConfig: { axes: { locale: "de" } },
     });
     expect(status).toBe(422);
     expect(body.errors.length).toBeGreaterThan(0);
@@ -408,7 +410,7 @@ describe("AC7: route rejects invalid new-schema renderConfig with 422", () => {
     const { status, body } = await postExpectError({
       ...BASE_MAP,
       renderConfig: {
-        evolveStyles: { unknown: { stroke: "#000" } },
+        styling: { evolveStyles: { unknown: { stroke: "#000" } } },
       },
     });
     expect(status).toBe(422);
@@ -422,7 +424,7 @@ describe("AC7: route returns RFC 7807 error shape for invalid renderConfig", () 
   it("422 response includes type, title, status, detail, errors fields", async () => {
     const { status, body } = await postExpectError({
       ...BASE_MAP,
-      renderConfig: { theme: "bad-theme" },
+      renderConfig: { styling: { theme: "bad-theme" } },
     });
     expect(status).toBe(422);
     expect(body).toHaveProperty("type");
@@ -436,7 +438,7 @@ describe("AC7: route returns RFC 7807 error shape for invalid renderConfig", () 
   it("each error object has path, message, code fields", async () => {
     const { status, body } = await postExpectError({
       ...BASE_MAP,
-      renderConfig: { width: -1, theme: "invalid" },
+      renderConfig: { spatial: { width: -1 }, styling: { theme: "invalid" } },
     });
     expect(status).toBe(422);
     for (const err of body.errors) {
@@ -449,7 +451,7 @@ describe("AC7: route returns RFC 7807 error shape for invalid renderConfig", () 
   it("error detail mentions 'Invalid WardleyMap JSON'", async () => {
     const { body } = await postExpectError({
       ...BASE_MAP,
-      renderConfig: { background: { color: "notahex" } },
+      renderConfig: { styling: { background: { color: "notahex" } } },
     });
     expect(body.detail).toContain("Invalid WardleyMap JSON");
   });
@@ -462,26 +464,24 @@ describe("AC7: full nested renderConfig accepted end-to-end", () => {
     const res = await postSVG({
       ...BASE_MAP,
       renderConfig: {
-        width: 1600,
-        height: 800,
-        theme: "default",
-        background: {
-          color: "#ffffff",
-          evolutionXAxis: { show: true },
-          valueChainYAxis: { show: true },
-          evolutionPhases: { showPhaseDividerAndLabel: true },
+        spatial: { width: 1600, height: 800, strokeWidth: 1, nodeRadii: { _default: 5 } },
+        styling: {
+          theme: "default",
+          background: {
+            color: "#ffffff",
+            evolutionXAxis: { show: true },
+            valueChainYAxis: { show: true },
+            evolutionPhases: { showPhaseDividerAndLabel: true },
+          },
+          palette: { _default: "#374151", component: "#374151" },
+          evolveStyles: {
+            natural: { stroke: "#374151" },
+          },
         },
-        fontFamily: "Inter, sans-serif",
-        labelScale: 1.0,
-        nodeRadii: { _default: 5 },
+        typography: { fontFamily: "Inter, sans-serif", labelScale: 1.0 },
         avoidCollisions: true,
         filters: { excludeComponentTypes: [] },
-        typeColors: { _default: "#374151", component: "#374151" },
-        evolveStyles: {
-          natural: { stroke: "#374151" },
-        },
-        strokeWidth: 1,
-        locale: "en",
+        axes: { locale: "en" },
         legend: { show: true, position: "bottom-right" },
       },
     });
@@ -495,9 +495,9 @@ describe("AC7: full nested renderConfig accepted end-to-end", () => {
     const res = await postSVG({
       ...BASE_MAP,
       renderConfig: {
-        background: {
+        styling: { background: {
           evolutionPhases: { showPhaseDividerAndLabel: false },
-        },
+        } },
       },
     });
     expect(res.status).toBe(200);
@@ -513,9 +513,9 @@ describe("AC7: full nested renderConfig accepted end-to-end", () => {
     const res = await postSVG({
       ...BASE_MAP,
       renderConfig: {
-        background: {
+        styling: { background: {
           evolutionPhases: { showPhaseDividerAndLabel: true },
-        },
+        } },
       },
     });
     expect(res.status).toBe(200);

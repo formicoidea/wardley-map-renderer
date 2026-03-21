@@ -93,6 +93,8 @@ export const ConfigConstraintGraphSchema = z.object({
   legendBoundsValidation: ConstraintGraphSchema,
   layerDependencies: ConstraintGraphSchema,
   phaseStyleAlignment: ConstraintGraphSchema,
+  strokeWidthFontSizeRatio: ConstraintGraphSchema,
+  nodeRadiiStrokeWidth: ConstraintGraphSchema,
 });
 export type ConfigConstraintGraph = z.infer<typeof ConfigConstraintGraphSchema>;
 
@@ -109,7 +111,7 @@ export const EMPTY_CONFIG_CONSTRAINT_GRAPH: ConfigConstraintGraph = {
   legendBoundsValidation: {
     name: "legendBoundsValidation",
     description:
-      "Constraints imposed by coordinateSpace on legend positioning: " +
+      "Constraints imposed by spatial.coordinateSpace on legend positioning: " +
       "legend anchor and size must stay within the declared canvas bounds.",
     constraints: [],
   },
@@ -127,6 +129,20 @@ export const EMPTY_CONFIG_CONSTRAINT_GRAPH: ConfigConstraintGraph = {
       "Constraints between phase definitions and evolveStyles: " +
       "evolveStyles keys must be a closed enum derived from the component " +
       "evolution types present in phases.",
+    constraints: [],
+  },
+  strokeWidthFontSizeRatio: {
+    name: "strokeWidthFontSizeRatio",
+    description:
+      "Cross-group ratio constraint: spatial.strokeWidth relative to " +
+      "typography.labelScale-derived font size should stay within readable bounds.",
+    constraints: [],
+  },
+  nodeRadiiStrokeWidth: {
+    name: "nodeRadiiStrokeWidth",
+    description:
+      "Intra-spatial constraint: nodeRadii._default must be ≥ strokeWidth " +
+      "to avoid malformed node circles.",
     constraints: [],
   },
 };
@@ -193,17 +209,52 @@ export interface ConstraintResult {
  * absent, treating them as their logical defaults (matching `RenderConfigSchema`
  * defaults).
  *
+ * Reflects the nested RenderConfig v2 structure:
+ *   - `spatial`  — canvas dimensions, coordinate space, strokeWidth, nodeRadii
+ *   - `typography` — font family, label scale
+ *   - `styling`  — theme, palette, evolveStyles, background
+ *   - `filters`  — layer toggles, component type exclusions
+ *   - `legend`   — legend visibility and position
+ *
  * Intentionally a structural subset — not tied to the full `RenderConfigSchema`
  * so that constraints can be applied against parsed or unparsed config values.
  */
 export interface ConstraintCheckInput {
   /**
-   * Canvas coordinate space — `width` and `height` used for legend bounds checks.
-   * Defaults: 1600 × 800 (from `DEFAULT_COORDINATE_SPACE`).
+   * Spatial group — canvas dimensions, coordinate space, strokeWidth, nodeRadii.
    */
-  coordinateSpace?: {
+  spatial?: {
     width?: number;
     height?: number;
+    coordinateSpace?: {
+      width?: number;
+      height?: number;
+    };
+    strokeWidth?: number;
+    nodeRadii?: {
+      _default: number;
+      [key: string]: number | undefined;
+    };
+  };
+  /**
+   * Typography group — font family and label scale.
+   */
+  typography?: {
+    fontFamily?: string;
+    labelScale?: number;
+  };
+  /**
+   * Styling group — theme, palette, evolveStyles, background.
+   * Only `evolveStyles` and `background.evolutionPhases.phases` are inspected by constraints.
+   */
+  styling?: {
+    evolveStyles?: Partial<Record<string, unknown>>;
+    background?: {
+      evolutionPhases?: {
+        /** Array of phase label overrides (`string | undefined` per element). */
+        phases?: Array<string | undefined>;
+      };
+    };
   };
   /**
    * Legend configuration — only `position` is inspected.
@@ -220,21 +271,6 @@ export interface ConstraintCheckInput {
   filters?: {
     layers?: Record<string, boolean | undefined>;
   };
-  /**
-   * Background chrome — `evolutionPhases.phases` inspected by `phaseStyleAlignmentConstraint`.
-   */
-  background?: {
-    evolutionPhases?: {
-      /** Array of phase label overrides (`string | undefined` per element). */
-      phases?: Array<string | undefined>;
-    };
-  };
-  /**
-   * Evolution arrow style map — presence of named keys (`natural`, `ecosystem`,
-   * `forced`, `late`) inspected by `phaseStyleAlignmentConstraint`.
-   * Typed loosely so callers need not import the strict `EvolveStylesMap` shape.
-   */
-  evolveStyles?: Partial<Record<string, unknown>>;
 }
 
 // ── ExecutableConstraint ─────────────────────────────────────────────────────
@@ -303,7 +339,7 @@ function makeResult(violations: readonly ConstraintViolation[]): ConstraintResul
 export const legendBoundsValidation: ExecutableConstraint = {
   id: "legendBoundsValidation",
   metadata: {
-    source: "coordinateSpace",
+    source: "spatial.coordinateSpace",
     target: "legend",
     rule:
       "When legend.position is an explicit {x, y} pixel coordinate, " +
@@ -320,9 +356,10 @@ export const legendBoundsValidation: ExecutableConstraint = {
     }
 
     // Explicit {x, y} anchor — validate against canvas bounds
+    // v2 nested path: spatial.coordinateSpace > spatial.width/height > DEFAULT_COORDINATE_SPACE
     const { x, y } = pos as { x: number; y: number };
-    const width = config.coordinateSpace?.width ?? DEFAULT_COORDINATE_SPACE.width;
-    const height = config.coordinateSpace?.height ?? DEFAULT_COORDINATE_SPACE.height;
+    const width = config.spatial?.coordinateSpace?.width ?? config.spatial?.width ?? DEFAULT_COORDINATE_SPACE.width;
+    const height = config.spatial?.coordinateSpace?.height ?? config.spatial?.height ?? DEFAULT_COORDINATE_SPACE.height;
 
     const violations: ConstraintViolation[] = [];
 
@@ -480,8 +517,8 @@ const EVOLVE_TYPE_KEY_COUNT = EvolveTypeEnum.options.length; // 4
 export const phaseStyleAlignmentConstraint: ExecutableConstraint = {
   id: "phaseStyleAlignment",
   metadata: {
-    source: "background.evolutionPhases.phases",
-    target: "evolveStyles",
+    source: "styling.background.evolutionPhases.phases",
+    target: "styling.evolveStyles",
     rule:
       "Advisory parity: when explicit phase labels and per-type evolveStyles keys are both " +
       "provided, their counts should match to avoid unlabelled zones or unused style keys. " +
@@ -490,8 +527,8 @@ export const phaseStyleAlignmentConstraint: ExecutableConstraint = {
     violationPolicy: "warn",
   },
   check(config) {
-    const phases = config.background?.evolutionPhases?.phases;
-    const evolveStyles = config.evolveStyles;
+    const phases = config.styling?.background?.evolutionPhases?.phases;
+    const evolveStyles = config.styling?.evolveStyles;
 
     // Skip when either field is absent
     if (phases === undefined || evolveStyles === undefined) {
@@ -518,7 +555,7 @@ export const phaseStyleAlignmentConstraint: ExecutableConstraint = {
 
     return makeResult([
       {
-        path: "background.evolutionPhases.phases",
+        path: "styling.background.evolutionPhases.phases",
         message:
           `Phase label count (${phaseCount}) does not match explicit evolveStyles key count ` +
           `(${styleKeyCount} of ${EVOLVE_TYPE_KEY_COUNT} declared: ${explicitKeys.join(", ")}). ` +
@@ -530,27 +567,150 @@ export const phaseStyleAlignmentConstraint: ExecutableConstraint = {
   },
 };
 
+// ── strokeWidthFontSizeRatioConstraint ─────────────────────────────────────────
+
+/**
+ * Base font size in pixels — the reference point for labelScale multiplication.
+ * @internal
+ */
+const BASE_FONT_SIZE_PX = 12;
+
+/**
+ * Maximum allowed ratio of strokeWidth to rendered font size.
+ * A ratio above this makes strokes visually dominant over labels.
+ * @internal
+ */
+const MAX_STROKE_FONT_RATIO = 0.5;
+
+/**
+ * **strokeWidthFontSizeRatioConstraint** — cross-group: `spatial.strokeWidth ↔ typography.labelScale`.
+ *
+ * Advisory parity check: when both `spatial.strokeWidth` and `typography.labelScale`
+ * are explicitly provided, the ratio `strokeWidth / (BASE_FONT_SIZE_PX × labelScale)`
+ * should not exceed {@link MAX_STROKE_FONT_RATIO} (0.5). A higher ratio means strokes
+ * are disproportionately thick relative to label text, reducing readability.
+ *
+ * Violation severity: `"warning"` — does not prevent rendering.
+ *
+ * ## When the check is skipped
+ * - `spatial` absent → skip (defaults are known to be consistent)
+ * - `typography` absent → skip (defaults are known to be consistent)
+ * - Either `strokeWidth` or `labelScale` absent → skip (defaults are consistent)
+ */
+export const strokeWidthFontSizeRatioConstraint: ExecutableConstraint = {
+  id: "strokeWidthFontSizeRatio",
+  metadata: {
+    source: "spatial.strokeWidth",
+    target: "typography.labelScale",
+    rule:
+      `Cross-group ratio: spatial.strokeWidth / (${BASE_FONT_SIZE_PX} × typography.labelScale) ` +
+      `should not exceed ${MAX_STROKE_FONT_RATIO}. Thick strokes with small labels reduce readability.`,
+    violationPolicy: "warn",
+  },
+  check(config) {
+    const strokeWidth = config.spatial?.strokeWidth;
+    const labelScale = config.typography?.labelScale;
+
+    // Skip when either field is absent — defaults (strokeWidth=1, labelScale=1.0) are consistent
+    if (strokeWidth === undefined || labelScale === undefined) {
+      return makeResult([]);
+    }
+
+    const renderedFontSize = BASE_FONT_SIZE_PX * labelScale;
+    const ratio = strokeWidth / renderedFontSize;
+
+    if (ratio <= MAX_STROKE_FONT_RATIO) {
+      return makeResult([]);
+    }
+
+    return makeResult([
+      {
+        path: "spatial.strokeWidth",
+        message:
+          `spatial.strokeWidth (${strokeWidth}) is ${(ratio * 100).toFixed(0)}% of rendered font size ` +
+          `(${renderedFontSize.toFixed(1)} px = ${BASE_FONT_SIZE_PX} × typography.labelScale ${labelScale}), ` +
+          `exceeding the ${(MAX_STROKE_FONT_RATIO * 100).toFixed(0)}% advisory threshold. ` +
+          `Reduce strokeWidth or increase labelScale for better readability.`,
+        severity: "warning",
+      },
+    ]);
+  },
+};
+
+// ── nodeRadiiStrokeWidthConstraint ────────────────────────────────────────────
+
+/**
+ * **nodeRadiiStrokeWidthConstraint** — intra-spatial: `spatial.nodeRadii._default ≥ spatial.strokeWidth`.
+ *
+ * When both `nodeRadii._default` and `strokeWidth` are explicitly provided within the
+ * spatial group, the default node radius must be at least as large as the stroke width.
+ * A node radius smaller than its outline stroke produces an invisible or malformed circle.
+ *
+ * Violation severity: `"error"` — the node would be visually broken.
+ *
+ * ## When the check is skipped
+ * - `spatial` absent → skip (defaults are consistent: nodeRadii._default=5, strokeWidth=1)
+ * - Either `nodeRadii` or `strokeWidth` absent → skip (defaults are consistent)
+ */
+export const nodeRadiiStrokeWidthConstraint: ExecutableConstraint = {
+  id: "nodeRadiiStrokeWidth",
+  metadata: {
+    source: "spatial.strokeWidth",
+    target: "spatial.nodeRadii",
+    rule:
+      "spatial.nodeRadii._default must be ≥ spatial.strokeWidth. " +
+      "A node radius smaller than its stroke width produces a malformed circle.",
+    violationPolicy: "error",
+  },
+  check(config) {
+    const strokeWidth = config.spatial?.strokeWidth;
+    const defaultRadius = config.spatial?.nodeRadii?._default;
+
+    // Skip when either field is absent — defaults (nodeRadii._default=5, strokeWidth=1) are consistent
+    if (strokeWidth === undefined || defaultRadius === undefined) {
+      return makeResult([]);
+    }
+
+    if (defaultRadius >= strokeWidth) {
+      return makeResult([]);
+    }
+
+    return makeResult([
+      {
+        path: "spatial.nodeRadii._default",
+        message:
+          `spatial.nodeRadii._default (${defaultRadius}) is less than spatial.strokeWidth (${strokeWidth}). ` +
+          `Node circles would be smaller than their outline stroke, producing malformed shapes. ` +
+          `Increase nodeRadii._default to ≥ ${strokeWidth} or reduce strokeWidth.`,
+        severity: "error",
+      },
+    ]);
+  },
+};
+
 // ── CONFIG_CONSTRAINT_GRAPH ───────────────────────────────────────────────────
 
 /**
- * The populated `ConfigConstraintGraph` — all three slots filled with their
+ * The populated `ConfigConstraintGraph` — all five slots filled with their
  * declarative constraint metadata derived from the executable implementations.
  *
  * Use `EXECUTABLE_CONSTRAINT_GRAPH` (the flat array) when you need to run
  * `checkConstraints`.  Use `CONFIG_CONSTRAINT_GRAPH` (this object) when you
  * need to introspect available constraints by slot name.
  *
- * | Slot                   | Source field                      | Constrained field |
- * |------------------------|-----------------------------------|-------------------|
- * | legendBoundsValidation | coordinateSpace                   | legend.position   |
- * | layerDependencies      | filters.layers (LAYER_TOGGLE_DAG) | filters.layers    |
- * | phaseStyleAlignment    | background.evolutionPhases.phases | evolveStyles      |
+ * | Slot                      | Source field                              | Constrained field         |
+ * |---------------------------|------------------------------------------|---------------------------|
+ * | legendBoundsValidation    | spatial.coordinateSpace                  | legend.position           |
+ * | layerDependencies         | filters.layers (LAYER_TOGGLE_DAG)        | filters.layers            |
+ * | phaseStyleAlignment       | styling.background.evolutionPhases.phases | styling.evolveStyles      |
+ * | strokeWidthFontSizeRatio  | spatial.strokeWidth                      | typography.labelScale     |
+ * | nodeRadiiStrokeWidth      | spatial.strokeWidth                      | spatial.nodeRadii         |
  */
 export const CONFIG_CONSTRAINT_GRAPH: ConfigConstraintGraph = {
   legendBoundsValidation: {
     name: "legendBoundsValidation",
     description:
-      "Constraints imposed by coordinateSpace on legend positioning: " +
+      "Constraints imposed by spatial.coordinateSpace on legend positioning: " +
       "legend anchor and size must stay within the declared canvas bounds.",
     constraints: [legendBoundsValidation.metadata],
   },
@@ -570,6 +730,20 @@ export const CONFIG_CONSTRAINT_GRAPH: ConfigConstraintGraph = {
       "because phases and evolveStyles are intentionally decoupled by design.",
     constraints: [phaseStyleAlignmentConstraint.metadata],
   },
+  strokeWidthFontSizeRatio: {
+    name: "strokeWidthFontSizeRatio",
+    description:
+      "Cross-group ratio: spatial.strokeWidth relative to typography.labelScale-derived " +
+      "font size should stay within readable bounds (≤ 50% of rendered font size).",
+    constraints: [strokeWidthFontSizeRatioConstraint.metadata],
+  },
+  nodeRadiiStrokeWidth: {
+    name: "nodeRadiiStrokeWidth",
+    description:
+      "Intra-spatial: nodeRadii._default must be ≥ strokeWidth to avoid " +
+      "malformed node circles where the outline is thicker than the circle.",
+    constraints: [nodeRadiiStrokeWidthConstraint.metadata],
+  },
 };
 
 // ── EXECUTABLE_CONSTRAINT_GRAPH ───────────────────────────────────────────────
@@ -577,13 +751,13 @@ export const CONFIG_CONSTRAINT_GRAPH: ConfigConstraintGraph = {
 /**
  * Flat ordered list of executable constraints — suitable for `checkConstraints`.
  *
- * Mirrors the three slots of `CONFIG_CONSTRAINT_GRAPH` as a flat array so
+ * Mirrors the five slots of `CONFIG_CONSTRAINT_GRAPH` as a flat array so
  * that `checkConstraints` can iterate without needing to know the slot names.
  */
 export type ExecutableConstraintGraph = readonly ExecutableConstraint[];
 
 /**
- * The canonical executable constraint graph — flat list of all three built-in
+ * The canonical executable constraint graph — flat list of all five built-in
  * constraints in declaration order.
  *
  * Pass a subset to `checkConstraints` to run only specific rules.
@@ -592,6 +766,8 @@ export const EXECUTABLE_CONSTRAINT_GRAPH: ExecutableConstraintGraph = [
   legendBoundsValidation,
   layerDependenciesConstraint,
   phaseStyleAlignmentConstraint,
+  strokeWidthFontSizeRatioConstraint,
+  nodeRadiiStrokeWidthConstraint,
 ] as const;
 
 // ── checkConstraints ──────────────────────────────────────────────────────────

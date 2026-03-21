@@ -39,7 +39,7 @@ export const renderNotesLayer: LayerRenderer = (
   // Skip entire notes layer if "note" type is excluded
   if (ctx.resolvedConfig.excludeComponentTypes.includes("note")) return [];
 
-  const fontFamily = ctx.resolvedConfig.fontFamily;
+  const fontFamily = ctx.resolvedConfig.typography.fontFamily;
   const parts: string[] = [];
 
   for (const node of ctx.nodes) {

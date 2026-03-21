@@ -180,35 +180,35 @@ describe("RenderConfigV2Schema — backward-compat layerToggles → filters.laye
 });
 
 describe("RenderConfigSchema (new nested structure — migrated from v2)", () => {
-  it("parses an empty object with strokeWidth default", () => {
+  it("parses an empty object — spatial/styling/typography are optional", () => {
     const result = RenderConfigSchema.parse({});
-    expect(result.strokeWidth).toBe(1);
-    expect(result.theme).toBeUndefined();
-    expect(result.background).toBeUndefined();
-    expect(result.fontFamily).toBeUndefined();
+    // Nested: top-level strokeWidth doesn't exist; it's inside spatial
+    expect(result.spatial).toBeUndefined();
+    expect(result.styling).toBeUndefined();
+    expect(result.typography).toBeUndefined();
   });
 
-  it("parses a config with theme", () => {
-    const result = RenderConfigSchema.parse({ theme: "dark" });
-    expect(result.theme).toBe("dark");
-    expect(result.strokeWidth).toBe(1);
+  it("parses a config with nested styling.theme", () => {
+    const result = RenderConfigSchema.parse({ styling: { theme: "dark" } });
+    expect(result.styling?.theme).toBe("dark");
+    expect(result.spatial).toBeUndefined();
   });
 
-  it("rejects unknown theme values", () => {
-    expect(() => RenderConfigSchema.parse({ theme: "neon" })).toThrow();
+  it("rejects unknown theme values in styling.theme", () => {
+    expect(() => RenderConfigSchema.parse({ styling: { theme: "neon" } })).toThrow();
   });
 
-  it("rejects invalid strokeWidth below minimum", () => {
-    expect(() => RenderConfigSchema.parse({ strokeWidth: 0.1 })).toThrow();
+  it("rejects invalid strokeWidth below minimum in spatial.strokeWidth", () => {
+    expect(() => RenderConfigSchema.parse({ spatial: { strokeWidth: 0.1 } })).toThrow();
   });
 
-  it("rejects invalid strokeWidth above maximum", () => {
-    expect(() => RenderConfigSchema.parse({ strokeWidth: 10 })).toThrow();
+  it("rejects invalid strokeWidth above maximum in spatial.strokeWidth", () => {
+    expect(() => RenderConfigSchema.parse({ spatial: { strokeWidth: 10 } })).toThrow();
   });
 
-  it("accepts strokeWidth boundary values", () => {
-    expect(RenderConfigSchema.parse({ strokeWidth: 0.25 }).strokeWidth).toBe(0.25);
-    expect(RenderConfigSchema.parse({ strokeWidth: 8 }).strokeWidth).toBe(8);
+  it("accepts strokeWidth boundary values in spatial.strokeWidth", () => {
+    expect(RenderConfigSchema.parse({ spatial: { strokeWidth: 0.25 } }).spatial?.strokeWidth).toBe(0.25);
+    expect(RenderConfigSchema.parse({ spatial: { strokeWidth: 8 } }).spatial?.strokeWidth).toBe(8);
   });
 });
 

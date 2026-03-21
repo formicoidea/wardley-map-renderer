@@ -35,10 +35,17 @@ import {
   PositionSchema,
   LocaleEnum,
   AxisLabelsSchema,
+  AxesConfigSchema,
   LegendPositionEnum,
   LegendPositionXYSchema,
+  LegendOverflowEnum,
   LegendSchema,
+  LayerTogglesSchema,
+  FiltersSchema,
   EvolveStyleSchema,
+  SpatialConfigSchema,
+  TypographyConfigSchema,
+  StylingConfigSchema,
   RenderConfigSchema,
   WardleyMapSchema,
   MethodSchema,
@@ -105,6 +112,10 @@ export function registerSchemas(): void {
     description: "Absolute {x, y} coordinates for legend placement.",
   }));
 
+  registry.register("LegendOverflow", LegendOverflowEnum.openapi({
+    description: "Controls how a legend bounding box that extends beyond the canvas boundary is handled. 'allow' (default) renders as-is, 'clip' clips to canvas, 'warn' renders as-is with a console warning.",
+  }));
+
   registry.register("Locale", LocaleEnum.openapi({
     description: "Supported locale for axis label presets.",
   }));
@@ -169,11 +180,23 @@ export function registerSchemas(): void {
   }));
 
   registry.register("AxisLabels", AxisLabelsSchema.openapi({
-    description: "i18n axis label overrides (per-field). Locale preset selected via renderConfig.locale.",
+    description: "i18n axis label overrides (per-field). Locale preset selected via renderConfig.axes.locale.",
+  }));
+
+  registry.register("AxesConfig", AxesConfigSchema.openapi({
+    description: "Axes configuration — locale preset for axis labels and per-field i18n label overrides.",
   }));
 
   registry.register("Legend", LegendSchema.openapi({
     description: "Legend visibility and position configuration.",
+  }));
+
+  registry.register("LayerToggles", LayerTogglesSchema.openapi({
+    description: "Visual layer toggles (post-render): enable/disable entire SVG rendering layers independently. All default to true (visible).",
+  }));
+
+  registry.register("Filters", FiltersSchema.openapi({
+    description: "Unified visibility filters — consolidates layer toggles (post-render) and data-level type exclusions (pre-render).",
   }));
 
   registry.register("EvolveStyle", EvolveStyleSchema.openapi({
@@ -207,8 +230,22 @@ export function registerSchemas(): void {
     },
   }));
 
+  // ── Nested RenderConfig sub-schemas ────────────────────────
+
+  registry.register("SpatialConfig", SpatialConfigSchema.openapi({
+    description: "Canvas dimensions, coordinate space, stroke width, and node radii. Each leaf field has its own default — omit partially or entirely.",
+  }));
+
+  registry.register("TypographyConfig", TypographyConfigSchema.openapi({
+    description: "Font family and label scale multiplier. Each leaf field has its own default — omit partially or entirely.",
+  }));
+
+  registry.register("StylingConfig", StylingConfigSchema.openapi({
+    description: "Visual styling: theme preset, per-type palette colors, evolve arrow styles, and background controls. Themes handle only colors and font — strokeWidth and nodeRadii belong to spatial.",
+  }));
+
   registry.register("RenderConfig", RenderConfigSchema.openapi({
-    description: "Optional visual rendering overrides that travel with the map payload.",
+    description: "Nested visual rendering overrides that travel with the map payload. Groups: spatial, typography, styling, filters, legend, axes.",
   }));
 
   // ── Root request schema ────────────────────────────────────

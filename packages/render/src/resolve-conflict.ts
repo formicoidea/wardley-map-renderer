@@ -13,7 +13,7 @@
  *   evolution-arrow styles, layout algorithm, filters, and legend placement.
  *
  * - **Viewer** — the end-user who controls their display environment:
- *   visual theme (dark/light), locale (language), and label scale.
+ *   visual theme (dark/light), axes config (locale + axis labels), and label scale.
  *
  * When both sources supply a value for the same field, one must win.  This
  * module defines that rule as a first-class, exported constant so every
@@ -23,10 +23,10 @@
  *
  * | Category              | Winner        | Fields                                                       |
  * |-----------------------|---------------|--------------------------------------------------------------|
- * | `author-intent`       | `authorConfig`| width, height, coordinateSpace, background, fontFamily,      |
+ * | `author-intent`       | `authorConfig`| width, height, coordinateSpace, background, typography,      |
  * |                       |               | nodeRadii, avoidCollisions, typeColors, evolveStyles, legend, |
  * |                       |               | filters, strokeWidth                                         |
- * | `viewer-preference`   | `viewerConfig`| theme, locale, labelScale                                    |
+ * | `viewer-preference`   | `viewerConfig`| theme, axes                                                |
  *
  * ## Precedence chain
  *
@@ -131,7 +131,7 @@ export const EMPTY_RENDER_DIAGNOSTICS: RenderDiagnostics = {
  * | `height`          | Canvas pixel height — part of the coordinate space contract    |
  * | `coordinateSpace` | Axis ranges & units — defines the normalized map geometry      |
  * | `background`      | Chrome (axes, phase dividers, color) — structural map scaffold |
- * | `fontFamily`      | Brand font choice — typographic design decision                |
+ * | `typography`      | Font family + label scale — typographic design group           |
  * | `nodeRadii`       | Node circle sizes in px-space — visual design                  |
  * | `avoidCollisions` | Label collision algorithm — layout design                      |
  * | `typeColors`      | Color overrides per component type — visual design             |
@@ -143,18 +143,14 @@ export const EMPTY_RENDER_DIAGNOSTICS: RenderDiagnostics = {
  * @see VIEWER_PREFERENCE_FIELDS — the complementary set of viewer-owned fields
  */
 export const AUTHOR_INTENT_FIELDS = [
-  "width",
-  "height",
-  "coordinateSpace",
-  "background",
-  "fontFamily",
-  "nodeRadii",
-  "avoidCollisions",
-  "typeColors",
-  "evolveStyles",
-  "legend",
+  "spatial",
+  "typography",
+  "styling",
   "filters",
-  "strokeWidth",
+  "legend",
+  "avoidCollisions",
+  "methods",
+  "configIntent",
 ] as const satisfies ReadonlyArray<keyof RenderConfig>;
 
 /** Union of all field names in the author-intent category. */
@@ -176,15 +172,13 @@ export type AuthorIntentField = typeof AUTHOR_INTENT_FIELDS[number];
  * | Field        | Rationale                                                         |
  * |--------------|-------------------------------------------------------------------|
  * | `theme`      | Visual theme (dark / light / high-contrast) — display preference  |
- * | `locale`     | Language for axis labels — viewer locale preference               |
- * | `labelScale` | Label font-size multiplier — accessibility / readability setting  |
+ * | `axes`       | Axes config (locale + axis labels) — viewer locale preference    |
+ * (labelScale is now inside typography group)
  *
  * @see AUTHOR_INTENT_FIELDS — the complementary set of author-owned fields
  */
 export const VIEWER_PREFERENCE_FIELDS = [
-  "theme",
-  "locale",
-  "labelScale",
+  "axes",
 ] as const satisfies ReadonlyArray<keyof RenderConfig>;
 
 /** Union of all field names in the viewer-preference category. */
@@ -228,14 +222,14 @@ export type ViewerPreferenceField = typeof VIEWER_PREFERENCE_FIELDS[number];
  * // Viewer wants dark mode in French.
  * const viewerConfig = {
  *   theme: "dark" as const,
- *   locale: "fr" as const,
+ *   axes: { locale: "fr" as const },
  * };
  *
  * const merged = resolveConflict(viewerConfig, authorConfig);
  * // merged.width       === 1920              (from author)
  * // merged.typeColors  === { _default: … }   (from author)
  * // merged.theme       === "dark"             (from viewer)
- * // merged.locale      === "fr"              (from viewer)
+ * // merged.axes.locale === "fr"              (from viewer)
  * const resolved = resolveTheme(merged);
  * ```
  *
@@ -260,32 +254,21 @@ export function resolveConflict(
   const merged: Record<string, unknown> = {};
 
   // ── Author-intent fields (authorConfig wins) ──────────────────────────────
-  if (authorConfig.width !== undefined) merged.width = authorConfig.width;
-  if (authorConfig.height !== undefined) merged.height = authorConfig.height;
-  if (authorConfig.coordinateSpace !== undefined)
-    merged.coordinateSpace = authorConfig.coordinateSpace;
-  if (authorConfig.background !== undefined)
-    merged.background = authorConfig.background;
-  if (authorConfig.fontFamily !== undefined)
-    merged.fontFamily = authorConfig.fontFamily;
-  if (authorConfig.nodeRadii !== undefined)
-    merged.nodeRadii = authorConfig.nodeRadii;
+  if (authorConfig.spatial !== undefined) merged.spatial = authorConfig.spatial;
+  if (authorConfig.typography !== undefined)
+    merged.typography = authorConfig.typography;
+  if (authorConfig.styling !== undefined)
+    merged.styling = authorConfig.styling;
   if (authorConfig.avoidCollisions !== undefined)
     merged.avoidCollisions = authorConfig.avoidCollisions;
-  if (authorConfig.typeColors !== undefined)
-    merged.typeColors = authorConfig.typeColors;
-  if (authorConfig.evolveStyles !== undefined)
-    merged.evolveStyles = authorConfig.evolveStyles;
   if (authorConfig.legend !== undefined) merged.legend = authorConfig.legend;
   if (authorConfig.filters !== undefined) merged.filters = authorConfig.filters;
-  if (authorConfig.strokeWidth !== undefined)
-    merged.strokeWidth = authorConfig.strokeWidth;
+  if (authorConfig.methods !== undefined) merged.methods = authorConfig.methods;
+  if (authorConfig.configIntent !== undefined)
+    merged.configIntent = authorConfig.configIntent;
 
   // ── Viewer-preference fields (viewerConfig wins) ──────────────────────────
-  if (viewerConfig.theme !== undefined) merged.theme = viewerConfig.theme;
-  if (viewerConfig.locale !== undefined) merged.locale = viewerConfig.locale;
-  if (viewerConfig.labelScale !== undefined)
-    merged.labelScale = viewerConfig.labelScale;
+  if (viewerConfig.axes !== undefined) merged.axes = viewerConfig.axes;
 
   // Parse through Zod to apply defaults (e.g. strokeWidth=1) and validate.
   return RenderConfigSchema.parse(merged as RenderConfigInput);
@@ -347,8 +330,8 @@ export const LAYOUT_STRUCTURAL_FIELDS: ReadonlyArray<
  * |-----------------------|---------------|--------------------------------------------------|
  * | `platform-constraint` | authorConfig  | width, height, coordinateSpace, configIntent |
  * | `layout-structural`   | authorConfig  | background, legend, filters                      |
- * | `author-intent`       | authorConfig  | fontFamily, nodeRadii, avoidCollisions, typeColors, evolveStyles, strokeWidth |
- * | `viewer-preference`   | viewerConfig  | theme, locale, labelScale                        |
+ * | `author-intent`       | authorConfig  | typography, nodeRadii, avoidCollisions, typeColors, evolveStyles, strokeWidth |
+ * | `viewer-preference`   | viewerConfig  | theme, axes                                    |
  *
  * ## Difference from resolveConflict()
  *
@@ -430,7 +413,11 @@ export function resolveConfig(
   // Populate `diagnosticsOut` (if the caller provided one) with the richer
   // UnrecognizedTypeEntry objects, and always populate the `diagnostics` return
   // value with the flat string array for the existing `RenderDiagnostics` shape.
-  const configDiag = collectConfigDiagnostics(config);
+  const configDiag = collectConfigDiagnostics({
+    typeColors: config.styling?.palette as Record<string, unknown> | undefined,
+    evolveStyles: config.styling?.evolveStyles as Record<string, unknown> | undefined,
+    nodeRadii: config.spatial?.nodeRadii as Record<string, unknown> | undefined,
+  });
 
   // Propagate to the optional mutable output container (richer entry format)
   if (options?.diagnosticsOut) {

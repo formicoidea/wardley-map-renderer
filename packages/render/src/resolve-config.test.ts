@@ -7,10 +7,10 @@
  * ## 4-Tier Precedence (highest → lowest)
  *
  * ```
- * Tier 1 (highest): platform-constraint — width, height, coordinateSpace, configIntent
- * Tier 2:           layout-structural   — background, legend, filters
- * Tier 3:           author-intent       — fontFamily, nodeRadii, avoidCollisions, typeColors, evolveStyles, strokeWidth
- * Tier 4 (lowest):  viewer-preference  — theme, locale, labelScale
+ * Tier 1 (highest): platform-constraint — spatial, configIntent
+ * Tier 2:           layout-structural   — legend, filters
+ * Tier 3:           author-intent       — styling, typography, avoidCollisions, methods
+ * Tier 4 (lowest):  viewer-preference  — axes
  * ```
  *
  * @see resolve-conflict.ts — resolveConfig() + field arrays
@@ -29,6 +29,9 @@ import {
   getFieldTierCategory,
   type RenderConfig,
 } from "./schema.js";
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const cfg = (viewer: any, author: any, opts?: any) => resolveConfig(viewer, author, opts);
 
 // ── TIER_PRECEDENCE ──────────────────────────────────────────────────────────
 
@@ -100,7 +103,7 @@ describe("TIERED_RENDER_CONFIG_TAXONOMY — shape contract", () => {
 // ── TIERED_RENDER_CONFIG_TAXONOMY tier classifications ───────────────────────
 
 describe("TIERED_RENDER_CONFIG_TAXONOMY — platform-constraint fields", () => {
-  const expected = ["width", "height", "coordinateSpace", "configIntent"] as const;
+  const expected = ["spatial", "configIntent"] as const;
   for (const field of expected) {
     it(`${field} is platform-constraint`, () => {
       expect(TIERED_RENDER_CONFIG_TAXONOMY[field].category).toBe("platform-constraint");
@@ -109,7 +112,7 @@ describe("TIERED_RENDER_CONFIG_TAXONOMY — platform-constraint fields", () => {
 });
 
 describe("TIERED_RENDER_CONFIG_TAXONOMY — layout-structural fields", () => {
-  const expected = ["background", "legend", "filters"] as const;
+  const expected = ["legend", "filters"] as const;
   for (const field of expected) {
     it(`${field} is layout-structural`, () => {
       expect(TIERED_RENDER_CONFIG_TAXONOMY[field].category).toBe("layout-structural");
@@ -119,12 +122,10 @@ describe("TIERED_RENDER_CONFIG_TAXONOMY — layout-structural fields", () => {
 
 describe("TIERED_RENDER_CONFIG_TAXONOMY — author-intent fields", () => {
   const expected = [
-    "fontFamily",
-    "nodeRadii",
+    "typography",
+    "styling",
     "avoidCollisions",
-    "typeColors",
-    "evolveStyles",
-    "strokeWidth",
+    "methods",
   ] as const;
   for (const field of expected) {
     it(`${field} is author-intent`, () => {
@@ -134,7 +135,7 @@ describe("TIERED_RENDER_CONFIG_TAXONOMY — author-intent fields", () => {
 });
 
 describe("TIERED_RENDER_CONFIG_TAXONOMY — viewer-preference fields", () => {
-  const expected = ["theme", "locale", "labelScale"] as const;
+  const expected = ["axes"] as const;
   for (const field of expected) {
     it(`${field} is viewer-preference`, () => {
       expect(TIERED_RENDER_CONFIG_TAXONOMY[field].category).toBe("viewer-preference");
@@ -145,36 +146,32 @@ describe("TIERED_RENDER_CONFIG_TAXONOMY — viewer-preference fields", () => {
 // ── getFieldTierCategory ─────────────────────────────────────────────────────
 
 describe("getFieldTierCategory", () => {
-  it("returns platform-constraint for width", () => {
-    expect(getFieldTierCategory("width")).toBe("platform-constraint");
+  it("returns platform-constraint for spatial", () => {
+    expect(getFieldTierCategory("spatial")).toBe("platform-constraint");
   });
 
-  it("returns platform-constraint for coordinateSpace", () => {
-    expect(getFieldTierCategory("coordinateSpace")).toBe("platform-constraint");
-  });
-
-  it("returns layout-structural for background", () => {
-    expect(getFieldTierCategory("background")).toBe("layout-structural");
+  it("returns platform-constraint for configIntent", () => {
+    expect(getFieldTierCategory("configIntent")).toBe("platform-constraint");
   });
 
   it("returns layout-structural for legend", () => {
     expect(getFieldTierCategory("legend")).toBe("layout-structural");
   });
 
-  it("returns author-intent for typeColors", () => {
-    expect(getFieldTierCategory("typeColors")).toBe("author-intent");
+  it("returns layout-structural for filters", () => {
+    expect(getFieldTierCategory("filters")).toBe("layout-structural");
   });
 
-  it("returns author-intent for strokeWidth", () => {
-    expect(getFieldTierCategory("strokeWidth")).toBe("author-intent");
+  it("returns author-intent for styling", () => {
+    expect(getFieldTierCategory("styling")).toBe("author-intent");
   });
 
-  it("returns viewer-preference for theme", () => {
-    expect(getFieldTierCategory("theme")).toBe("viewer-preference");
+  it("returns author-intent for typography", () => {
+    expect(getFieldTierCategory("typography")).toBe("author-intent");
   });
 
-  it("returns viewer-preference for locale", () => {
-    expect(getFieldTierCategory("locale")).toBe("viewer-preference");
+  it("returns viewer-preference for axes", () => {
+    expect(getFieldTierCategory("axes")).toBe("viewer-preference");
   });
 });
 
@@ -182,18 +179,15 @@ describe("getFieldTierCategory", () => {
 
 describe("PLATFORM_CONSTRAINT_FIELDS", () => {
   it("contains all expected platform-constraint fields", () => {
-    expect(PLATFORM_CONSTRAINT_FIELDS).toContain("width");
-    expect(PLATFORM_CONSTRAINT_FIELDS).toContain("height");
-    expect(PLATFORM_CONSTRAINT_FIELDS).toContain("coordinateSpace");
+    expect(PLATFORM_CONSTRAINT_FIELDS).toContain("spatial");
     expect(PLATFORM_CONSTRAINT_FIELDS).toContain("configIntent");
   });
 
   it("does not contain viewer-preference or author-intent fields", () => {
-    expect(PLATFORM_CONSTRAINT_FIELDS).not.toContain("theme");
-    expect(PLATFORM_CONSTRAINT_FIELDS).not.toContain("locale");
-    expect(PLATFORM_CONSTRAINT_FIELDS).not.toContain("fontFamily");
-    expect(PLATFORM_CONSTRAINT_FIELDS).not.toContain("strokeWidth");
-    expect(PLATFORM_CONSTRAINT_FIELDS).not.toContain("background");
+    expect(PLATFORM_CONSTRAINT_FIELDS).not.toContain("axes");
+    expect(PLATFORM_CONSTRAINT_FIELDS).not.toContain("typography");
+    expect(PLATFORM_CONSTRAINT_FIELDS).not.toContain("styling");
+    expect(PLATFORM_CONSTRAINT_FIELDS).not.toContain("legend");
   });
 
   it("every entry in the array has category platform-constraint in the taxonomy", () => {
@@ -210,15 +204,14 @@ describe("PLATFORM_CONSTRAINT_FIELDS", () => {
 
 describe("LAYOUT_STRUCTURAL_FIELDS", () => {
   it("contains all expected layout-structural fields", () => {
-    expect(LAYOUT_STRUCTURAL_FIELDS).toContain("background");
     expect(LAYOUT_STRUCTURAL_FIELDS).toContain("legend");
     expect(LAYOUT_STRUCTURAL_FIELDS).toContain("filters");
   });
 
   it("does not contain platform-constraint or viewer-preference fields", () => {
-    expect(LAYOUT_STRUCTURAL_FIELDS).not.toContain("width");
-    expect(LAYOUT_STRUCTURAL_FIELDS).not.toContain("theme");
-    expect(LAYOUT_STRUCTURAL_FIELDS).not.toContain("strokeWidth");
+    expect(LAYOUT_STRUCTURAL_FIELDS).not.toContain("spatial");
+    expect(LAYOUT_STRUCTURAL_FIELDS).not.toContain("axes");
+    expect(LAYOUT_STRUCTURAL_FIELDS).not.toContain("styling");
   });
 
   it("every entry in the array has category layout-structural in the taxonomy", () => {
@@ -242,52 +235,53 @@ describe("LAYOUT_STRUCTURAL_FIELDS", () => {
 
 describe("resolveConfig — empty inputs", () => {
   it("accepts two empty objects and returns a valid RenderConfig", () => {
-    const { config: result } = resolveConfig({}, {});
-    expect(result.strokeWidth).toBe(1); // Zod default
+    const { config: result } = cfg({}, {});
+    // spatial is not set when both configs are empty — optional at top level
+    expect(result.spatial).toBeUndefined();
   });
 });
 
 // ── resolveConfig — tier 1 (platform-constraint) ─────────────────────────────
 
 describe("resolveConfig — tier 1 (platform-constraint): authorConfig wins", () => {
-  it("width from authorConfig wins over viewer attempt", () => {
-    const { config: result } = resolveConfig(
-      { width: 800 } as Partial<RenderConfig>,  // platform-constraint → ignored from viewer
-      { width: 1920 },
+  it("spatial.width from authorConfig wins over viewer attempt", () => {
+    const { config: result } = cfg(
+      { spatial: { width: 800 } },  // platform-constraint → ignored from viewer
+      { spatial: { width: 1920 } },
     );
-    expect(result.width).toBe(1920);
+    expect(result.spatial?.width).toBe(1920);
   });
 
-  it("height from authorConfig wins over viewer attempt", () => {
-    const { config: result } = resolveConfig(
-      { height: 400 } as Partial<RenderConfig>,
-      { height: 1080 },
+  it("spatial.height from authorConfig wins over viewer attempt", () => {
+    const { config: result } = cfg(
+      { spatial: { height: 400 } },
+      { spatial: { height: 1080 } },
     );
-    expect(result.height).toBe(1080);
+    expect(result.spatial?.height).toBe(1080);
   });
 
-  it("coordinateSpace from authorConfig is applied", () => {
-    const { config: result } = resolveConfig({}, {
-      coordinateSpace: { width: 2400, height: 1200 } as RenderConfig["coordinateSpace"],
+  it("spatial.coordinateSpace from authorConfig is applied", () => {
+    const { config: result } = cfg({}, {
+      spatial: { coordinateSpace: { width: 2400, height: 1200 } as any },
     });
-    expect(result.coordinateSpace?.width).toBe(2400);
-    expect(result.coordinateSpace?.height).toBe(1200);
+    expect(result.spatial?.coordinateSpace?.width).toBe(2400);
+    expect(result.spatial?.coordinateSpace?.height).toBe(1200);
   });
 });
 
 // ── resolveConfig — tier 2 (layout-structural) ───────────────────────────────
 
 describe("resolveConfig — tier 2 (layout-structural): authorConfig wins", () => {
-  it("background from authorConfig wins", () => {
-    const { config: result } = resolveConfig(
-      { background: { color: "#000000" } } as Partial<RenderConfig>,
-      { background: { color: "#ffffff" } },
+  it("styling.background from authorConfig wins", () => {
+    const { config: result } = cfg(
+      { styling: { background: { color: "#000000" } } },
+      { styling: { background: { color: "#ffffff" } } },
     );
-    expect(result.background?.color).toBe("#ffffff");
+    expect(result.styling?.background?.color).toBe("#ffffff");
   });
 
   it("legend from authorConfig wins", () => {
-    const { config: result } = resolveConfig(
+    const { config: result } = cfg(
       { legend: { show: false, position: "top-left", legendOverflow: "clip" } },
       { legend: { show: true, position: "bottom-right", legendOverflow: "allow" } },
     );
@@ -296,8 +290,8 @@ describe("resolveConfig — tier 2 (layout-structural): authorConfig wins", () =
   });
 
   it("filters from authorConfig wins", () => {
-    const { config: result } = resolveConfig(
-      { filters: { excludeComponentTypes: ["anchor" as const] } } as Partial<RenderConfig>,
+    const { config: result } = cfg(
+      { filters: { excludeComponentTypes: ["anchor" as const] } },
       { filters: { excludeComponentTypes: ["note" as const] } },
     );
     expect(result.filters?.excludeComponentTypes).toEqual(["note"]);
@@ -307,64 +301,56 @@ describe("resolveConfig — tier 2 (layout-structural): authorConfig wins", () =
 // ── resolveConfig — tier 3 (author-intent) ───────────────────────────────────
 
 describe("resolveConfig — tier 3 (author-intent): authorConfig wins", () => {
-  it("fontFamily from authorConfig wins", () => {
-    const { config: result } = resolveConfig(
-      { fontFamily: "Arial" } as Partial<RenderConfig>,
-      { fontFamily: "Roboto, sans-serif" },
+  it("typography.fontFamily from authorConfig wins", () => {
+    const { config: result } = cfg(
+      { typography: { fontFamily: "Arial", labelScale: 1.0 } },
+      { typography: { fontFamily: "Roboto, sans-serif", labelScale: 1.0 } },
     );
-    expect(result.fontFamily).toBe("Roboto, sans-serif");
+    expect(result.typography?.fontFamily).toBe("Roboto, sans-serif");
   });
 
-  it("strokeWidth from authorConfig wins", () => {
-    const { config: result } = resolveConfig(
-      { strokeWidth: 0.5 } as Partial<RenderConfig>,
-      { strokeWidth: 2 },
+  it("spatial.strokeWidth from authorConfig wins", () => {
+    const { config: result } = cfg(
+      { spatial: { strokeWidth: 0.5 } },
+      { spatial: { strokeWidth: 2 } },
     );
-    expect(result.strokeWidth).toBe(2);
+    expect(result.spatial?.strokeWidth).toBe(2);
   });
 
-  it("typeColors from authorConfig wins", () => {
-    const { config: result } = resolveConfig(
-      { typeColors: { _default: "#ff0000" } } as Partial<RenderConfig>,
-      { typeColors: { _default: "#334155", "user-need": "#0ea5e9" } },
+  it("styling.palette from authorConfig wins", () => {
+    const { config: result } = cfg(
+      { styling: { palette: { _default: "#ff0000" } } },
+      { styling: { palette: { _default: "#334155", "user-need": "#0ea5e9" } } },
     );
-    expect(result.typeColors?._default).toBe("#334155");
+    expect(result.styling?.palette?._default).toBe("#334155");
   });
 
-  it("evolveStyles from authorConfig wins", () => {
-    const { config: result } = resolveConfig(
-      { evolveStyles: { natural: { stroke: "#ff0000" } } } as Partial<RenderConfig>,
-      { evolveStyles: { natural: { stroke: "#00ff00" } } },
+  it("styling.evolveStyles from authorConfig wins", () => {
+    const { config: result } = cfg(
+      { styling: { evolveStyles: { natural: { stroke: "#ff0000" } } } },
+      { styling: { evolveStyles: { natural: { stroke: "#00ff00" } } } },
     );
-    expect(result.evolveStyles?.natural?.stroke).toBe("#00ff00");
+    expect(result.styling?.evolveStyles?.natural?.stroke).toBe("#00ff00");
   });
 });
 
 // ── resolveConfig — tier 4 (viewer-preference) ───────────────────────────────
 
 describe("resolveConfig — tier 4 (viewer-preference): viewerConfig wins", () => {
-  it("theme from viewerConfig wins over author value", () => {
-    const { config: result } = resolveConfig(
-      { theme: "dark" },
-      { theme: "default" } as Partial<RenderConfig>,
+  it("axes.locale from viewerConfig wins over author value", () => {
+    const { config: result } = cfg(
+      { axes: { locale: "fr" } },
+      { axes: { locale: "en" } },
     );
-    expect(result.theme).toBe("dark");
+    expect(result.axes?.locale).toBe("fr");
   });
 
-  it("locale from viewerConfig wins over author value", () => {
-    const { config: result } = resolveConfig(
-      { locale: "fr" },
-      { locale: "en" } as Partial<RenderConfig>,
+  it("typography.labelScale from authorConfig wins (typography is author-intent)", () => {
+    const { config: result } = cfg(
+      { typography: { fontFamily: "Inter, sans-serif", labelScale: 1.5 } },
+      { typography: { fontFamily: "Inter, sans-serif", labelScale: 0.8 } },
     );
-    expect(result.locale).toBe("fr");
-  });
-
-  it("labelScale from viewerConfig wins over author value", () => {
-    const { config: result } = resolveConfig(
-      { labelScale: 1.5 },
-      { labelScale: 0.8 } as Partial<RenderConfig>,
-    );
-    expect(result.labelScale).toBe(1.5);
+    expect(result.typography?.labelScale).toBe(0.8);
   });
 });
 
@@ -372,61 +358,55 @@ describe("resolveConfig — tier 4 (viewer-preference): viewerConfig wins", () =
 
 describe("resolveConfig — realistic scenario", () => {
   it("author brand config + viewer dark mode + French locale", () => {
-    const authorConfig: Partial<RenderConfig> = {
-      width: 1920,
-      height: 1080,
-      background: { color: "#f8fafc" },
-      typeColors: { _default: "#334155", "user-need": "#0ea5e9" },
-      strokeWidth: 1.5,
-      fontFamily: "Inter, sans-serif",
+    const authorConfig = {
+      spatial: { width: 1920, height: 1080, strokeWidth: 1.5 },
+      styling: {
+        background: { color: "#f8fafc" },
+        palette: { _default: "#334155", "user-need": "#0ea5e9" },
+      },
+      typography: { fontFamily: "Inter, sans-serif", labelScale: 1.2 },
       legend: { show: true, position: "bottom-right", legendOverflow: "allow" },
-      theme: "default",  // author sets — but viewer wins for this field
-      locale: "en",      // author sets — but viewer wins for this field
-    };
+      axes: { locale: "en" },      // author sets — but viewer wins for this field
+    } as unknown as Partial<RenderConfig>;
 
     const viewerConfig: Partial<RenderConfig> = {
-      theme: "dark",
-      locale: "fr",
-      labelScale: 1.2,
-      width: 800 as unknown as number, // viewer attempts platform-constraint — ignored
-    };
+      axes: { locale: "fr" },
+      spatial: { width: 800 },       // viewer attempts platform-constraint — ignored
+    } as Partial<RenderConfig>;
 
-    const { config: result } = resolveConfig(viewerConfig, authorConfig);
+    const { config: result } = cfg(viewerConfig, authorConfig);
 
     // Tier 1 (platform-constraint): authorConfig wins
-    expect(result.width).toBe(1920);   // author wins over viewer's 800
-    expect(result.height).toBe(1080);
+    expect(result.spatial?.width).toBe(1920);   // author wins over viewer's 800
+    expect(result.spatial?.height).toBe(1080);
 
     // Tier 2 (layout-structural): authorConfig wins
-    expect(result.background?.color).toBe("#f8fafc");
     expect(result.legend?.show).toBe(true);
     expect(result.legend?.position).toBe("bottom-right");
 
     // Tier 3 (author-intent): authorConfig wins
-    expect(result.typeColors?._default).toBe("#334155");
-    expect(result.strokeWidth).toBe(1.5);
-    expect(result.fontFamily).toBe("Inter, sans-serif");
+    expect(result.styling?.palette?._default).toBe("#334155");
+    expect(result.spatial?.strokeWidth).toBe(1.5);
+    expect(result.typography?.fontFamily).toBe("Inter, sans-serif");
+    expect(result.typography?.labelScale).toBe(1.2);
 
     // Tier 4 (viewer-preference): viewerConfig wins
-    expect(result.theme).toBe("dark");   // viewer wins over author's "default"
-    expect(result.locale).toBe("fr");    // viewer wins over author's "en"
-    expect(result.labelScale).toBe(1.2);
+    expect(result.axes?.locale).toBe("fr");    // viewer wins over author's "en"
   });
 
   it("viewer-only (no author) returns viewer preferences + defaults", () => {
-    const { config: result } = resolveConfig({ theme: "highContrast", locale: "fr" }, {});
-    expect(result.theme).toBe("highContrast");
-    expect(result.locale).toBe("fr");
-    expect(result.strokeWidth).toBe(1); // Zod default
+    const { config: result } = cfg({ axes: { locale: "fr" } }, {});
+    expect(result.axes?.locale).toBe("fr");
+    // spatial is not set — optional at top level
+    expect(result.spatial).toBeUndefined();
   });
 
   it("author-only (no viewer) returns author fields + defaults", () => {
-    const { config: result } = resolveConfig({}, { width: 3200, height: 1800, strokeWidth: 2 });
-    expect(result.width).toBe(3200);
-    expect(result.height).toBe(1800);
-    expect(result.strokeWidth).toBe(2);
+    const { config: result } = cfg({}, { spatial: { width: 3200, height: 1800, strokeWidth: 2 } });
+    expect(result.spatial?.width).toBe(3200);
+    expect(result.spatial?.height).toBe(1800);
+    expect(result.spatial?.strokeWidth).toBe(2);
     // Viewer-preference fields absent → undefined (no viewer supplied them)
-    expect(result.theme).toBeUndefined();
-    expect(result.locale).toBeUndefined();
+    expect(result.axes).toBeUndefined();
   });
 });

@@ -171,14 +171,14 @@ export interface ConstraintEvaluationOptions {
 // Clip handlers are keyed by ExecutableConstraint.id and registered in
 // CONSTRAINT_CLIP_HANDLERS below.
 
-/** Resolve effective canvas width from a RenderConfig. */
+/** Resolve effective canvas width from a nested v2 RenderConfig. */
 function resolveCanvasWidth(config: RenderConfig): number {
-  return config.coordinateSpace?.width ?? config.width ?? DEFAULT_COORDINATE_SPACE.width;
+  return config.spatial?.coordinateSpace?.width ?? config.spatial?.width ?? DEFAULT_COORDINATE_SPACE.width;
 }
 
-/** Resolve effective canvas height from a RenderConfig. */
+/** Resolve effective canvas height from a nested v2 RenderConfig. */
 function resolveCanvasHeight(config: RenderConfig): number {
-  return config.coordinateSpace?.height ?? config.height ?? DEFAULT_COORDINATE_SPACE.height;
+  return config.spatial?.coordinateSpace?.height ?? config.spatial?.height ?? DEFAULT_COORDINATE_SPACE.height;
 }
 
 /**
@@ -250,6 +250,31 @@ function clipLayerDependencies(config: RenderConfig): RenderConfig {
   };
 }
 
+/**
+ * Clip handler for `nodeRadiiStrokeWidth`.
+ *
+ * Bumps `spatial.nodeRadii._default` up to equal `spatial.strokeWidth` when
+ * the default radius is smaller than the stroke, avoiding malformed circles.
+ */
+function clipNodeRadiiStrokeWidth(config: RenderConfig): RenderConfig {
+  const strokeWidth = config.spatial?.strokeWidth;
+  const defaultRadius = config.spatial?.nodeRadii?._default as number | undefined;
+
+  if (strokeWidth === undefined || defaultRadius === undefined) return config;
+  if (defaultRadius >= strokeWidth) return config;
+
+  return {
+    ...config,
+    spatial: {
+      ...config.spatial!,
+      nodeRadii: {
+        ...config.spatial!.nodeRadii!,
+        _default: strokeWidth,
+      },
+    },
+  };
+}
+
 // ── CONSTRAINT_CLIP_HANDLERS ─────────────────────────────────────────────────
 
 /**
@@ -257,21 +282,26 @@ function clipLayerDependencies(config: RenderConfig): RenderConfig {
  *
  * Only constraints that support meaningful auto-correction have entries:
  *
- * | Constraint ID          | Clip behavior                                   |
- * |------------------------|-------------------------------------------------|
- * | `legendBoundsValidation` | Clamp `legend.position.{x,y}` to canvas bounds |
- * | `layerDependencies`    | Set dependent layers to `false` when required layer is off |
- * | `phaseStyleAlignment`  | Not clippable — warning only, no auto-correction |
+ * | Constraint ID              | Clip behavior                                        |
+ * |----------------------------|------------------------------------------------------|
+ * | `legendBoundsValidation`   | Clamp `legend.position.{x,y}` to canvas bounds       |
+ * | `layerDependencies`        | Set dependent layers to `false` when required layer off |
+ * | `nodeRadiiStrokeWidth`     | Bump `nodeRadii._default` up to `strokeWidth`        |
+ * | `phaseStyleAlignment`      | Not clippable — warning only, no auto-correction     |
+ * | `strokeWidthFontSizeRatio` | Not clippable — advisory warning only                |
  *
  * @see clipLegendBounds — handler for `legendBoundsValidation`
  * @see clipLayerDependencies — handler for `layerDependencies`
+ * @see clipNodeRadiiStrokeWidth — handler for `nodeRadiiStrokeWidth`
  */
 export const CONSTRAINT_CLIP_HANDLERS: Readonly<
   Record<string, ((config: RenderConfig) => RenderConfig) | undefined>
 > = {
   legendBoundsValidation: clipLegendBounds,
   layerDependencies: clipLayerDependencies,
+  nodeRadiiStrokeWidth: clipNodeRadiiStrokeWidth,
   // phaseStyleAlignment: intentionally absent — no sensible auto-correction
+  // strokeWidthFontSizeRatio: intentionally absent — advisory warning only
 } as const;
 
 // ── evaluateConstraints ───────────────────────────────────────────────────────
@@ -366,4 +396,133 @@ export function evaluateConstraints(
   }
 
   return result;
+}
+
+// ── RenderConfigValidationError ───────────────────────────────────────────────
+
+/**
+ * A typed validation error returned by {@link validateRenderConfig}.
+ *
+ * Combines the constraint identity with the violation details so callers
+ * can programmatically handle errors per constraint and per field path.
+ */
+export interface RenderConfigValidationError {
+  /** Stable camelCase constraint ID (matches `ExecutableConstraint.id`). */
+  readonly constraintId: string;
+  /**
+   * Dot-path of the field responsible for the violation.
+   * Follows the same convention as Zod issue paths
+   * (e.g. `"legend.position.x"`, `"filters.layers.evolvesTo"`, `"spatial.nodeRadii._default"`).
+   */
+  readonly path: string;
+  /** Human-readable description with actionable guidance. */
+  readonly message: string;
+  /**
+   * Violation severity.
+   *
+   * - `"error"`   — structurally invalid; renderers should refuse to proceed.
+   * - `"warning"` — advisory mismatch; rendering continues but output may not
+   *                 match author intent.
+   */
+  readonly severity: "error" | "warning";
+}
+
+// ── RenderConfigValidationResult ──────────────────────────────────────────────
+
+/**
+ * Result returned by {@link validateRenderConfig}.
+ *
+ * Provides both aggregate booleans (`valid`, `ok`) and a flat list of typed
+ * errors with full field paths for programmatic consumption.
+ */
+export interface RenderConfigValidationResult {
+  /**
+   * `true` when no constraint reports any violation (neither error nor warning).
+   * Equivalent to `errors.length === 0`.
+   */
+  readonly valid: boolean;
+  /**
+   * `true` when no violation has `severity === "error"`.
+   * Warnings leave `ok` as `true` — only hard errors set it to `false`.
+   */
+  readonly ok: boolean;
+  /** Flat list of all validation errors across all constraints, in evaluation order. */
+  readonly errors: readonly RenderConfigValidationError[];
+}
+
+// ── validateRenderConfig ──────────────────────────────────────────────────────
+
+/**
+ * Run all cross-group constraints against a resolved `RenderConfig` and return
+ * a typed validation result with field paths.
+ *
+ * Unlike {@link evaluateConstraints} (which applies a policy: warn/throw/clip),
+ * `validateRenderConfig` is a **pure query** — it never mutates the config,
+ * never throws, and never emits console warnings. It simply reports what
+ * constraints are violated.
+ *
+ * ## Usage
+ *
+ * ```ts
+ * import { validateRenderConfig } from "@wardleyapi/render";
+ *
+ * const result = validateRenderConfig(config);
+ *
+ * if (!result.valid) {
+ *   for (const err of result.errors) {
+ *     console.log(`[${err.constraintId}] ${err.path}: ${err.message} (${err.severity})`);
+ *   }
+ * }
+ *
+ * // Check only hard errors (ignore warnings):
+ * if (!result.ok) {
+ *   throw new Error("Config has structural errors");
+ * }
+ * ```
+ *
+ * ## Constraint evaluation order
+ *
+ * Constraints are evaluated in `EXECUTABLE_CONSTRAINT_GRAPH` declaration order:
+ * 1. `legendBoundsValidation`    — spatial.coordinateSpace → legend bounds
+ * 2. `layerDependencies`         — DAG-based layer toggle reachability
+ * 3. `phaseStyleAlignment`       — phases.length ↔ evolveStyles key count parity
+ * 4. `strokeWidthFontSizeRatio`  — spatial.strokeWidth ↔ typography.labelScale ratio
+ * 5. `nodeRadiiStrokeWidth`      — spatial.nodeRadii._default ≥ spatial.strokeWidth
+ *
+ * Each constraint independently evaluates against the **original** config — no
+ * cascading corrections are applied (unlike `evaluateConstraints` with `"clip"` policy).
+ *
+ * @param config - A fully resolved `RenderConfig` (output of `RenderConfigSchema.parse`
+ *   or `resolveConfig`). Constraints are pure functions; Zod is not called here.
+ * @returns Typed validation result with field paths for every violation.
+ *
+ * @see evaluateConstraints — policy-based evaluation (warn/throw/clip)
+ * @see checkConstraints — lower-level per-constraint results (Map-based)
+ * @see EXECUTABLE_CONSTRAINT_GRAPH — the constraint array
+ */
+export function validateRenderConfig(
+  config: RenderConfig,
+): RenderConfigValidationResult {
+  const errors: RenderConfigValidationError[] = [];
+
+  for (const constraint of EXECUTABLE_CONSTRAINT_GRAPH) {
+    const result = constraint.check(config as Parameters<typeof constraint.check>[0]);
+
+    if (!result.valid) {
+      for (const violation of result.violations) {
+        errors.push({
+          constraintId: constraint.id,
+          path: violation.path,
+          message: violation.message,
+          severity: violation.severity,
+        });
+      }
+    }
+  }
+
+  return {
+    valid: errors.length === 0,
+    ok: !errors.some((e) => e.severity === "error"),
+    errors,
+  };
 }

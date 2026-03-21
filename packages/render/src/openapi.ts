@@ -164,12 +164,15 @@ const FiltersSchema = z.object({
   excludeComponentTypes: z.array(ComponentTypeEnum).optional(),
 }).openapi("Filters");
 
+const LegendOverflowEnum = z.enum(["clip", "allow", "warn"]).openapi("LegendOverflow");
+
 const LegendSchema = z.object({
   show: z.boolean().default(true),
   position: z.union([
     z.enum(["top-left", "top-right", "bottom-left", "bottom-right", "auto"]),
     z.object({ x: z.number(), y: z.number() }),
   ]).default("bottom-right"),
+  legendOverflow: LegendOverflowEnum.default("allow"),
 }).openapi("Legend");
 
 const EvolveStyleSchema = z.object({
@@ -186,41 +189,104 @@ const MethodConfigSchema = z.object({
   ),
 }).openapi("MethodConfig");
 
-const RenderConfigSchema = z.object({
-  /** Override canvas width (defaults to 1600) */
-  width: z.number().positive().optional(),
-  /** Override canvas height (defaults to 800) */
-  height: z.number().positive().optional(),
-  /** Named visual theme preset (default: "default") */
-  theme: ThemeEnum.optional(),
+const AxesConfigSchema = z.object({
   /** Locale preset for axis labels (default: "en") */
-  locale: LocaleEnum.optional(),
-  /** Background canvas color and axis/phase display controls.
-   *  backgroundColor is now background.color — no top-level backgroundColor field. */
-  background: BackgroundSchema.optional(),
-  fontFamily: z.string().optional(),
-  labelScale: z.number().positive().max(5).optional(),
-  nodeRadii: z.object({ _default: z.number().positive().max(50) })
-    .catchall(z.number().positive().max(50))
-    .optional(),
-  avoidCollisions: z.boolean().optional(),
-  /** Per-component-type color overrides. `_default` is required when provided (TypeStyleMap pattern). */
-  typeColors: z.object({ _default: z.string() })
-    .catchall(z.string())
-    .optional(),
-  evolveStyles: z.object({
-    natural: EvolveStyleSchema.optional(),
-    ecosystem: EvolveStyleSchema.optional(),
-    forced: EvolveStyleSchema.optional(),
-    late: EvolveStyleSchema.optional(),
+  locale: LocaleEnum.default("en"),
+  /** i18n axis label overrides */
+  axisLabels: z.object({
+    xAxis: z.string().optional(),
+    yAxis: z.string().optional(),
+    phases: z.array(z.string().optional()).min(1).optional(),
+    evolutionStart: z.string().optional(),
+    evolutionEnd: z.string().optional(),
+    visibilityHigh: z.string().optional(),
+    visibilityLow: z.string().optional(),
   }).optional(),
-  legend: LegendSchema.optional(),
+}).openapi("AxesConfig");
+
+const CoordinateSpaceOpenApiSchema = z.object({
+  units: z.enum(["px", "normalized"]).default("px"),
+  origin: z.enum(["top-left", "bottom-left"]).default("top-left"),
+}).openapi("CoordinateSpace");
+
+const NodeRadiiOpenApiSchema = z.object({ _default: z.number().positive().max(50) })
+  .catchall(z.number().positive().max(50))
+  .openapi("NodeRadii");
+
+const TypeColorsOpenApiSchema = z.object({ _default: z.string() })
+  .catchall(z.string())
+  .openapi("TypeColors");
+
+const EvolveStylesMapOpenApiSchema = z.object({
+  natural: EvolveStyleSchema.optional(),
+  ecosystem: EvolveStyleSchema.optional(),
+  forced: EvolveStyleSchema.optional(),
+  late: EvolveStyleSchema.optional(),
+}).openapi("EvolveStylesMap");
+
+/** Spatial — canvas dimensions, coordinate space, stroke width, node radii */
+const SpatialConfigOpenApiSchema = z.object({
+  /** Canvas width in pixels (default: 1600) */
+  width: z.number().positive().max(10000).default(1600),
+  /** Canvas height in pixels (default: 800) */
+  height: z.number().positive().max(10000).default(800),
+  /** Explicit coordinate space declaration */
+  coordinateSpace: CoordinateSpaceOpenApiSchema.optional(),
+  /** Stroke width in pixels for edges and node outlines (default: 1) */
+  strokeWidth: z.number().min(0.25).max(8).default(1),
+  /** Per-type node circle radii (default: { _default: 5 }) */
+  nodeRadii: NodeRadiiOpenApiSchema.default({ _default: 5 }),
+}).openapi("SpatialConfig");
+
+/** Typography — font family and label scale multiplier */
+const TypographyConfigOpenApiSchema = z.object({
+  /** CSS font-family stack (default: "Inter, sans-serif") */
+  fontFamily: z.string().default("Inter, sans-serif"),
+  /** Label font size multiplier (default: 1.0) */
+  labelScale: z.number().positive().max(5).default(1.0),
+}).openapi("TypographyConfig");
+
+/** Styling — theme, palette (colors), evolve styles, background */
+const StylingConfigOpenApiSchema = z.object({
+  /** Named visual theme preset (default: "default") */
+  theme: ThemeEnum.default("default"),
+  /** Per-renderable-type color overrides */
+  palette: TypeColorsOpenApiSchema.optional(),
+  /** Per-evolve-type arrow stroke style overrides */
+  evolveStyles: EvolveStylesMapOpenApiSchema.optional(),
+  /** Background canvas color and axis/phase display controls */
+  background: BackgroundSchema.optional(),
+}).openapi("StylingConfig");
+
+/** ConfigIntent — scope-boundary intent flags */
+const ConfigIntentOpenApiSchema = z.object({
+  /** Output is a one-shot static SVG/PNG (default: true) */
+  staticExport: z.boolean().default(true),
+  /** Temporal diffing excluded (default: true) */
+  noTemporalDiff: z.boolean().default(true),
+  /** SVG output is inert — no JS, no event listeners (default: true) */
+  noInteraction: z.boolean().default(true),
+}).openapi("ConfigIntent");
+
+const RenderConfigSchema = z.object({
+  /** Spatial — canvas dimensions, coordinate space, stroke width, node radii */
+  spatial: SpatialConfigOpenApiSchema.optional(),
+  /** Typography — font family and label scale multiplier */
+  typography: TypographyConfigOpenApiSchema.optional(),
+  /** Styling — theme, palette (colors), evolve styles, background */
+  styling: StylingConfigOpenApiSchema.optional(),
   /** Unified visibility filters: layer toggles (post-render) + data exclusions (pre-render) */
   filters: FiltersSchema.optional(),
-  /** Stroke width in pixels for edges and node outlines (defaults to 1) */
-  strokeWidth: z.number().min(0.25).max(8).default(1),
+  /** Legend visibility and position */
+  legend: LegendSchema.optional(),
+  /** Axes configuration — locale and axis label overrides */
+  axes: AxesConfigSchema.optional(),
+  /** Enable/disable label collision avoidance */
+  avoidCollisions: z.boolean().optional(),
   /** Per-method rendering configuration (type, color, i18n legend labels) */
   methods: z.array(MethodConfigSchema).optional(),
+  /** Scope-boundary intent flags */
+  configIntent: ConfigIntentOpenApiSchema.partial().optional(),
 }).openapi("RenderConfig");
 
 const AcceleratorTypeEnum = z.enum(["accelerator", "deaccelerator"]).openapi("AcceleratorType");

@@ -286,7 +286,7 @@ describe("buildRenderContext()", () => {
         { id: "a", label: { name: "A" }, type: "component", position: { evolution: { scalar: 0.5 }, visibility: { scalar: 0.5 } } },
       ],
       relations: [],
-      renderConfig: { width: 800, height: 400 },
+      renderConfig: { spatial: { width: 800, height: 400 } },
     });
 
     const ctx = buildRenderContext(customMap);

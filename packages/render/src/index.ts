@@ -49,6 +49,15 @@ export {
   vis,
   evoTarget,
   visTarget,
+  // RenderConfig accessor helpers
+  rcWidth,
+  rcHeight,
+  rcStrokeWidth,
+  rcFontFamily,
+  rcLabelScale,
+  rcTheme,
+  rcLocale,
+  resolveRenderConfigDefaults,
   ComponentSchema,
   RelationSchema,
   EvolutionSchema,
@@ -75,6 +84,20 @@ export {
   LegendPositionEnum,
   LegendPositionXYSchema,
   RenderConfigSchema,
+  // Sub-schema exports
+  SpatialConfigSchema,
+  TypographyConfigSchema,
+  StylingConfigSchema,
+  AxesConfigSchema,
+  FiltersSchema,
+  // Default config exports
+  DEFAULT_RENDER_CONFIG,
+  DEFAULT_SPATIAL_CONFIG,
+  DEFAULT_TYPOGRAPHY_CONFIG,
+  DEFAULT_STYLING_CONFIG,
+  DEFAULT_AXES_CONFIG,
+  DEFAULT_LEGEND_CONFIG,
+  DEFAULT_FILTERS_CONFIG,
   ConfigIntentSchema,
   DEFAULT_CONFIG_INTENT,
   resolveConfigIntent,
@@ -116,6 +139,20 @@ export {
   type RenderConfig,
   type RenderConfigInput,
   type ResolvedRenderConfig,
+  // Sub-schema types (output — after Zod defaults applied)
+  type SpatialConfig,
+  type SpatialConfigInput,
+  type TypographyConfig,
+  type TypographyConfigInput,
+  type StylingConfig,
+  type StylingConfigInput,
+  type AxesConfig,
+  type AxesConfigInput,
+  type Filters,
+  type FiltersInput,
+  type ConfigIntent,
+  type ConfigIntentInput,
+  type LegendInput,
   type EvolveStyle,
   type AcceleratorType,
   type Accelerator,
@@ -133,6 +170,34 @@ export {
   type OutputHint,
   type ScaleFactor,
 } from "./coordinate-space.js";
+
+// ── RenderConfig v2 — theme baselines, v2 schema, phase mapping ──
+export {
+  // Theme baseline system
+  resolveThemeBaseline,
+  DEFAULT_THEME_BASELINE,
+  DARK_THEME_BASELINE,
+  HIGH_CONTRAST_THEME_BASELINE,
+  THEME_BASELINES,
+  type ThemeBaseline,
+  // V2 structured render config (with backward-compat flat-key preprocess)
+  RenderConfigV2BaseSchema,
+  RenderConfigV2Schema,
+  type RenderConfigV2,
+  type RenderConfigV2Input,
+  // Flat-to-nested backward-compat layer toggles/filters
+  DEFAULT_LAYER_TOGGLES,
+  DEFAULT_FILTERS,
+  type DefaultLayerToggles,
+  // Phase mapping (object-keyed, complementary to phase-mapping.ts array-based)
+  PHASE_KEYS,
+  PhaseRangeSchema,
+  PhaseMappingSchema as V2PhaseMappingSchema,
+  DEFAULT_PHASE_MAPPING as V2_DEFAULT_PHASE_MAPPING,
+  type PhaseKey,
+  type PhaseRange,
+  type PhaseMapping as V2PhaseMapping,
+} from "./render-config-v2.js";
 
 // ── Rendering-local type vocabulary ──────────────────────────────
 export {
@@ -179,6 +244,8 @@ export {
   legendBoundsValidation,
   layerDependenciesConstraint,
   phaseStyleAlignmentConstraint,
+  strokeWidthFontSizeRatioConstraint,
+  nodeRadiiStrokeWidthConstraint,
   CONFIG_CONSTRAINT_GRAPH,
   EXECUTABLE_CONSTRAINT_GRAPH,
   checkConstraints,
@@ -192,10 +259,13 @@ export {
 // ── Config constraint evaluation — Sub-AC 3: violationPolicy wiring ──────────
 export {
   evaluateConstraints,
+  validateRenderConfig,
   CONSTRAINT_CLIP_HANDLERS,
   ConstraintViolationError,
   type ConstraintPolicy,
   type ConstraintEvaluationOptions,
+  type RenderConfigValidationError,
+  type RenderConfigValidationResult,
 } from "./render-config-constraints.js";
 
 // ── Runtime diagnostics — Sub-AC 2 of AC 6: unrecognized type detection ──────

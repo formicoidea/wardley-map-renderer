@@ -69,12 +69,11 @@ describe("category-merge tier precedence — Tier 2 > Tier 1", () => {
       // Tier 2 category winner: author explicitly sets strokeWidth = 3
       // Expected: Tier 2 wins — resolved strokeWidth is 3, not 1.5
 
-      const authorConfig: Partial<RenderConfig> = {
-        strokeWidth: 3,         // explicit Tier-2 author-intent value
-      };
-      const viewerConfig: Partial<RenderConfig> = {
-        theme: "dark",          // selects the dark theme (Tier-1 baseline: strokeWidth=1.5)
-      };
+      const authorConfig = {
+        spatial: { strokeWidth: 3 },         // explicit author-intent value
+        styling: { theme: "dark" as const },          // author selects the dark theme
+      } as Partial<RenderConfig>;
+      const viewerConfig: Partial<RenderConfig> = {};
 
       // Step 1: category-based merge
       const merged = resolveConflict(viewerConfig, authorConfig);
@@ -105,10 +104,10 @@ describe("category-merge tier precedence — Tier 2 > Tier 1", () => {
       // strokeWidth=1.5 from applying. background.color has no Zod default, so it
       // correctly reflects the dark theme baseline when not explicitly set.
 
-      const viewerConfig: Partial<RenderConfig> = {
-        theme: "dark",   // viewer-preference: selects the dark theme baseline
-      };
-      const authorConfig: Partial<RenderConfig> = {};   // no explicit author overrides
+      const viewerConfig: Partial<RenderConfig> = {};   // no viewer overrides
+      const authorConfig = {
+        styling: { theme: "dark" as const },   // author-intent: selects the dark theme baseline
+      } as Partial<RenderConfig>;
 
       const merged = resolveConflict(viewerConfig, authorConfig);
       const resolved = resolveTheme(merged);
@@ -199,41 +198,38 @@ describe("category-merge tier precedence — same-tier edge case (field-level in
       // Each field independently applies the field-level rule: "authorConfig wins".
       // They do NOT compete with each other — they coexist in the merged output.
 
-      const authorConfig: Partial<RenderConfig> = {
-        width: 1920,                     // Tier-2, author-intent
-        fontFamily: "Roboto, sans-serif", // Tier-2, author-intent (same tier as width)
-      };
+      const authorConfig = {
+        spatial: { width: 1920 },                     // Tier-2, author-intent
+        typography: { fontFamily: "Roboto, sans-serif", labelScale: 1.0 }, // Tier-2, author-intent (same tier as spatial)
+      } as Partial<RenderConfig>;
       const viewerConfig: Partial<RenderConfig> = {};
 
       const result = resolveConflict(viewerConfig, authorConfig);
 
       // Both same-tier author-intent fields survive independently
-      expect(result.width).toBe(1920);
-      expect(result.fontFamily).toBe("Roboto, sans-serif");
+      expect(result.spatial?.width).toBe(1920);
+      expect(result.typography?.fontFamily).toBe("Roboto, sans-serif");
     },
   );
 
   it(
     "two viewer-preference Tier-2 fields from the same viewer both survive without interfering",
     () => {
-      // Both `theme` and `locale` are Tier-2 viewer-preference fields.
+      // Both `theme` and `axes` are Tier-2 viewer-preference fields.
       // They belong to the same tier AND the same category.
       // Each field independently applies the field-level rule: "viewerConfig wins".
       // They do NOT compete with each other.
 
       const viewerConfig: Partial<RenderConfig> = {
-        theme: "dark",    // Tier-2, viewer-preference
-        locale: "fr",     // Tier-2, viewer-preference (same tier as theme)
-        labelScale: 1.4,  // Tier-2, viewer-preference (same tier as both above)
+        axes: { locale: "fr" },     // viewer-preference
       };
       const authorConfig: Partial<RenderConfig> = {};
 
       const result = resolveConflict(viewerConfig, authorConfig);
 
-      // All same-tier viewer-preference fields survive independently
-      expect(result.theme).toBe("dark");
-      expect(result.locale).toBe("fr");
-      expect(result.labelScale).toBe(1.4);
+      // Viewer-preference field survives
+      expect(result.axes?.locale).toBe("fr");
+      expect(result.axes?.locale).toBe("fr");
     },
   );
 
@@ -245,21 +241,19 @@ describe("category-merge tier precedence — same-tier edge case (field-level in
       // existing field-level rule applies: authorConfig wins, viewer is discarded.
       // Two fields at the same tier each apply the rule independently.
 
-      const authorConfig: Partial<RenderConfig> = {
-        width: 1920,        // author-intent: author wins
-        strokeWidth: 2,     // author-intent: author wins
-      };
+      const authorConfig = {
+        spatial: { width: 1920, strokeWidth: 2 },  // author-intent: author wins
+      } as Partial<RenderConfig>;
       const viewerConfig: Partial<RenderConfig> = {
-        width: 800 as unknown as number,    // ignored — width is author-intent, viewer loses
-        strokeWidth: 0.5 as unknown as number, // ignored — strokeWidth is author-intent, viewer loses
+        spatial: { width: 800, strokeWidth: 0.5 },  // ignored — spatial is author-intent, viewer loses
       } as Partial<RenderConfig>;
 
       const result = resolveConflict(viewerConfig, authorConfig);
 
       // For EACH author-intent field, the field-level rule is applied independently:
       // authorConfig wins, viewerConfig is discarded.
-      expect(result.width).toBe(1920);       // author's value, not viewer's 800
-      expect(result.strokeWidth).toBe(2);    // author's value, not viewer's 0.5
+      expect(result.spatial?.width).toBe(1920);       // author's value, not viewer's 800
+      expect(result.spatial?.strokeWidth).toBe(2);    // author's value, not viewer's 0.5
 
       // The field-level rule fires separately for each field — no cross-field
       // influence between same-tier fields.

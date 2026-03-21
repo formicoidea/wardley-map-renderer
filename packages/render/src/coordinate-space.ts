@@ -49,6 +49,9 @@
 
 import { z } from "zod";
 
+/** Round a number to 3 decimal places (API boundary normalization). */
+const round3 = (v: number): number => Math.round(v * 1000) / 1000;
+
 // ── OutputHintSchema ─────────────────────────────────────────────────────────
 
 /**
@@ -287,7 +290,7 @@ export const CoordinateSpaceSchema = z.object({
    * @category platform-constraint
    */
   evolutionRange: z
-    .tuple([z.number().min(0).max(1), z.number().min(0).max(1)])
+    .tuple([z.number().min(0).max(1).transform(round3), z.number().min(0).max(1).transform(round3)])
     .refine(([s, e]) => s < e, {
       message:
         "evolutionRange[0] (start) must be strictly less than evolutionRange[1] (end)",
@@ -315,7 +318,7 @@ export const CoordinateSpaceSchema = z.object({
    * @category platform-constraint
    */
   visibilityRange: z
-    .tuple([z.number().min(0).max(1), z.number().min(0).max(1)])
+    .tuple([z.number().min(0).max(1).transform(round3), z.number().min(0).max(1).transform(round3)])
     .refine(([h, l]) => h < l, {
       message:
         "visibilityRange[0] (high/top) must be strictly less than visibilityRange[1] (low/bottom)",

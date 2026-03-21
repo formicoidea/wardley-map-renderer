@@ -48,8 +48,8 @@ export const renderLabelsLayer: LayerRenderer = (
 ): string[] => {
   const labelPlacements: LabelPlacement[] = [];
   const excluded = new Set(ctx.resolvedConfig.excludeComponentTypes);
-  const fontFamily = ctx.resolvedConfig.fontFamily;
-  const fontSize = Math.round(COMPONENT_LABEL_BASE_FONT_SIZE * ctx.resolvedConfig.labelScale);
+  const fontFamily = ctx.resolvedConfig.typography.fontFamily;
+  const fontSize = Math.round(COMPONENT_LABEL_BASE_FONT_SIZE * ctx.resolvedConfig.typography.labelScale);
 
   for (const node of ctx.nodes) {
     const comp = node.component;

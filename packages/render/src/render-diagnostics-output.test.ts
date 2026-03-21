@@ -40,6 +40,8 @@ import {
   type RenderDiagnostics,
 } from "./resolve-conflict.js";
 import { resolveConfig } from "./resolve-conflict.js";
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const cfg = (viewer: any, author: any, opts?: any) => resolveConfig(viewer, author, opts);
 
 // ── 1. RenderDiagnosticsSchema — Zod schema shape validation ─────────────────
 
@@ -146,7 +148,7 @@ describe("resolveConfig → { config, diagnostics } output shape", () => {
   });
 
   it("diagnostics has all three required arrays", () => {
-    const { diagnostics } = resolveConfig({}, {});
+    const { diagnostics } = cfg({}, {});
     expect(diagnostics).toHaveProperty("unrecognizedTypes");
     expect(diagnostics).toHaveProperty("constraintViolations");
     expect(diagnostics).toHaveProperty("warnings");
@@ -156,16 +158,16 @@ describe("resolveConfig → { config, diagnostics } output shape", () => {
   });
 
   it("diagnostics satisfies RenderDiagnosticsSchema for an empty input config", () => {
-    const { diagnostics } = resolveConfig({}, {});
+    const { diagnostics } = cfg({}, {});
     const validated = RenderDiagnosticsSchema.safeParse(diagnostics);
     expect(validated.success).toBe(true);
   });
 
   it("diagnostics satisfies RenderDiagnosticsSchema when config has unrecognized typeColors keys", () => {
     // typeColors uses .catchall() — unrecognized key passes Zod but appears in diagnostics
-    const { diagnostics } = resolveConfig(
+    const { diagnostics } = cfg(
       {},
-      { typeColors: { _default: "#374151", "future-type": "#f59e0b" } as never },
+      { styling: { palette: { _default: "#374151", "future-type": "#f59e0b" } } } as never,
     );
     const validated = RenderDiagnosticsSchema.safeParse(diagnostics);
     expect(validated.success).toBe(true);
@@ -180,16 +182,18 @@ describe("resolveConfig → { config, diagnostics } output shape", () => {
 
 describe("RenderDiagnostics.unrecognizedTypes — public string[] surface", () => {
   it("is empty when typeColors has only known renderable type keys", () => {
-    const { diagnostics } = resolveConfig(
+    const { diagnostics } = cfg(
       {},
       {
-        typeColors: {
-          _default: "#374151",
-          component: "#dc2626",
-          "user-need": "#3b82f6",
-          pipeline: "#22c55e",
-          note: "#f59e0b",
-          anchor: "#8b5cf6",
+        styling: {
+          palette: {
+            _default: "#374151",
+            component: "#dc2626",
+            "user-need": "#3b82f6",
+            pipeline: "#22c55e",
+            note: "#f59e0b",
+            anchor: "#8b5cf6",
+          },
         },
       },
     );
@@ -198,9 +202,9 @@ describe("RenderDiagnostics.unrecognizedTypes — public string[] surface", () =
 
   it("contains the unrecognized key string — NOT the full UnrecognizedTypeEntry object", () => {
     // The PUBLIC API returns string[], not the richer DiagnosticsCollector entries
-    const { diagnostics } = resolveConfig(
+    const { diagnostics } = cfg(
       {},
-      { typeColors: { _default: "#000", "mystery-type": "#f00" } as never },
+      { styling: { palette: { _default: "#000", "mystery-type": "#f00" } } } as never,
     );
     // Each element is a plain string
     expect(diagnostics.unrecognizedTypes.every((t) => typeof t === "string")).toBe(true);
@@ -210,24 +214,26 @@ describe("RenderDiagnostics.unrecognizedTypes — public string[] surface", () =
 
   it("does NOT include '_default' in unrecognizedTypes", () => {
     // '_default' is a sentinel, not a component type — never reported as unrecognized
-    const { diagnostics } = resolveConfig(
+    const { diagnostics } = cfg(
       {},
-      { typeColors: { _default: "#000", "weird-type": "#f00" } as never },
+      { styling: { palette: { _default: "#000", "weird-type": "#f00" } } } as never,
     );
     expect(diagnostics.unrecognizedTypes).not.toContain("_default");
   });
 
   it("collects multiple unrecognized type names in a single call", () => {
-    const { diagnostics } = resolveConfig(
+    const { diagnostics } = cfg(
       {},
       {
-        typeColors: {
-          _default: "#000",
-          component: "#f00",       // known
-          "stale-type": "#0f0",    // unrecognized
-          "legacy-widget": "#00f", // unrecognized
-        } as never,
-      },
+        styling: {
+          palette: {
+            _default: "#000",
+            component: "#f00",       // known
+            "stale-type": "#0f0",    // unrecognized
+            "legacy-widget": "#00f", // unrecognized
+          },
+        },
+      } as never,
     );
     expect(diagnostics.unrecognizedTypes).toContain("stale-type");
     expect(diagnostics.unrecognizedTypes).toContain("legacy-widget");
@@ -242,14 +248,14 @@ describe("RenderDiagnostics.constraintViolations — string[] (stub: always empt
   it("is always empty [] in the current implementation (stub)", () => {
     // constraintViolations population is wired through resolveConfig's violationPolicy
     // Currently returns [] unless violationPolicy is wired to populate this array.
-    const { diagnostics } = resolveConfig({}, {});
+    const { diagnostics } = cfg({}, {});
     expect(diagnostics.constraintViolations).toEqual([]);
   });
 
   it("remains empty [] even when a valid config is provided", () => {
-    const { diagnostics } = resolveConfig(
-      { theme: "dark" },
-      { width: 1600, height: 800, strokeWidth: 2 },
+    const { diagnostics } = cfg(
+      { axes: { locale: "fr" } },
+      { spatial: { width: 1600, height: 800, strokeWidth: 2 } },
     );
     expect(diagnostics.constraintViolations).toEqual([]);
   });
@@ -259,16 +265,16 @@ describe("RenderDiagnostics.constraintViolations — string[] (stub: always empt
 
 describe("RenderDiagnostics.warnings — string[] (stub: always empty[])", () => {
   it("is always empty [] in the current implementation (stub)", () => {
-    const { diagnostics } = resolveConfig({}, {});
+    const { diagnostics } = cfg({}, {});
     expect(diagnostics.warnings).toEqual([]);
   });
 
   it("remains empty [] for any valid non-empty config input", () => {
-    const { diagnostics } = resolveConfig(
+    const { diagnostics } = cfg(
       {},
       {
-        typeColors: { _default: "#000", component: "#f00" },
-        strokeWidth: 1.5,
+        styling: { palette: { _default: "#000", component: "#f00" } },
+        spatial: { strokeWidth: 1.5 },
       },
     );
     expect(diagnostics.warnings).toEqual([]);

@@ -103,7 +103,7 @@ describe("LegendLayer — regression", () => {
 describe("LegendLayer — type+color", () => {
   it("typeColors reflected in swatches", () => {
     const map = makeMap({
-      renderConfig: { typeColors: { _default: "#2563eb", "anchor": "#dc2626" } },
+      renderConfig: { styling: { palette: { _default: "#2563eb", "anchor": "#dc2626" } } },
     });
     const ctx = buildRenderContext(map);
     const parts = renderLegendLayer(ctx);
@@ -144,7 +144,7 @@ describe("LegendLayer — type+color", () => {
 
   it("two distinct types get two separate colored entries", () => {
     const map = makeMap({
-      renderConfig: { typeColors: { _default: "#2563eb", "user-need": "#dc2626" } },
+      renderConfig: { styling: { palette: { _default: "#2563eb", "user-need": "#dc2626" } } },
       components: [
         { id: "a", label: { name: "Need" }, type: "user-need", position: { evolution: { scalar: 0.3 }, visibility: { scalar: 0.2 } } },
         { id: "b", label: { name: "Svc" }, type: "component", position: { evolution: { scalar: 0.6 }, visibility: { scalar: 0.5 } } },
@@ -211,7 +211,7 @@ describe("LegendLayer — type+color", () => {
 
 describe("LegendLayer — i18n", () => {
   it("locale 'fr' → French labels", () => {
-    const map = makeMap({ renderConfig: { locale: "fr" } });
+    const map = makeMap({ renderConfig: { axes: { locale: "fr" } } });
     const ctx = buildRenderContext(map);
     const parts = renderLegendLayer(ctx);
     const svg = parts.join("");
@@ -243,7 +243,7 @@ describe("LegendLayer — i18n", () => {
     const map = makeEvolveMap("natural");
     const parsed = sanitizeMap(WardleyMapSchema.parse({
       ...JSON.parse(JSON.stringify(map)),
-      renderConfig: { locale: "fr" },
+      renderConfig: { axes: { locale: "fr" } },
     }));
     const ctx = buildRenderContext(parsed);
     const parts = renderLegendLayer(ctx);
@@ -310,7 +310,7 @@ describe("LegendLayer — method entries (resolved textual values)", () => {
         },
       ],
       relations: [],
-      renderConfig: { locale: "fr" },
+      renderConfig: { axes: { locale: "fr" } },
     }));
     const ctx = buildRenderContext(map);
     const parts = renderLegendLayer(ctx);
@@ -555,7 +555,7 @@ describe("LegendLayer — i18n for new elements", () => {
       ],
       relations: [],
       renderConfig: {
-        locale: "fr",
+        axes: { locale: "fr" },
         methods: [
           { type: "build", color: "#00a86b", legend: { Uncharted: "faire", Transitional: "acheter", Industrialized: "externaliser" } },
         ],

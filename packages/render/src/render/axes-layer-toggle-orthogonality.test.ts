@@ -49,14 +49,14 @@ function makeMap(
       ],
       relations: [],
       renderConfig: {
-        background: {
+        styling: { background: {
           evolutionXAxis:
             showAxis !== undefined ? { show: showAxis } : undefined,
           evolutionPhases:
             showPhase !== undefined
               ? { showPhaseDividerAndLabel: showPhase }
               : undefined,
-        },
+        } },
       },
     })
   );

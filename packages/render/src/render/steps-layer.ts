@@ -52,7 +52,7 @@ export const renderStepsLayer: LayerRenderer = (
   if (!steps || steps.length === 0) return [];
 
   const parts: string[] = [];
-  const fontFamily = ctx.resolvedConfig.fontFamily;
+  const fontFamily = ctx.resolvedConfig.typography.fontFamily;
 
   for (const step of steps) {
     // Convert normalised [0-1] coordinates to pixel positions

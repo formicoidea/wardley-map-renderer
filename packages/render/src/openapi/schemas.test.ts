@@ -47,6 +47,8 @@ describe("OpenAPI schema registrations", () => {
     "Nature",
     "RelationType",
     "LegendPosition",
+    "LegendPositionXY",
+    "LegendOverflow",
     "Locale",
     "LabelPosition",
     "Label",
@@ -61,6 +63,9 @@ describe("OpenAPI schema registrations", () => {
     "AxisLabels",
     "Legend",
     "EvolveStyle",
+    "SpatialConfig",
+    "TypographyConfig",
+    "StylingConfig",
     "RenderConfig",
     "WardleyMap",
     "ProblemDetail",
@@ -79,7 +84,7 @@ describe("OpenAPI schema registrations", () => {
   it("registers at least 21 schemas", () => {
     const schemas = (doc().components as any)?.schemas;
     const schemaNames = Object.keys(schemas || {});
-    expect(schemaNames.length).toBeGreaterThanOrEqual(24);
+    expect(schemaNames.length).toBeGreaterThanOrEqual(27);
   });
 
   // ── WardleyMap schema structure ──────────────────────────
@@ -173,14 +178,29 @@ describe("OpenAPI schema registrations", () => {
 
   // ── RenderConfig schema ──────────────────────────────────
 
-  it("RenderConfig schema has rendering override fields", () => {
+  it("RenderConfig schema has nested sub-schema fields", () => {
     const schemas = (doc().components as any)?.schemas;
     const rc = schemas?.RenderConfig;
     expect(rc).toBeDefined();
-    expect(rc.properties.width).toBeDefined();
-    // backgroundColor moved to background.color in nested structure
-    expect(rc.properties.background).toBeDefined();
-    expect(rc.properties.fontFamily).toBeDefined();
+    // Nested groups — no flat width/height/theme at top level
+    expect(rc.properties.spatial).toBeDefined();
+    expect(rc.properties.typography).toBeDefined();
+    expect(rc.properties.styling).toBeDefined();
+    expect(rc.properties.filters).toBeDefined();
+    expect(rc.properties.legend).toBeDefined();
+    expect(rc.properties.axes).toBeDefined();
+    // Flat fields should NOT exist in nested structure
+    expect(rc.properties.width).toBeUndefined();
+    expect(rc.properties.height).toBeUndefined();
+    expect(rc.properties.theme).toBeUndefined();
+    expect(rc.properties.background).toBeUndefined();
+  });
+
+  it("registers SpatialConfig, TypographyConfig, StylingConfig sub-schemas", () => {
+    const schemas = (doc().components as any)?.schemas;
+    expect(schemas?.SpatialConfig).toBeDefined();
+    expect(schemas?.TypographyConfig).toBeDefined();
+    expect(schemas?.StylingConfig).toBeDefined();
   });
 });
 

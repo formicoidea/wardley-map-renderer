@@ -20,6 +20,8 @@ import {
   legendBoundsValidation,
   layerDependenciesConstraint,
   phaseStyleAlignmentConstraint,
+  strokeWidthFontSizeRatioConstraint,
+  nodeRadiiStrokeWidthConstraint,
   CONFIG_CONSTRAINT_GRAPH,
   EXECUTABLE_CONSTRAINT_GRAPH,
   checkConstraints,
@@ -75,8 +77,8 @@ describe("legendBoundsValidation", () => {
     expect(legendBoundsValidation.id).toBe("legendBoundsValidation");
   });
 
-  it("has metadata with source='coordinateSpace' and target='legend'", () => {
-    expect(legendBoundsValidation.metadata.source).toBe("coordinateSpace");
+  it("has metadata with source='spatial.coordinateSpace' and target='legend'", () => {
+    expect(legendBoundsValidation.metadata.source).toBe("spatial.coordinateSpace");
     expect(legendBoundsValidation.metadata.target).toBe("legend");
   });
 
@@ -191,7 +193,7 @@ describe("legendBoundsValidation", () => {
   it("uses custom coordinateSpace.width for bounds check", () => {
     // x=900 exceeds custom width=800 but is within default 1600
     const result = legendBoundsValidation.check({
-      coordinateSpace: { width: 800, height: 600 },
+      spatial: { coordinateSpace: { width: 800, height: 600 } },
       legend: { position: { x: 900, y: 100 } },
     });
     expectViolation(result, { count: 1, severity: "error", pathIncludes: "legend.position.x" });
@@ -200,7 +202,7 @@ describe("legendBoundsValidation", () => {
   it("uses custom coordinateSpace.height for bounds check", () => {
     // y=700 exceeds custom height=600 but is within default 800
     const result = legendBoundsValidation.check({
-      coordinateSpace: { width: 800, height: 600 },
+      spatial: { coordinateSpace: { width: 800, height: 600 } },
       legend: { position: { x: 100, y: 700 } },
     });
     expectViolation(result, { count: 1, severity: "error", pathIncludes: "legend.position.y" });
@@ -209,7 +211,7 @@ describe("legendBoundsValidation", () => {
   it("returns valid for XY within custom coordinateSpace bounds", () => {
     expectValid(
       legendBoundsValidation.check({
-        coordinateSpace: { width: 800, height: 600 },
+        spatial: { coordinateSpace: { width: 800, height: 600 } },
         legend: { position: { x: 800, y: 600 } },
       }),
       "exact custom edge",
@@ -219,7 +221,7 @@ describe("legendBoundsValidation", () => {
   it("returns valid for XY at custom canvas exact boundary", () => {
     expectValid(
       legendBoundsValidation.check({
-        coordinateSpace: { width: 1200, height: 900 },
+        spatial: { coordinateSpace: { width: 1200, height: 900 } },
         legend: { position: { x: 1200, y: 900 } },
       }),
       "custom exact edge 1200×900",
@@ -228,7 +230,7 @@ describe("legendBoundsValidation", () => {
 
   it("violation message mentions the offending value and canvas bound", () => {
     const result = legendBoundsValidation.check({
-      coordinateSpace: { width: 500, height: 400 },
+      spatial: { coordinateSpace: { width: 500, height: 400 } },
       legend: { position: { x: 999, y: 0 } },
     });
     expect(result.violations[0].message).toContain("999");
@@ -397,9 +399,9 @@ describe("phaseStyleAlignmentConstraint", () => {
     expect(phaseStyleAlignmentConstraint.id).toBe("phaseStyleAlignment");
   });
 
-  it("has metadata source containing 'phases' and target='evolveStyles'", () => {
+  it("has metadata source containing 'phases' and target='styling.evolveStyles'", () => {
     expect(phaseStyleAlignmentConstraint.metadata.source).toContain("phases");
-    expect(phaseStyleAlignmentConstraint.metadata.target).toBe("evolveStyles");
+    expect(phaseStyleAlignmentConstraint.metadata.target).toBe("styling.evolveStyles");
   });
 
   it("has metadata violationPolicy='warn'", () => {
@@ -413,7 +415,7 @@ describe("phaseStyleAlignmentConstraint", () => {
   it("skips check when phases is absent", () => {
     expectValid(
       phaseStyleAlignmentConstraint.check({
-        evolveStyles: { natural: { stroke: "#000" } },
+        styling: { evolveStyles: { natural: { stroke: "#000" } } },
       }),
       "no phases",
     );
@@ -422,7 +424,7 @@ describe("phaseStyleAlignmentConstraint", () => {
   it("skips check when evolveStyles is absent", () => {
     expectValid(
       phaseStyleAlignmentConstraint.check({
-        background: { evolutionPhases: { phases: ["A", "B", "C", "D"] } },
+        styling: { background: { evolutionPhases: { phases: ["A", "B", "C", "D"] } } },
       }),
       "no evolveStyles",
     );
@@ -431,8 +433,10 @@ describe("phaseStyleAlignmentConstraint", () => {
   it("skips check when evolveStyles has only _default (no per-type keys)", () => {
     expectValid(
       phaseStyleAlignmentConstraint.check({
-        background: { evolutionPhases: { phases: ["A", "B", "C"] } },
-        evolveStyles: { _default: { stroke: "#888" } },
+        styling: {
+          background: { evolutionPhases: { phases: ["A", "B", "C"] } },
+          evolveStyles: { _default: { stroke: "#888" } },
+        },
       }),
       "only _default",
     );
@@ -441,12 +445,14 @@ describe("phaseStyleAlignmentConstraint", () => {
   it("returns valid when 4 phases match 4 explicit evolveStyles keys", () => {
     expectValid(
       phaseStyleAlignmentConstraint.check({
-        background: { evolutionPhases: { phases: ["A", "B", "C", "D"] } },
-        evolveStyles: {
-          natural: { stroke: "#f00" },
-          ecosystem: { stroke: "#0f0" },
-          forced: { stroke: "#00f" },
-          late: { stroke: "#ff0" },
+        styling: {
+          background: { evolutionPhases: { phases: ["A", "B", "C", "D"] } },
+          evolveStyles: {
+            natural: { stroke: "#f00" },
+            ecosystem: { stroke: "#0f0" },
+            forced: { stroke: "#00f" },
+            late: { stroke: "#ff0" },
+          },
         },
       }),
       "4 phases, 4 keys",
@@ -456,8 +462,10 @@ describe("phaseStyleAlignmentConstraint", () => {
   it("returns valid when 2 phases match 2 explicit evolveStyles keys", () => {
     expectValid(
       phaseStyleAlignmentConstraint.check({
-        background: { evolutionPhases: { phases: ["X", "Y"] } },
-        evolveStyles: { natural: {}, ecosystem: {} },
+        styling: {
+          background: { evolutionPhases: { phases: ["X", "Y"] } },
+          evolveStyles: { natural: {}, ecosystem: {} },
+        },
       }),
       "2 phases, 2 keys",
     );
@@ -465,33 +473,41 @@ describe("phaseStyleAlignmentConstraint", () => {
 
   it("returns warning when phase count ≠ evolveStyles key count", () => {
     const result = phaseStyleAlignmentConstraint.check({
-      background: { evolutionPhases: { phases: ["A", "B", "C"] } },
-      evolveStyles: { natural: {}, ecosystem: {} },
+      styling: {
+        background: { evolutionPhases: { phases: ["A", "B", "C"] } },
+        evolveStyles: { natural: {}, ecosystem: {} },
+      },
     });
     expectViolation(result, { count: 1, severity: "warning" });
   });
 
   it("warning severity means ok=true (warnings don't block rendering)", () => {
     const result = phaseStyleAlignmentConstraint.check({
-      background: { evolutionPhases: { phases: ["A", "B"] } },
-      evolveStyles: { natural: {}, ecosystem: {}, forced: {} },
+      styling: {
+        background: { evolutionPhases: { phases: ["A", "B"] } },
+        evolveStyles: { natural: {}, ecosystem: {}, forced: {} },
+      },
     });
     expect(result.valid).toBe(false);
     expect(result.ok).toBe(true); // ok=true because only warnings
   });
 
-  it("violation path is 'background.evolutionPhases.phases'", () => {
+  it("violation path is 'styling.background.evolutionPhases.phases'", () => {
     const result = phaseStyleAlignmentConstraint.check({
-      background: { evolutionPhases: { phases: ["A", "B", "C"] } },
-      evolveStyles: { natural: {} },
+      styling: {
+        background: { evolutionPhases: { phases: ["A", "B", "C"] } },
+        evolveStyles: { natural: {} },
+      },
     });
-    expect(result.violations[0].path).toBe("background.evolutionPhases.phases");
+    expect(result.violations[0].path).toBe("styling.background.evolutionPhases.phases");
   });
 
   it("violation message includes both counts", () => {
     const result = phaseStyleAlignmentConstraint.check({
-      background: { evolutionPhases: { phases: ["A", "B", "C"] } },
-      evolveStyles: { natural: {}, ecosystem: {} },
+      styling: {
+        background: { evolutionPhases: { phases: ["A", "B", "C"] } },
+        evolveStyles: { natural: {}, ecosystem: {} },
+      },
     });
     // 3 phases, 2 keys
     expect(result.violations[0].message).toContain("3");
@@ -500,8 +516,10 @@ describe("phaseStyleAlignmentConstraint", () => {
 
   it("violation message lists the declared evolveStyles keys", () => {
     const result = phaseStyleAlignmentConstraint.check({
-      background: { evolutionPhases: { phases: ["A", "B", "C"] } },
-      evolveStyles: { natural: {}, ecosystem: {} },
+      styling: {
+        background: { evolutionPhases: { phases: ["A", "B", "C"] } },
+        evolveStyles: { natural: {}, ecosystem: {} },
+      },
     });
     expect(result.violations[0].message).toContain("natural");
     expect(result.violations[0].message).toContain("ecosystem");
@@ -509,8 +527,10 @@ describe("phaseStyleAlignmentConstraint", () => {
 
   it("violation message mentions _default as a fallback option", () => {
     const result = phaseStyleAlignmentConstraint.check({
-      background: { evolutionPhases: { phases: ["A", "B", "C"] } },
-      evolveStyles: { natural: {} },
+      styling: {
+        background: { evolutionPhases: { phases: ["A", "B", "C"] } },
+        evolveStyles: { natural: {} },
+      },
     });
     expect(result.violations[0].message).toContain("_default");
   });
@@ -518,8 +538,10 @@ describe("phaseStyleAlignmentConstraint", () => {
   it("skips _default when counting evolveStyles keys but counts per-type keys", () => {
     // 2 per-type keys (natural, ecosystem) plus _default — _default should not be counted
     const result = phaseStyleAlignmentConstraint.check({
-      background: { evolutionPhases: { phases: ["A", "B", "C"] } },
-      evolveStyles: { _default: {}, natural: {}, ecosystem: {} },
+      styling: {
+        background: { evolutionPhases: { phases: ["A", "B", "C"] } },
+        evolveStyles: { _default: {}, natural: {}, ecosystem: {} },
+      },
     });
     // 3 phases vs 2 per-type keys (natural + ecosystem) — mismatch → warning
     expect(result.valid).toBe(false);
@@ -530,8 +552,10 @@ describe("phaseStyleAlignmentConstraint", () => {
   it("ignores undefined values in evolveStyles when counting keys", () => {
     // forced is present as undefined — should not be counted
     const result = phaseStyleAlignmentConstraint.check({
-      background: { evolutionPhases: { phases: ["A", "B", "C"] } },
-      evolveStyles: { natural: {}, ecosystem: {}, forced: undefined },
+      styling: {
+        background: { evolutionPhases: { phases: ["A", "B", "C"] } },
+        evolveStyles: { natural: {}, ecosystem: {}, forced: undefined },
+      },
     });
     // 3 phases vs 2 defined keys → warning
     expect(result.valid).toBe(false);
@@ -540,8 +564,10 @@ describe("phaseStyleAlignmentConstraint", () => {
   it("returns valid for 1 phase matching 1 explicit key", () => {
     expectValid(
       phaseStyleAlignmentConstraint.check({
-        background: { evolutionPhases: { phases: ["Solo"] } },
-        evolveStyles: { natural: {} },
+        styling: {
+          background: { evolutionPhases: { phases: ["Solo"] } },
+          evolveStyles: { natural: {} },
+        },
       }),
       "1 phase, 1 key",
     );
@@ -557,10 +583,12 @@ describe("phaseStyleAlignmentConstraint", () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe("CONFIG_CONSTRAINT_GRAPH", () => {
-  it("has the three required slots", () => {
+  it("has the five required slots", () => {
     expect(CONFIG_CONSTRAINT_GRAPH).toHaveProperty("legendBoundsValidation");
     expect(CONFIG_CONSTRAINT_GRAPH).toHaveProperty("layerDependencies");
     expect(CONFIG_CONSTRAINT_GRAPH).toHaveProperty("phaseStyleAlignment");
+    expect(CONFIG_CONSTRAINT_GRAPH).toHaveProperty("strokeWidthFontSizeRatio");
+    expect(CONFIG_CONSTRAINT_GRAPH).toHaveProperty("nodeRadiiStrokeWidth");
   });
 
   it("legendBoundsValidation slot has name='legendBoundsValidation'", () => {
@@ -579,17 +607,21 @@ describe("CONFIG_CONSTRAINT_GRAPH", () => {
     expect(CONFIG_CONSTRAINT_GRAPH.legendBoundsValidation.description.length).toBeGreaterThan(10);
     expect(CONFIG_CONSTRAINT_GRAPH.layerDependencies.description.length).toBeGreaterThan(10);
     expect(CONFIG_CONSTRAINT_GRAPH.phaseStyleAlignment.description.length).toBeGreaterThan(10);
+    expect(CONFIG_CONSTRAINT_GRAPH.strokeWidthFontSizeRatio.description.length).toBeGreaterThan(10);
+    expect(CONFIG_CONSTRAINT_GRAPH.nodeRadiiStrokeWidth.description.length).toBeGreaterThan(10);
   });
 
   it("each slot has at least one constraint", () => {
     expect(CONFIG_CONSTRAINT_GRAPH.legendBoundsValidation.constraints).toHaveLength(1);
     expect(CONFIG_CONSTRAINT_GRAPH.layerDependencies.constraints).toHaveLength(1);
     expect(CONFIG_CONSTRAINT_GRAPH.phaseStyleAlignment.constraints).toHaveLength(1);
+    expect(CONFIG_CONSTRAINT_GRAPH.strokeWidthFontSizeRatio.constraints).toHaveLength(1);
+    expect(CONFIG_CONSTRAINT_GRAPH.nodeRadiiStrokeWidth.constraints).toHaveLength(1);
   });
 
-  it("legendBoundsValidation constraint has source='coordinateSpace'", () => {
+  it("legendBoundsValidation constraint has source='spatial.coordinateSpace'", () => {
     const c = CONFIG_CONSTRAINT_GRAPH.legendBoundsValidation.constraints[0];
-    expect(c.source).toBe("coordinateSpace");
+    expect(c.source).toBe("spatial.coordinateSpace");
   });
 
   it("layerDependencies constraint has violationPolicy='error'", () => {
@@ -622,8 +654,8 @@ describe("CONFIG_CONSTRAINT_GRAPH", () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe("EXECUTABLE_CONSTRAINT_GRAPH", () => {
-  it("contains exactly 3 constraints", () => {
-    expect(EXECUTABLE_CONSTRAINT_GRAPH).toHaveLength(3);
+  it("contains exactly 5 constraints", () => {
+    expect(EXECUTABLE_CONSTRAINT_GRAPH).toHaveLength(5);
   });
 
   it("first constraint is legendBoundsValidation", () => {
@@ -636,6 +668,14 @@ describe("EXECUTABLE_CONSTRAINT_GRAPH", () => {
 
   it("third constraint is phaseStyleAlignment", () => {
     expect(EXECUTABLE_CONSTRAINT_GRAPH[2].id).toBe("phaseStyleAlignment");
+  });
+
+  it("fourth constraint is strokeWidthFontSizeRatio", () => {
+    expect(EXECUTABLE_CONSTRAINT_GRAPH[3].id).toBe("strokeWidthFontSizeRatio");
+  });
+
+  it("fifth constraint is nodeRadiiStrokeWidth", () => {
+    expect(EXECUTABLE_CONSTRAINT_GRAPH[4].id).toBe("nodeRadiiStrokeWidth");
   });
 
   it("each entry has id, metadata, and check function", () => {
@@ -655,6 +695,8 @@ describe("EXECUTABLE_CONSTRAINT_GRAPH", () => {
     expect(EXECUTABLE_CONSTRAINT_GRAPH[0]).toBe(legendBoundsValidation);
     expect(EXECUTABLE_CONSTRAINT_GRAPH[1]).toBe(layerDependenciesConstraint);
     expect(EXECUTABLE_CONSTRAINT_GRAPH[2]).toBe(phaseStyleAlignmentConstraint);
+    expect(EXECUTABLE_CONSTRAINT_GRAPH[3]).toBe(strokeWidthFontSizeRatioConstraint);
+    expect(EXECUTABLE_CONSTRAINT_GRAPH[4]).toBe(nodeRadiiStrokeWidthConstraint);
   });
 });
 
@@ -669,11 +711,13 @@ describe("checkConstraints", () => {
     expect(ok).toBe(true);
   });
 
-  it("results map contains entries for all three constraint IDs", () => {
+  it("results map contains entries for all five constraint IDs", () => {
     const { results } = checkConstraints({});
     expect(results.has("legendBoundsValidation")).toBe(true);
     expect(results.has("layerDependencies")).toBe(true);
     expect(results.has("phaseStyleAlignment")).toBe(true);
+    expect(results.has("strokeWidthFontSizeRatio")).toBe(true);
+    expect(results.has("nodeRadiiStrokeWidth")).toBe(true);
   });
 
   it("all per-constraint results are valid for empty config", () => {
@@ -711,8 +755,10 @@ describe("checkConstraints", () => {
 
   it("returns valid=false but ok=true for only phase style warning", () => {
     const { valid, ok } = checkConstraints({
-      background: { evolutionPhases: { phases: ["A", "B", "C"] } },
-      evolveStyles: { natural: {} },
+      styling: {
+        background: { evolutionPhases: { phases: ["A", "B", "C"] } },
+        evolveStyles: { natural: {} },
+      },
     });
     expect(valid).toBe(false);
     expect(ok).toBe(true); // only warning, no error
@@ -722,8 +768,10 @@ describe("checkConstraints", () => {
     // Legend out of bounds (error) + phase mismatch (warning)
     const { valid, ok } = checkConstraints({
       legend: { position: { x: 9999, y: 0 } },
-      background: { evolutionPhases: { phases: ["A", "B", "C"] } },
-      evolveStyles: { natural: {} },
+      styling: {
+        background: { evolutionPhases: { phases: ["A", "B", "C"] } },
+        evolveStyles: { natural: {} },
+      },
     });
     expect(valid).toBe(false);
     expect(ok).toBe(false);
@@ -764,8 +812,10 @@ describe("checkConstraints", () => {
 
   it("phaseStyleAlignment violation is visible via results.get()", () => {
     const { results } = checkConstraints({
-      background: { evolutionPhases: { phases: ["A", "B", "C"] } },
-      evolveStyles: { natural: {}, ecosystem: {} },
+      styling: {
+        background: { evolutionPhases: { phases: ["A", "B", "C"] } },
+        evolveStyles: { natural: {}, ecosystem: {} },
+      },
     });
     const phaseResult = results.get("phaseStyleAlignment");
     expect(phaseResult).toBeDefined();
@@ -779,22 +829,28 @@ describe("checkConstraints", () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe("EMPTY_CONFIG_CONSTRAINT_GRAPH", () => {
-  it("has the three required slots", () => {
+  it("has the five required slots", () => {
     expect(EMPTY_CONFIG_CONSTRAINT_GRAPH).toHaveProperty("legendBoundsValidation");
     expect(EMPTY_CONFIG_CONSTRAINT_GRAPH).toHaveProperty("layerDependencies");
     expect(EMPTY_CONFIG_CONSTRAINT_GRAPH).toHaveProperty("phaseStyleAlignment");
+    expect(EMPTY_CONFIG_CONSTRAINT_GRAPH).toHaveProperty("strokeWidthFontSizeRatio");
+    expect(EMPTY_CONFIG_CONSTRAINT_GRAPH).toHaveProperty("nodeRadiiStrokeWidth");
   });
 
   it("all constraint arrays are empty", () => {
     expect(EMPTY_CONFIG_CONSTRAINT_GRAPH.legendBoundsValidation.constraints).toHaveLength(0);
     expect(EMPTY_CONFIG_CONSTRAINT_GRAPH.layerDependencies.constraints).toHaveLength(0);
     expect(EMPTY_CONFIG_CONSTRAINT_GRAPH.phaseStyleAlignment.constraints).toHaveLength(0);
+    expect(EMPTY_CONFIG_CONSTRAINT_GRAPH.strokeWidthFontSizeRatio.constraints).toHaveLength(0);
+    expect(EMPTY_CONFIG_CONSTRAINT_GRAPH.nodeRadiiStrokeWidth.constraints).toHaveLength(0);
   });
 
   it("slot names match their slot keys", () => {
     expect(EMPTY_CONFIG_CONSTRAINT_GRAPH.legendBoundsValidation.name).toBe("legendBoundsValidation");
     expect(EMPTY_CONFIG_CONSTRAINT_GRAPH.layerDependencies.name).toBe("layerDependencies");
     expect(EMPTY_CONFIG_CONSTRAINT_GRAPH.phaseStyleAlignment.name).toBe("phaseStyleAlignment");
+    expect(EMPTY_CONFIG_CONSTRAINT_GRAPH.strokeWidthFontSizeRatio.name).toBe("strokeWidthFontSizeRatio");
+    expect(EMPTY_CONFIG_CONSTRAINT_GRAPH.nodeRadiiStrokeWidth.name).toBe("nodeRadiiStrokeWidth");
   });
 
   it("is JSON-serialisable", () => {
@@ -835,13 +891,203 @@ describe("ConstraintResult shape", () => {
 
   it("ok=true with valid=false means only warning violations", () => {
     const result = phaseStyleAlignmentConstraint.check({
-      background: { evolutionPhases: { phases: ["A", "B", "C"] } },
-      evolveStyles: { natural: {} },
+      styling: {
+        background: { evolutionPhases: { phases: ["A", "B", "C"] } },
+        evolveStyles: { natural: {} },
+      },
     });
     expect(result.valid).toBe(false);
     expect(result.ok).toBe(true);
     for (const v of result.violations) {
       expect(v.severity).toBe("warning");
     }
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// strokeWidthFontSizeRatioConstraint
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("strokeWidthFontSizeRatioConstraint", () => {
+  it("has id 'strokeWidthFontSizeRatio'", () => {
+    expect(strokeWidthFontSizeRatioConstraint.id).toBe("strokeWidthFontSizeRatio");
+  });
+
+  it("has metadata source='spatial.strokeWidth' and target='typography.labelScale'", () => {
+    expect(strokeWidthFontSizeRatioConstraint.metadata.source).toBe("spatial.strokeWidth");
+    expect(strokeWidthFontSizeRatioConstraint.metadata.target).toBe("typography.labelScale");
+  });
+
+  it("has metadata violationPolicy='warn'", () => {
+    expect(strokeWidthFontSizeRatioConstraint.metadata.violationPolicy).toBe("warn");
+  });
+
+  it("returns valid for empty config (defaults are consistent)", () => {
+    expectValid(strokeWidthFontSizeRatioConstraint.check({}), "empty config");
+  });
+
+  it("skips when spatial is absent", () => {
+    expectValid(
+      strokeWidthFontSizeRatioConstraint.check({ typography: { labelScale: 1.0 } }),
+      "no spatial",
+    );
+  });
+
+  it("skips when typography is absent", () => {
+    expectValid(
+      strokeWidthFontSizeRatioConstraint.check({ spatial: { strokeWidth: 1 } }),
+      "no typography",
+    );
+  });
+
+  it("skips when strokeWidth is absent", () => {
+    expectValid(
+      strokeWidthFontSizeRatioConstraint.check({
+        spatial: {},
+        typography: { labelScale: 1.0 },
+      }),
+      "no strokeWidth",
+    );
+  });
+
+  it("skips when labelScale is absent", () => {
+    expectValid(
+      strokeWidthFontSizeRatioConstraint.check({
+        spatial: { strokeWidth: 1 },
+        typography: {},
+      }),
+      "no labelScale",
+    );
+  });
+
+  it("returns valid when ratio is within threshold (strokeWidth=1, labelScale=1)", () => {
+    // ratio = 1 / (12 × 1.0) = 0.083 ≤ 0.5
+    expectValid(
+      strokeWidthFontSizeRatioConstraint.check({
+        spatial: { strokeWidth: 1 },
+        typography: { labelScale: 1.0 },
+      }),
+      "strokeWidth=1, labelScale=1",
+    );
+  });
+
+  it("returns valid when ratio equals threshold (strokeWidth=6, labelScale=1)", () => {
+    // ratio = 6 / (12 × 1.0) = 0.5 = threshold → valid (≤)
+    expectValid(
+      strokeWidthFontSizeRatioConstraint.check({
+        spatial: { strokeWidth: 6 },
+        typography: { labelScale: 1.0 },
+      }),
+      "strokeWidth=6, labelScale=1 (exact threshold)",
+    );
+  });
+
+  it("returns warning when ratio exceeds threshold", () => {
+    // ratio = 7 / (12 × 1.0) = 0.583 > 0.5
+    const result = strokeWidthFontSizeRatioConstraint.check({
+      spatial: { strokeWidth: 7 },
+      typography: { labelScale: 1.0 },
+    });
+    expectViolation(result, { count: 1, severity: "warning", pathIncludes: "spatial.strokeWidth" });
+  });
+
+  it("returns warning when small labelScale causes high ratio", () => {
+    // ratio = 2 / (12 × 0.3) = 2 / 3.6 = 0.556 > 0.5
+    const result = strokeWidthFontSizeRatioConstraint.check({
+      spatial: { strokeWidth: 2 },
+      typography: { labelScale: 0.3 },
+    });
+    expectViolation(result, { count: 1, severity: "warning" });
+  });
+
+  it("ok=true for warning severity", () => {
+    const result = strokeWidthFontSizeRatioConstraint.check({
+      spatial: { strokeWidth: 8 },
+      typography: { labelScale: 0.5 },
+    });
+    expect(result.valid).toBe(false);
+    expect(result.ok).toBe(true); // warnings don't block
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// nodeRadiiStrokeWidthConstraint
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("nodeRadiiStrokeWidthConstraint", () => {
+  it("has id 'nodeRadiiStrokeWidth'", () => {
+    expect(nodeRadiiStrokeWidthConstraint.id).toBe("nodeRadiiStrokeWidth");
+  });
+
+  it("has metadata source='spatial.strokeWidth' and target='spatial.nodeRadii'", () => {
+    expect(nodeRadiiStrokeWidthConstraint.metadata.source).toBe("spatial.strokeWidth");
+    expect(nodeRadiiStrokeWidthConstraint.metadata.target).toBe("spatial.nodeRadii");
+  });
+
+  it("has metadata violationPolicy='error'", () => {
+    expect(nodeRadiiStrokeWidthConstraint.metadata.violationPolicy).toBe("error");
+  });
+
+  it("returns valid for empty config (defaults are consistent)", () => {
+    expectValid(nodeRadiiStrokeWidthConstraint.check({}), "empty config");
+  });
+
+  it("skips when spatial is absent", () => {
+    expectValid(nodeRadiiStrokeWidthConstraint.check({}), "no spatial");
+  });
+
+  it("skips when strokeWidth is absent", () => {
+    expectValid(
+      nodeRadiiStrokeWidthConstraint.check({ spatial: { nodeRadii: { _default: 5 } } }),
+      "no strokeWidth",
+    );
+  });
+
+  it("skips when nodeRadii is absent", () => {
+    expectValid(
+      nodeRadiiStrokeWidthConstraint.check({ spatial: { strokeWidth: 1 } }),
+      "no nodeRadii",
+    );
+  });
+
+  it("returns valid when nodeRadii._default > strokeWidth", () => {
+    expectValid(
+      nodeRadiiStrokeWidthConstraint.check({
+        spatial: { strokeWidth: 1, nodeRadii: { _default: 5 } },
+      }),
+      "nodeRadii=5, strokeWidth=1",
+    );
+  });
+
+  it("returns valid when nodeRadii._default equals strokeWidth", () => {
+    expectValid(
+      nodeRadiiStrokeWidthConstraint.check({
+        spatial: { strokeWidth: 3, nodeRadii: { _default: 3 } },
+      }),
+      "nodeRadii=3, strokeWidth=3 (equal)",
+    );
+  });
+
+  it("returns error when nodeRadii._default < strokeWidth", () => {
+    const result = nodeRadiiStrokeWidthConstraint.check({
+      spatial: { strokeWidth: 5, nodeRadii: { _default: 2 } },
+    });
+    expectViolation(result, { count: 1, severity: "error", pathIncludes: "spatial.nodeRadii._default" });
+  });
+
+  it("ok=false for error severity", () => {
+    const result = nodeRadiiStrokeWidthConstraint.check({
+      spatial: { strokeWidth: 8, nodeRadii: { _default: 1 } },
+    });
+    expect(result.valid).toBe(false);
+    expect(result.ok).toBe(false);
+  });
+
+  it("violation message mentions both values", () => {
+    const result = nodeRadiiStrokeWidthConstraint.check({
+      spatial: { strokeWidth: 6, nodeRadii: { _default: 2 } },
+    });
+    expect(result.violations[0].message).toContain("2");
+    expect(result.violations[0].message).toContain("6");
   });
 });

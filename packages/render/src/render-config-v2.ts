@@ -37,6 +37,21 @@ import {
   LayerTogglesSchema,
   LegendSchema,
   FiltersSchema,
+  // Sub-schemas — canonical definitions live in schema.ts; consumed here
+  SpatialConfigSchema,
+  TypographyConfigSchema,
+  StylingConfigSchema,
+  TypeColorsSchema,
+  DEFAULT_SPATIAL_CONFIG,
+  DEFAULT_TYPOGRAPHY_CONFIG,
+  DEFAULT_STYLING_CONFIG,
+  type SpatialConfig,
+  type SpatialConfigInput,
+  type TypographyConfig,
+  type TypographyConfigInput,
+  type StylingConfig,
+  type StylingConfigInput,
+  type TypeColors,
 } from "./schema.js";
 import {
   CoordinateSpaceSchema,
@@ -53,6 +68,26 @@ import {
 // Re-export ThemeEnum, LocaleEnum from schema.ts — single source of truth for validation
 export { ThemeEnum, LocaleEnum } from "./schema.js";
 export type { Theme, Locale } from "./schema.js";
+
+// Re-export sub-schemas from schema.ts — consumed by render-config-v2.test.ts and other consumers
+export {
+  SpatialConfigSchema,
+  TypographyConfigSchema,
+  StylingConfigSchema,
+  TypeColorsSchema,
+  DEFAULT_SPATIAL_CONFIG,
+  DEFAULT_TYPOGRAPHY_CONFIG,
+  DEFAULT_STYLING_CONFIG,
+};
+export type {
+  SpatialConfig,
+  SpatialConfigInput,
+  TypographyConfig,
+  TypographyConfigInput,
+  StylingConfig,
+  StylingConfigInput,
+  TypeColors,
+};
 
 // Re-export the canonical CoordinateSpaceSchema and CoordinateSpace type from coordinate-space.ts.
 // Sub-AC 6a: CoordinateSpace is now defined in coordinate-space.ts (not a local duplicate here).
@@ -76,202 +111,10 @@ export type { CoordinateSpace } from "./coordinate-space.js";
 // @see CoordinateSpaceSchema in coordinate-space.ts — Zod schema with full validation
 
 // ── SpatialConfig sub-schema ─────────────────────────────────────────────────
-
-/**
- * SpatialConfig — Zod sub-schema grouping all canvas dimension and coordinate
- * space concerns for a Wardley Map render.
- *
- * This is the first sub-concern extracted from the flat RenderConfig:
- *   - `width`  / `height`      — canvas pixel dimensions (px-space)
- *   - `coordinateSpace`        — explicit coordinate space declaration (units + origin)
- *
- * Defaults applied at parse time:
- *   - `width`  → 1600 px
- *   - `height` → 800 px
- *   - `coordinateSpace.units`  → "px"    (only supported value)
- *   - `coordinateSpace.origin` → "top-left" (only supported value)
- *
- * ## Backward-compatibility contract
- * The flat `width` / `height` / `coordinateSpace` fields continue to exist on
- * `RenderConfigSchema` in schema.ts. This sub-schema is an ADDITIVE grouping
- * that allows consuming code to validate spatial concerns in isolation and
- * serves as the blueprint for the future nested structure migration.
- *
- * ## Relationship to CoordinateSpace type
- * `CoordinateSpace` (in coordinate-space.ts) is the canonical Zod-validated type
- * documenting the three distinct coordinate spaces in the system (px-space, unitless
- * multipliers, normalized [0,1]).  `SpatialConfigSchema` is an ADDITIVE grouping
- * that allows validating spatial concerns in isolation.
- *
- * The `coordinateSpace` sub-field now uses the full `CoordinateSpaceSchema` from
- * coordinate-space.ts — it includes width, height, evolutionRange, visibilityRange,
- * and the unit/origin declarations.
- *
- * @example
- *   const spatial = SpatialConfigSchema.parse({});
- *   // → { width: 1600, height: 800 }
- *
- *   const halved = SpatialConfigSchema.parse({ width: 800, height: 400 });
- *   // → { width: 800, height: 400 }
- *
- * @see CoordinateSpaceSchema in coordinate-space.ts — full Zod definition with width, height, ranges
- * @see CoordinateSpace in coordinate-space.ts — canonical TypeScript type
- * @see RenderConfigSchema in schema.ts for the flat config that contains these fields
- */
-export const SpatialConfigSchema = z.object({
-  /**
-   * Canvas width in pixels — defines the horizontal extent of the canvas coordinate space.
-   * All px-space values (nodeRadii, strokeWidth, legend position) are interpreted within this space.
-   * Default: 1600 px. Valid range: 1–10000 px.
-   *
-   * @remarks CoordinateSpace category: **canvas px-space** — this dimension, together with
-   *   `height`, establishes the px coordinate space that `nodeRadii`, `strokeWidth`, and
-   *   legend `{x, y}` positions are measured in. When you change `width`, scale those
-   *   px-space values proportionally. `labelScale` is NOT px-space and does not need scaling.
-   * @see CoordinateSpace for the full coordinate space declaration
-   * @category layout-structural
-   */
-  width: z
-    .number()
-    .positive()
-    .max(10000, "Canvas width must not exceed 10000 px")
-    .default(1600),
-
-  /**
-   * Canvas height in pixels — defines the vertical extent of the canvas coordinate space.
-   * Default: 800 px. Valid range: 1–10000 px.
-   *
-   * @remarks CoordinateSpace category: **canvas px-space** — this dimension, together with
-   *   `width`, establishes the px coordinate space that `nodeRadii`, `strokeWidth`, and
-   *   legend `{x, y}` positions are measured in. When you change `height`, scale those
-   *   px-space values proportionally. `labelScale` is NOT px-space and does not need scaling.
-   * @see CoordinateSpace for the full coordinate space declaration
-   * @category layout-structural
-   */
-  height: z
-    .number()
-    .positive()
-    .max(10000, "Canvas height must not exceed 10000 px")
-    .default(800),
-
-  /**
-   * Explicit coordinate space declaration for this canvas.
-   *
-   * Uses the canonical `CoordinateSpaceSchema` from coordinate-space.ts which
-   * encapsulates ALL coordinate-system-defining parameters:
-   *  - `units: "px"` — only canvas pixels are supported (default).
-   *  - `origin: "top-left"` — (0, 0) is the top-left corner of the canvas (default).
-   *  - `width` / `height` — canvas pixel dimensions (default 1600 × 800).
-   *  - `evolutionRange` — [start, end] normalized display range (default [0, 1]).
-   *  - `visibilityRange` — [high, low] normalized display range (default [0, 1]).
-   *  - `unit: "canvas-px"` — coordinate unit declaration.
-   *
-   * All fields default automatically — this field is optional.
-   *
-   * @see CoordinateSpaceSchema in coordinate-space.ts — full Zod definition
-   * @see CoordinateSpace in coordinate-space.ts — canonical TypeScript type
-   * @category platform-constraint
-   */
-  coordinateSpace: CoordinateSpaceSchema.optional(),
-});
-
-/** TypeScript type for the SpatialConfig sub-schema */
-export type SpatialConfig = z.infer<typeof SpatialConfigSchema>;
-
-/** Default SpatialConfig values (canvas 1600 × 800 px, top-left origin, px units) */
-export const DEFAULT_SPATIAL_CONFIG: SpatialConfig = SpatialConfigSchema.parse({});
+// Canonical definition lives in schema.ts — re-exported above via import.
 
 // ── TypographyConfig sub-schema ──────────────────────────────────────────────
-
-/**
- * TypographyConfig — Zod sub-schema grouping all font and text-scale concerns
- * for a Wardley Map render.
- *
- * This is the typography sub-concern extracted from the flat RenderConfig:
- *   - `fontFamily`  — CSS font-family stack applied to all map text elements
- *   - `labelScale`  — unitless multiplier for component label font size
- *
- * Defaults applied at parse time:
- *   - `fontFamily`  → "Inter, sans-serif"
- *   - `labelScale`  → 1.0  (base 12 px label size, no scaling)
- *
- * ## Coordinate space category
- * `labelScale` is a **unitless multiplier** — NOT a px-space value.
- * It scales relative to the base 12 px font size regardless of canvas dimensions.
- * @see CoordinateSpace for the full distinction between px-space, unitless, and normalized values.
- *
- * ## Backward-compatibility contract
- * The flat `fontFamily` / `labelScale` fields continue to exist on
- * `RenderConfigSchema` in schema.ts. This sub-schema is an ADDITIVE grouping
- * that allows consuming code to validate typography concerns in isolation and
- * serves as the blueprint for the future nested structure migration.
- *
- * @example
- *   const typography = TypographyConfigSchema.parse({});
- *   // → { fontFamily: "Inter, sans-serif", labelScale: 1.0 }
- *
- *   const larger = TypographyConfigSchema.parse({ labelScale: 1.5 });
- *   // → { fontFamily: "Inter, sans-serif", labelScale: 1.5 }
- *
- *   const custom = TypographyConfigSchema.parse({ fontFamily: "Georgia, serif", labelScale: 0.9 });
- *   // → { fontFamily: "Georgia, serif", labelScale: 0.9 }
- *
- * @see RenderConfigSchema in schema.ts for the flat config that contains these fields
- * @see CoordinateSpace in coordinate-space.ts for the coordinate space documentation
- * @see ThemeBaseline.font for the per-theme font baseline values
- */
-export const TypographyConfigSchema = z.object({
-  /**
-   * CSS font-family stack applied to all map text elements (node labels, axis labels,
-   * phase labels, legend text).
-   *
-   * Any valid CSS `font-family` value is accepted (e.g. "Inter, sans-serif",
-   * "Georgia, serif", "monospace").
-   * Default: "Inter, sans-serif"
-   * @category viewer-preference
-   */
-  fontFamily: z.string().default("Inter, sans-serif"),
-
-  /**
-   * Unitless multiplier for component label font size.
-   *
-   * The base font size is 12 px; `labelScale` scales it proportionally:
-   *   - `1.0` → 12 px (default, no scaling)
-   *   - `0.8` → 9.6 px (smaller labels)
-   *   - `1.5` → 18 px (50% larger labels)
-   *
-   * ## Resolution independence
-   *
-   * `labelScale` is **resolution-independent** — it is a dimensionless ratio, NOT a
-   * canvas pixel value.  Consequently:
-   *
-   * - Changing `coordinateSpace.width` (canvas resize) does NOT require updating `labelScale`.
-   * - Adding `outputHint.targetWidth` (PNG export at higher resolution) does NOT scale
-   *   `labelScale` — the font size ratio remains the same regardless of output dimensions.
-   *
-   * Contrast with `nodeRadii` and `strokeWidth`, which ARE canvas px-space values and ARE
-   * scaled by `outputHint.targetWidth / coordinateSpace.width` when `outputHint` is present.
-   *
-   * Valid range: >0 to 5× (enforced by Zod).
-   *
-   * @remarks CoordinateSpace category: **unitless multiplier** — this value is NOT expressed
-   *   in the canvas px coordinate space. Do NOT scale when resizing the canvas or setting
-   *   `outputHint`; scale `nodeRadii` and `strokeWidth` instead.
-   * @see outputHint (schema.ts) — controls px-space scaling; does NOT affect labelScale
-   * @see nodeRadii — px-space value that IS scaled by outputHint
-   * @see strokeWidth — px-space value that IS scaled by outputHint
-   * @see CoordinateSpace — labelScale is listed as a "unitless multiplier"
-   * @category viewer-preference
-   */
-  labelScale: z.number().positive().max(5).default(1.0),
-});
-
-/** TypeScript type for TypographyConfig, inferred from TypographyConfigSchema */
-export type TypographyConfig = z.infer<typeof TypographyConfigSchema>;
-
-/** Default TypographyConfig values (Inter font, 1.0× label scale) */
-export const DEFAULT_TYPOGRAPHY_CONFIG: TypographyConfig =
-  TypographyConfigSchema.parse({});
+// Canonical definition lives in schema.ts — re-exported above via import.
 
 // ── ThemeBaseline type ───────────────────────────────────────────────────────
 
@@ -314,19 +157,8 @@ export interface ThemeBaseline {
      */
     labelScale: number;
   };
-  /**
-   * Stroke width in px-space (canvas coordinate space) for edges and node outlines.
-   * Default: 1 px. Valid range: 0.25–8 px.
-   * @see CoordinateSpace for the canvas coordinate space definition
-   */
-  strokeWidth: number;
-  /**
-   * Per-type node circle radii in px-space (canvas coordinate space).
-   * `_default` is required and serves as the catch-all fallback.
-   * Default: `{ _default: 5 }` (5 px radius).
-   * @see CoordinateSpace for the canvas coordinate space definition
-   */
-  nodeRadii: { _default: number } & Record<string, number>;
+  // Note: strokeWidth and nodeRadii belong to SpatialConfigSchema, not ThemeBaseline.
+  // Themes handle only colors and font.
 }
 
 // ── Default theme baseline ───────────────────────────────────────────────────
@@ -352,8 +184,6 @@ export const DEFAULT_THEME_BASELINE: ThemeBaseline = {
     fontFamily: "Inter, sans-serif",
     labelScale: 1.0,
   },
-  strokeWidth: 1,
-  nodeRadii: { _default: 3 },
 };
 
 // ── Dark theme baseline (placeholder — identical to default) ─────────────────
@@ -411,218 +241,44 @@ export function resolveThemeBaseline(theme?: string): ThemeBaseline {
 }
 
 // ── StylingConfig sub-schema ──────────────────────────────────────────────────
+// TypeColorsSchema canonical definition lives in schema.ts — re-exported above via import.
+
+// StylingConfigSchema, StylingConfig, StylingConfigInput, DEFAULT_STYLING_CONFIG
+// Canonical definitions live in schema.ts — re-exported above via import.
+
+// ── Filters defaults ─────────────────────────────────────────────────────────
 
 /**
- * TypeColorsSchema — per-renderable-type CSS color override map.
+ * Default layer toggles — all layers visible.
  *
- * Keys are restricted to the KNOWN_RENDERABLE_TYPES closed set (rendering-local
- * vocabulary declared in renderable-type.ts — decoupled from the data-schema
- * ComponentType enum). All fields are optional — only provided keys override the
- * theme baseline palette. Absent keys fall back to the ThemeBaseline.palette for
- * that type.
- *
- * Value format: any CSS color string (hex, rgb, named).
- * Recommended: 6-digit hex (e.g. "#374151") for consistency with ThemeBaseline.
- *
- * @see KNOWN_RENDERABLE_TYPES in renderable-type.ts — the rendering-local closed set of valid keys
- * @see ThemeBaseline.palette — the fallback colors when a key is absent
+ * Every rendering layer defaults to `true` (visible). Absent toggles in
+ * `LayerTogglesSchema` are also treated as visible by each layer renderer,
+ * so this constant provides the fully-expanded form for merge operations
+ * and DEFAULT_RENDER_CONFIG completeness.
  */
-export const TypeColorsSchema = z
-  .object(
-    Object.fromEntries(
-      KNOWN_RENDERABLE_TYPES.map((k) => [k, z.string().optional()])
-    ) as Record<KnownRenderableType, z.ZodOptional<z.ZodString>>
-  )
-  .partial();
+export const DEFAULT_LAYER_TOGGLES = {
+  title: true,
+  pipelines: true,
+  edges: true,
+  evolvesTo: true,
+  nodes: true,
+  labels: true,
+  notes: true,
+} as const;
 
-/** TypeScript type for TypeColors (all component-type fields optional) */
-export type TypeColors = z.infer<typeof TypeColorsSchema>;
+/** Inferred type for the DEFAULT_LAYER_TOGGLES constant */
+export type DefaultLayerToggles = typeof DEFAULT_LAYER_TOGGLES;
 
 /**
- * StylingConfig — Zod sub-schema grouping all visual styling concerns:
- *   - `typeColors`:    per-component-type color overrides
- *   - `evolveStyles`:  per-evolve-type arrow stroke style overrides
- *   - `nodeRadii`:     per-component-type node circle radii (px-space)
- *   - `strokeWidth`:   edge and node-outline stroke width (px-space)
+ * Default filters config — all layers visible, no component types excluded.
  *
- * ## Defaults applied at parse time
- * | Field          | Default           | Description                              |
- * |----------------|-------------------|------------------------------------------|
- * | `strokeWidth`  | `1`               | 1 px stroke for edges and node outlines  |
- * | `nodeRadii`    | `{ _default: 5 }` | 5 px radius for all component types      |
- * | `typeColors`   | `undefined`       | Theme baseline palette is used           |
- * | `evolveStyles` | `undefined`       | Hardcoded per-type defaults in layer     |
- *
- * ## Theme resolution precedence (highest wins)
- *   1. Explicit StylingConfig field (this schema — highest priority)
- *   2. Theme baseline (`ThemeBaseline.palette` / `strokeWidth` / `nodeRadii`)
- *   3. Hardcoded renderer defaults in each layer renderer (lowest — last resort)
- *
- * ## Cross-schema contract (single source of truth)
- * - `typeColors` keys are derived from `KNOWN_RENDERABLE_TYPES` (renderable-type.ts) — decoupled from data-schema ComponentType.
- * - `evolveStyles` keys are constrained by `EvolveTypeEnum` via `EvolveStylesMapSchema`
- *   (schema.ts) — this ensures evolveStyles stays in sync with the closed enum of
- *   evolution arrow types. Unknown keys are rejected at parse time (.strict()).
- * - `nodeRadii` uses `NodeRadiiSchema` (schema.ts) — `_default` is required when provided.
- *
- * ## Purely structural grouping
- * This sub-schema introduces no new behavioral capabilities. It is a structural
- * decomposition of existing flat `RenderConfigSchema` fields into a coherent group.
- * The flat fields (`typeColors`, `evolveStyles`, `nodeRadii`, `strokeWidth`) continue
- * to exist on `RenderConfigSchema` in schema.ts for backward compatibility.
- *
- * @example Minimal — use all defaults:
- *   const s = StylingConfigSchema.parse({});
- *   // → { strokeWidth: 1, nodeRadii: { _default: 5 }, typeColors: undefined, evolveStyles: undefined }
- *
- * @example Override stroke width and enlarge nodes:
- *   const s = StylingConfigSchema.parse({ strokeWidth: 2, nodeRadii: { _default: 8 } });
- *   // → { strokeWidth: 2, nodeRadii: { _default: 8 }, ... }
- *
- * @example Per-type color and evolve style overrides:
- *   const s = StylingConfigSchema.parse({
- *     typeColors: { "user-need": "#1d4ed8", component: "#374151" },
- *     evolveStyles: { natural: { stroke: "#dc2626", strokeDasharray: "6,3" } },
- *   });
- *
- * @see EvolveStylesMapSchema in schema.ts — evolveStyles key constraints (EvolveTypeEnum)
- * @see NodeRadiiSchema in schema.ts — nodeRadii shape (_default required)
- * @see TypeColorsSchema (above) — typeColors shape (KNOWN_RENDERABLE_TYPES keys)
- * @see ThemeBaseline — per-theme fallback values for palette, strokeWidth, nodeRadii
+ * Provides the baseline for the `filters` sub-object in DEFAULT_RENDER_CONFIG.
+ * `excludeComponentTypes` defaults to `undefined` (no exclusions) since it is
+ * opt-in — omitting it means all component types are rendered.
  */
-export const StylingConfigSchema = z.object({
-  /**
-   * Per-renderable-type color overrides (any CSS color string, e.g. "#374151").
-   * Keys are restricted to KNOWN_RENDERABLE_TYPES (rendering-local vocabulary):
-   *   "component" | "user-need" | "pipeline" | "note" | "anchor"
-   *
-   * When a type key is absent, the theme baseline palette color applies.
-   * When a type key is present, the explicit color overrides the baseline for that type only.
-   *
-   * @see TypeColorsSchema (above) for the Zod definition
-   * @see KNOWN_RENDERABLE_TYPES in renderable-type.ts — rendering-local closed set of valid keys
-   * @category author-intent
-   */
-  typeColors: TypeColorsSchema.optional(),
-
-  /**
-   * Per-evolve-type arrow stroke style overrides.
-   * Keys are constrained to the closed EvolveTypeEnum:
-   *   "natural" | "ecosystem" | "forced" | "late"
-   * Unknown keys are rejected at parse time (strict schema via EvolveStylesMapSchema).
-   *
-   * When absent for a type, the evolvesto-layer uses its hardcoded per-type color defaults.
-   * Each entry can override `stroke` (color string) and/or `strokeDasharray` (SVG dash pattern).
-   *
-   * @see EvolveStylesMapSchema in schema.ts — schema definition (key constraints)
-   * @see EvolveTypeEnum in schema.ts — the closed enum of valid evolveType values
-   * @category author-intent
-   */
-  evolveStyles: EvolveStylesMapSchema.optional(),
-
-  /**
-   * Per-component-type node circle radii in **canvas px-space**.
-   * `_default` is required and serves as the catch-all fallback for unlisted types.
-   * Per-type keys (e.g. `"anchor"`, `"user-need"`) override `_default` for that type only.
-   *
-   * Default: `{ _default: 5 }` (5 px radius for all component types).
-   * Valid values: positive numbers up to 50 px (enforced by NodeRadiiSchema).
-   *
-   * Precedence (highest wins): `nodeRadii[componentType]` → `nodeRadii._default`
-   *
-   * ## Scaling with coordinateSpace.outputHint (resolution independence)
-   *
-   * When `coordinateSpace.outputHint.targetWidth` is present, these values are scaled
-   * by the ratio `outputHint.targetWidth / coordinateSpace.width` before rasterisation:
-   *
-   * ```
-   *   scaleFactor    = coordinateSpace.outputHint.targetWidth / coordinateSpace.width
-   *   renderedRadius = nodeRadii[type] × scaleFactor
-   * ```
-   *
-   * Use `computeScaleFactor(coordinateSpace)` from `coordinate-space.ts` to derive the
-   * `ScaleFactor`; apply `scaleFactor.uniform` to all px-space values.
-   *
-   * This ensures a 5 px radius on a 1600 px canvas becomes 10 px when exported at 3200 px.
-   * Contrast with `labelScale`, which is a **unitless multiplier** and is NOT scaled by
-   * `outputHint` — it is already resolution-independent.
-   *
-   * @remarks CoordinateSpace category: **canvas px-space** — absolute pixels. Scale using
-   *   `computeScaleFactor(coordinateSpace).uniform` when rasterising at a different resolution.
-   *   Do NOT scale `labelScale` — it is a unitless multiplier and is resolution-independent.
-   * @see coordinateSpace.outputHint — set targetWidth to declare output resolution
-   * @see computeScaleFactor in coordinate-space.ts — derives ScaleFactor from CoordinateSpace
-   * @see labelScale — unitless multiplier; NOT scaled by outputHint
-   * @see NodeRadiiSchema in schema.ts — schema definition with positive number validation
-   * @see CoordinateSpace — px-space coordinate system documentation
-   * @category layout-structural
-   */
-  nodeRadii: NodeRadiiSchema.default({ _default: 5 }),
-
-  /**
-   * Stroke width in **canvas px-space** applied to:
-   *   - Dependency relation edge lines
-   *   - Node circle outlines
-   *   - Evolution arrow lines
-   *
-   * Default: 1 px. Valid range: 0.25–8 px (enforced by Zod).
-   *
-   * ## Scaling with coordinateSpace.outputHint (resolution independence)
-   *
-   * When `coordinateSpace.outputHint.targetWidth` is present, this value is scaled
-   * by the ratio `outputHint.targetWidth / coordinateSpace.width` before rasterisation:
-   *
-   * ```
-   *   scaleFactor         = coordinateSpace.outputHint.targetWidth / coordinateSpace.width
-   *   renderedStrokeWidth = strokeWidth × scaleFactor
-   * ```
-   *
-   * Use `computeScaleFactor(coordinateSpace)` from `coordinate-space.ts` to derive the
-   * `ScaleFactor`; apply `scaleFactor.uniform` to all px-space values.
-   *
-   * This ensures a 1 px stroke on a 1600 px canvas becomes 2 px when exported at 3200 px.
-   * Contrast with `labelScale`, which is a **unitless multiplier** and is NOT scaled by
-   * `outputHint` — it is already resolution-independent.
-   *
-   * @remarks CoordinateSpace category: **canvas px-space** — absolute pixel measurement.
-   *   Scale using `computeScaleFactor(coordinateSpace).uniform`. Do NOT scale `labelScale`.
-   * @see coordinateSpace.outputHint — set targetWidth to declare output resolution
-   * @see computeScaleFactor in coordinate-space.ts — derives ScaleFactor from CoordinateSpace
-   * @see nodeRadii — also canvas px-space; also scaled by outputHint
-   * @see labelScale — unitless multiplier; NOT scaled by outputHint
-   * @see CoordinateSpace — px-space coordinate system documentation
-   * @category viewer-preference
-   */
-  strokeWidth: z.number().min(0.25).max(8).default(1),
-});
-
-/** TypeScript type for StylingConfig (inferred from StylingConfigSchema, with defaults applied) */
-export type StylingConfig = z.infer<typeof StylingConfigSchema>;
-
-/**
- * TypeScript input type for StylingConfig — accepts partial input before Zod applies defaults.
- * Use this type for function parameters that accept a user-provided styling config object.
- *
- * Difference from `StylingConfig`:
- *   - `StylingConfig.strokeWidth` is `number` (always present after parse)
- *   - `StylingConfigInput.strokeWidth` is `number | undefined` (optional before parse)
- *   - Same for `nodeRadii`
- */
-export type StylingConfigInput = z.input<typeof StylingConfigSchema>;
-
-/**
- * Default StylingConfig — the "out-of-box" styling when no explicit config is provided.
- *
- * Produced by parsing an empty object through StylingConfigSchema:
- *   - `strokeWidth`:   1 px
- *   - `nodeRadii`:     `{ _default: 5 }` (5 px radius for all types)
- *   - `typeColors`:    `undefined` (theme baseline palette applies for each type)
- *   - `evolveStyles`:  `undefined` (evolvesto-layer hardcoded per-type defaults apply)
- *
- * @see ThemeBaseline — per-theme palette that applies when typeColors is undefined
- * @see DEFAULT_THEME_BASELINE — the "default" theme baseline used when no theme is specified
- */
-export const DEFAULT_STYLING_CONFIG: StylingConfig = StylingConfigSchema.parse({});
+export const DEFAULT_FILTERS = {
+  layers: DEFAULT_LAYER_TOGGLES,
+} as const;
 
 // ── Backward-compat flat-to-nested preprocess ────────────────────────────────
 //
@@ -630,13 +286,18 @@ export const DEFAULT_STYLING_CONFIG: StylingConfig = StylingConfigSchema.parse({
 // lifts them into the appropriate nested sub-objects before Zod validation runs.
 //
 // Precedence rule: explicit nested sub-objects win over lifted flat keys.
-// Mixed usage: `{ width: 800, styling: { strokeWidth: 2 } }` produces
-// `{ spatial: { width: 800 }, styling: { strokeWidth: 2 } }`.
+// Mixed usage: `{ width: 800, spatial: { strokeWidth: 2 } }` produces
+// `{ spatial: { width: 800, strokeWidth: 2 } }`.
 
 /** Flat v1 keys that belong in the spatial sub-object */
-const SPATIAL_FLAT_KEYS = ["width", "height", "coordinateSpace"] as const;
-/** Flat v1 keys that belong in the styling sub-object */
-const STYLING_FLAT_KEYS = ["strokeWidth", "typeColors", "evolveStyles", "nodeRadii"] as const;
+const SPATIAL_FLAT_KEYS = ["width", "height", "coordinateSpace", "strokeWidth", "nodeRadii"] as const;
+/** Flat v1 keys that belong in the styling sub-object.
+ * - `theme` → styling.theme
+ * - `typeColors` → styling.palette (renamed)
+ * - `evolveStyles` → styling.evolveStyles
+ * - `background` → styling.background
+ */
+const STYLING_FLAT_KEYS = ["theme", "typeColors", "evolveStyles", "background"] as const;
 /** Flat v1 keys that belong in the typography sub-object */
 const TYPOGRAPHY_FLAT_KEYS = ["fontFamily", "labelScale"] as const;
 /**
@@ -706,9 +367,14 @@ function flatToNestedPreprocess(data: unknown): unknown {
   if (Object.keys(spatial).length > 0) result.spatial = spatial;
 
   // Build styling: flat keys as base, explicit nested styling overrides on top
+  // Note: flat v1 `typeColors` is renamed to `palette` in v2 styling
   const stylingFromFlat: Record<string, unknown> = {};
   for (const k of STYLING_FLAT_KEYS) {
-    if (k in flat) stylingFromFlat[k] = flat[k];
+    if (k in flat) {
+      // Rename typeColors → palette for v2
+      const targetKey = k === "typeColors" ? "palette" : k;
+      stylingFromFlat[targetKey] = flat[k];
+    }
   }
   const stylingFromNested =
     typeof flat.styling === "object" && flat.styling !== null
@@ -756,12 +422,10 @@ function flatToNestedPreprocess(data: unknown): unknown {
  * Composes SpatialConfig, StylingConfig, and TypographyConfig sub-schemas alongside
  * the existing top-level fields into a coherent nested structure:
  *
- *   - `theme`           — visual theme preset ("default" | "dark" | "highContrast")
  *   - `locale`          — axis label locale ("en" | "fr")
- *   - `spatial`         — canvas dimensions and coordinate space (SpatialConfig)
- *   - `styling`         — stroke width, node radii, colors, evolve styles (StylingConfig)
+ *   - `spatial`         — canvas dimensions, coordinate space, strokeWidth, nodeRadii (SpatialConfig)
+ *   - `styling`         — theme, palette (colors), evolve styles, background (StylingConfig)
  *   - `typography`      — font family and label scale (TypographyConfig)
- *   - `background`      — background color and axis/phase display controls
  *   - `filters`         — unified visibility filter (layers toggles + data-level type exclusion)
  *   - `legend`          — legend visibility and position
  *   - `avoidCollisions` — label collision avoidance flag
@@ -783,26 +447,22 @@ function flatToNestedPreprocess(data: unknown): unknown {
  */
 export const RenderConfigV2BaseSchema = z.object({
   /**
-   * Named visual theme preset — selects baseline palette, font, and stroke defaults.
-   * @category viewer-preference
-   */
-  theme: ThemeEnum.optional(),
-
-  /**
    * Locale preset for built-in axis labels ("en" | "fr").
-   * Overridable per-label in `background` sub-objects.
+   * Overridable per-label in `styling.background` sub-objects.
    * @category viewer-preference
    */
   locale: LocaleEnum.optional(),
 
   /**
-   * Canvas coordinate space — width, height, and coordinate system declaration.
+   * Canvas coordinate space — width, height, coordinate system declaration, strokeWidth, nodeRadii.
    * @category layout-structural
    */
   spatial: SpatialConfigSchema.optional(),
 
   /**
-   * Visual styling — stroke width, node radii, type colors, evolve styles.
+   * Visual styling — theme, palette (colors), evolve styles, background.
+   * Contains theme selection, color palette overrides, evolve arrow styles,
+   * and background/axis display controls.
    * @category author-intent
    */
   styling: StylingConfigSchema.optional(),
@@ -812,12 +472,6 @@ export const RenderConfigV2BaseSchema = z.object({
    * @category viewer-preference
    */
   typography: TypographyConfigSchema.optional(),
-
-  /**
-   * Background canvas color and axis/phase display controls.
-   * @category viewer-preference
-   */
-  background: BackgroundSchema.optional(),
 
   /**
    * Unified visibility filters — canonical mechanism for controlling what is shown in the
@@ -908,17 +562,17 @@ export type RenderConfigV2Input = z.input<typeof RenderConfigV2BaseSchema>;
  * { width: 800, height: 400 }
  *   → { spatial: { width: 800, height: 400 } }
  *
- * // Old flat styling + typography keys → lifted into sub-objects
+ * // Old flat spatial + typography keys → lifted into sub-objects
  * { strokeWidth: 2, fontFamily: "Roboto" }
- *   → { styling: { strokeWidth: 2 }, typography: { fontFamily: "Roboto" } }
+ *   → { spatial: { strokeWidth: 2 }, typography: { fontFamily: "Roboto" } }
  *
  * // Mixed: flat key lifted, explicit nested sub-object wins for overlapping keys
  * { width: 800, spatial: { width: 1920, coordinateSpace: { units: "px" } } }
  *   → { spatial: { width: 1920, coordinateSpace: { units: "px" } } }
  *
  * // New nested v2 keys → pass through as-is (fast path)
- * { theme: "dark", spatial: { width: 800 }, styling: { strokeWidth: 2 } }
- *   → { theme: "dark", spatial: { width: 800 }, styling: { strokeWidth: 2 } }
+ * { theme: "dark", spatial: { width: 800, strokeWidth: 2 } }
+ *   → { theme: "dark", spatial: { width: 800, strokeWidth: 2 } }
  *
  * // Backward-compat: top-level layerToggles → filters.layers
  * { layerToggles: { nodes: false, evolvesTo: false, labels: false } }
@@ -946,8 +600,8 @@ export const RenderConfigV2Schema = z.preprocess(
  * overrides or theme resolution. Callers can spread or merge this with their
  * own partial config:
  *
- * @example Basic spread:
- *   const myConfig = { ...DEFAULT_RENDER_CONFIG, theme: "dark" };
+ * @example Basic spread (theme is now inside styling):
+ *   const myConfig = { ...DEFAULT_RENDER_CONFIG, styling: { ...DEFAULT_RENDER_CONFIG.styling, theme: "dark" } };
  *
  * @example Deep merge for a sub-object:
  *   const myConfig: RenderConfigV2 = {
@@ -973,20 +627,25 @@ export const RenderConfigV2Schema = z.preprocess(
  * @see resolveTheme in schema.ts for the full theme resolution function
  * @see ThemeBaseline for the per-theme palette/font/stroke baseline values
  */
+/** Default legend config — show=true, position="bottom-right". */
+export const DEFAULT_LEGEND_CONFIG = LegendSchema.parse({});
+
 export const DEFAULT_RENDER_CONFIG = {
-  theme: "default",
   spatial: {
     width: 1600,
     height: 800,
-  },
-  styling: {
     strokeWidth: 1,
     nodeRadii: { _default: 5 },
+  },
+  styling: {
+    theme: "default" as const,
   },
   typography: {
     fontFamily: "Inter, sans-serif",
     labelScale: 1.0,
   },
+  filters: DEFAULT_FILTERS,
+  legend: DEFAULT_LEGEND_CONFIG,
 } satisfies RenderConfigV2;
 
 // ── PhaseMapping ──────────────────────────────────────────────────────────────

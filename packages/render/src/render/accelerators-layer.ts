@@ -107,7 +107,7 @@ export const renderAcceleratorsLayer: LayerRenderer = (
   if (!accelerators || accelerators.length === 0) return [];
 
   const parts: string[] = [];
-  const fontFamily = ctx.resolvedConfig.fontFamily;
+  const fontFamily = ctx.resolvedConfig.typography.fontFamily;
   const arrowD = buildArrowPath();
 
   for (const acc of accelerators) {

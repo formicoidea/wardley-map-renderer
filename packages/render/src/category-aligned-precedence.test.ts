@@ -19,7 +19,7 @@
  * Tier 3 (author-intent): Design choices — fontFamily, typeColors, evolveStyles,
  *   strokeWidth, nodeRadii, avoidCollisions. AuthorConfig wins. TIER_PRECEDENCE index 2.
  *
- * Tier 4 (viewer-preference): Presentational — theme, locale, labelScale.
+ * Tier 4 (viewer-preference): Presentational — theme, axes.
  *   Viewer can override (overridable: true). TIER_PRECEDENCE index 3 = lowest.
  * ```
  *
@@ -148,7 +148,7 @@ describe("category-aligned precedence — overridable flag mirrors tier authorit
   );
 
   it(
-    "viewer-preference fields (theme, locale, labelScale) are all overridable",
+    "viewer-preference fields (theme, axes) are all overridable",
     () => {
       // viewer-preference is the lowest-authority tier; fields in it MUST
       // have overridable: true so that viewer config can legitimately set them.
@@ -273,7 +273,7 @@ describe("category-aligned precedence — cross-tier isolation (lower-tier canno
       // Switching the theme must have zero effect on configIntent values.
 
       const withDefaultTheme = resolveTheme({});
-      const withDarkTheme = resolveTheme({ theme: "dark" });
+      const withDarkTheme = resolveTheme({ styling: { theme: "dark" } });
 
       // Both resolutions must produce the same DEFAULT_CONFIG_INTENT values
       expect(withDarkTheme.configIntent).toEqual(withDefaultTheme.configIntent);
@@ -284,20 +284,20 @@ describe("category-aligned precedence — cross-tier isolation (lower-tier canno
   );
 
   it(
-    "changing viewer-preference `locale` (Tier 4) does NOT alter configIntent (Tier 1)",
+    "changing viewer-preference `axes.locale` (Tier 4) does NOT alter configIntent (Tier 1)",
     () => {
-      // locale is viewer-preference; configIntent is platform-constraint.
-      // Changing locale cannot affect configIntent.
-      const withLocale = resolveTheme({ locale: "fr" });
+      // axes is viewer-preference; configIntent is platform-constraint.
+      // Changing axes.locale cannot affect configIntent.
+      const withLocale = resolveTheme({ axes: { locale: "fr" } });
 
       expect(withLocale.configIntent).toEqual(DEFAULT_CONFIG_INTENT);
     },
   );
 
   it(
-    "changing viewer-preference `labelScale` (Tier 4) does NOT alter configIntent (Tier 1)",
+    "changing typography.labelScale (author-intent) does NOT alter configIntent (Tier 1)",
     () => {
-      const withLabelScale = resolveTheme({ labelScale: 1.5 });
+      const withLabelScale = resolveTheme({ typography: { labelScale: 1.5 } });
 
       expect(withLabelScale.configIntent).toEqual(DEFAULT_CONFIG_INTENT);
     },
@@ -307,20 +307,20 @@ describe("category-aligned precedence — cross-tier isolation (lower-tier canno
     "explicit higher-tier configIntent survives alongside lower-tier viewer-preference fields",
     () => {
       // When both a platform-constraint field (configIntent) and viewer-preference
-      // fields (theme, locale) are set, they coexist without interference:
+      // fields (theme, axes) are set, they coexist without interference:
       // each tier applies its own resolution rule independently.
 
       const resolved = resolveTheme({
-        theme: "dark",
-        locale: "fr",
-        labelScale: 1.2,
+        styling: { theme: "dark" },
+        axes: { locale: "fr" },
+        typography: { labelScale: 1.2 },
         configIntent: { noInteraction: false }, // higher tier: platform-constraint
       });
 
       // Lower-tier viewer-preference fields resolve normally
       expect(resolved.theme).toBe("dark");
       expect(resolved.locale).toBe("fr");
-      expect(resolved.labelScale).toBe(1.2);
+      expect(resolved.typography.labelScale).toBe(1.2);
 
       // Higher-tier platform-constraint configIntent is preserved with explicit override
       expect(resolved.configIntent.noInteraction).toBe(false); // explicit override survives
@@ -369,21 +369,21 @@ describe("category-aligned precedence — TIER_PRECEDENCE ordering guarantees", 
   );
 
   it(
-    "configIntent tier index is lower (higher authority) than theme and locale tier indices",
+    "configIntent tier index is lower (higher authority) than theme and axes tier indices",
     () => {
-      // configIntent = platform-constraint, theme/locale = viewer-preference
+      // configIntent = platform-constraint, theme/axes = viewer-preference
       // platform-constraint index < viewer-preference index → configIntent has higher authority
       const configIntentTier = getFieldTierCategory("configIntent");
-      const themeTier = getFieldTierCategory("theme");
-      const localeTier = getFieldTierCategory("locale");
+      const stylingTier = getFieldTierCategory("styling");
+      const axesTier = getFieldTierCategory("axes");
 
       const configIntentIdx = TIER_PRECEDENCE.indexOf(configIntentTier);
-      const themeIdx = TIER_PRECEDENCE.indexOf(themeTier);
-      const localeIdx = TIER_PRECEDENCE.indexOf(localeTier);
+      const stylingIdx = TIER_PRECEDENCE.indexOf(stylingTier);
+      const axesIdx = TIER_PRECEDENCE.indexOf(axesTier);
 
-      // configIntent (platform-constraint) outranks theme and locale (viewer-preference)
-      expect(configIntentIdx).toBeLessThan(themeIdx);
-      expect(configIntentIdx).toBeLessThan(localeIdx);
+      // configIntent (platform-constraint) outranks styling and axes
+      expect(configIntentIdx).toBeLessThan(stylingIdx);
+      expect(configIntentIdx).toBeLessThan(axesIdx);
     },
   );
 
