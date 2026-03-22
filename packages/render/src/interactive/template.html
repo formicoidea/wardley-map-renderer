@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{TITLE}}</title>
+<style>
+/* ── Reset ──────────────────────────────────────────────────────────── */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden}
+body{font-family:var(--map-font,Inter,system-ui,sans-serif);background:var(--bg);color:var(--fg)}
+
+/* ── CSS Variables (injected at build time) ─────────────────────────── */
+:root{{{CSS_VARS_LIGHT}}}
+@media(prefers-color-scheme:dark){
+  :root{{{CSS_VARS_DARK}}}
+}
+
+/* ── Layout ─────────────────────────────────────────────────────────── */
+#map-container{width:100%;height:100%;display:flex;flex-direction:column}
+
+/* ── Global Bar ─────────────────────────────────────────────────────── */
+#global-bar{
+  display:flex;align-items:center;gap:8px;padding:6px 12px;
+  background:var(--panel-bg);border-bottom:1px solid var(--panel-border);
+  flex-shrink:0;font-size:13px;color:var(--panel-text);z-index:10
+}
+#global-bar button{
+  padding:4px 10px;border:1px solid var(--panel-border);border-radius:4px;
+  background:var(--panel-bg);color:var(--panel-text);cursor:pointer;
+  font-size:12px;font-family:inherit;line-height:1.4;white-space:nowrap;
+  transition:background .15s,border-color .15s
+}
+#global-bar button:hover{
+  border-color:var(--accent);
+  background:color-mix(in srgb,var(--accent) 10%,var(--panel-bg))
+}
+#global-bar button.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+#global-bar button.primary:hover{background:var(--accent-hover)}
+#global-bar button:disabled{opacity:.4;cursor:default;border-color:var(--panel-border);background:var(--panel-bg)}
+#global-bar .separator{width:1px;height:20px;background:var(--panel-border);flex-shrink:0}
+#global-bar .counter{font-variant-numeric:tabular-nums;opacity:.8}
+#global-bar .spacer{flex:1}
+
+/* ── Context Zone ───────────────────────────────────────────────────── */
+#context-zone{
+  display:none;align-items:center;gap:8px;padding:4px 12px;
+  background:color-mix(in srgb,var(--accent) 8%,var(--panel-bg));
+  border-bottom:1px solid var(--panel-border);
+  flex-shrink:0;font-size:12px;color:var(--panel-text);z-index:9;min-height:32px
+}
+#context-zone.visible{display:flex}
+#context-zone .ctx-label{
+  font-weight:600;color:var(--accent);margin-right:4px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px
+}
+#context-zone .ctx-group{display:flex;align-items:center;gap:6px}
+#context-zone button{
+  padding:3px 8px;border:1px solid var(--panel-border);border-radius:3px;
+  background:var(--panel-bg);color:var(--panel-text);cursor:pointer;
+  font-size:11px;font-family:inherit;line-height:1.4;white-space:nowrap;
+  transition:background .15s,border-color .15s
+}
+#context-zone button:hover{
+  border-color:var(--accent);
+  background:color-mix(in srgb,var(--accent) 10%,var(--panel-bg))
+}
+#context-zone button.danger{color:#ef4444;border-color:#ef4444}
+#context-zone button.danger:hover{background:color-mix(in srgb,#ef4444 10%,var(--panel-bg))}
+#context-zone input[type="text"]{
+  padding:3px 6px;border:1px solid var(--panel-border);border-radius:3px;
+  background:var(--panel-bg);color:var(--panel-text);font-size:11px;font-family:inherit;width:140px
+}
+#context-zone select{
+  padding:3px 6px;border:1px solid var(--panel-border);border-radius:3px;
+  background:var(--panel-bg);color:var(--panel-text);font-size:11px;font-family:inherit
+}
+#context-zone .ctx-sep{width:1px;height:18px;background:var(--panel-border);flex-shrink:0}
+#context-zone .ctx-hint{opacity:.6;font-style:italic}
+.ctx-panel{display:none}
+.ctx-panel.active{display:contents}
+
+/* ── SVG Wrapper ────────────────────────────────────────────────────── */
+#svg-wrapper{flex:1;overflow:auto;position:relative}
+#svg-wrapper svg{width:100%;height:auto;display:block}
+
+/* ── Selection & Interactive Styles ─────────────────────────────────── */
+.wm-selected{filter:drop-shadow(0 0 3px var(--accent,#3b82f6)) drop-shadow(0 0 6px var(--accent,#3b82f6))}
+.wm-selected>circle,.wm-selected>ellipse{stroke:var(--accent,#3b82f6)!important;stroke-width:2.5!important}
+.wm-selected>rect{stroke:var(--accent,#3b82f6)!important;stroke-width:2!important}
+.wm-selected>line,.wm-selected>path:not(.hit-area){stroke:var(--accent,#3b82f6)!important;stroke-width:2.5!important}
+[data-pipeline-id].wm-selected>rect:first-of-type{fill:color-mix(in srgb,var(--accent,#3b82f6) 8%,transparent)!important;stroke:var(--accent,#3b82f6)!important;stroke-width:2!important}
+[data-label-for].wm-selected,[data-label-for].wm-selected *{fill:var(--accent,#3b82f6)!important}
+[data-step-id].wm-selected>circle{stroke:var(--accent,#3b82f6)!important;stroke-width:2.5!important;fill:color-mix(in srgb,var(--accent,#3b82f6) 15%,transparent)!important}
+[data-step-id].wm-selected>text{fill:var(--accent,#3b82f6)!important}
+[data-evolves-from].wm-selected>line,[data-evolves-from].wm-selected>path{stroke:var(--accent,#3b82f6)!important;stroke-width:2.5!important}
+[data-component-id],[data-pipeline-id],[data-step-id]{cursor:grab}
+[data-label-for]{cursor:grab}
+[data-edge-id] .hit-area,[data-evolves-from] .hit-area{cursor:pointer}
+[data-handle]{display:none;pointer-events:none}
+.wm-selected>[data-handle]{display:block;pointer-events:auto}
+
+/* ── Inline Rename ──────────────────────────────────────────────────── */
+.wm-inline-rename{
+  background:var(--panel-bg,#fff);color:var(--panel-text,#222);
+  border:1.5px solid var(--accent,#3b82f6);border-radius:3px;
+  padding:2px 4px;font-family:var(--map-font,Inter,system-ui,sans-serif);
+  font-size:12px;outline:none;width:100%;box-sizing:border-box
+}
+
+/* ── Placement Feedback ─────────────────────────────────────────────── */
+.wm-placement-ghost{
+  opacity:0.5;pointer-events:none;
+  stroke:var(--accent,#3b82f6);stroke-dasharray:4 3
+}
+.wm-placement-target{
+  stroke:var(--accent,#3b82f6)!important;stroke-width:2.5!important;
+  filter:drop-shadow(0 0 4px var(--accent,#3b82f6))
+}
+.wm-placement-source{
+  filter:drop-shadow(0 0 6px var(--accent,#3b82f6)) drop-shadow(0 0 12px var(--accent,#3b82f6))
+}
+.wm-placement-source>circle,.wm-placement-source>ellipse{
+  stroke:var(--accent,#3b82f6)!important;stroke-width:2.5!important;
+  fill:rgba(59,130,246,0.15)!important
+}
+.wm-placement-source>rect{
+  stroke:var(--accent,#3b82f6)!important;stroke-width:2.5!important
+}
+.wm-rubber-band{
+  stroke:var(--accent,#3b82f6);opacity:0.7;
+  transition:opacity 0.1s ease
+}
+</style>
+</head>
+<body>
+<div id="map-container">
+  <!-- ── Global Bar ─────────────────────────────────────────────────── -->
+  <div id="global-bar">
+    <button id="btn-add-component" title="Add component">+ Component</button>
+    <button id="btn-add-edge" title="Add edge">+ Edge</button>
+    <button id="btn-add-evolves" title="Add evolvesTo link">+ EvolvesTo</button>
+    <div class="separator"></div>
+    <span class="counter" id="counter-display"></span>
+    <div class="separator"></div>
+    <button id="btn-undo" title="Undo last operation (Ctrl+Z)" disabled>Undo</button>
+    <button id="btn-reset" title="Reset all changes">Reset</button>
+    <div class="spacer"></div>
+    <button id="btn-copy" title="Copy diff to clipboard" disabled>Copy</button>
+    <button id="btn-apply" class="primary" title="Send diff to Claude" disabled>Update Claude</button>
+  </div>
+
+  <!-- ── Context Zone ───────────────────────────────────────────────── -->
+  <div id="context-zone">
+    <!-- Component context panel -->
+    <div id="ctx-component" class="ctx-panel">
+      <span class="ctx-label" id="ctx-comp-name"></span>
+      <div class="ctx-sep"></div>
+      <div class="ctx-group">
+        <input type="text" id="ctx-comp-rename" placeholder="Rename..." title="Rename component">
+        <button id="ctx-comp-rename-btn">Rename</button>
+      </div>
+      <div class="ctx-sep"></div>
+      <div class="ctx-group">
+        <select id="ctx-comp-type" title="Component type">
+          <option value="component">component</option>
+          <option value="build">build</option>
+          <option value="buy">buy</option>
+          <option value="outsource">outsource</option>
+          <option value="dataProduct">dataProduct</option>
+          <option value="market">market</option>
+        </select>
+      </div>
+      <div class="ctx-sep"></div>
+      <button id="ctx-comp-delete" class="danger" title="Delete component">Delete</button>
+    </div>
+
+    <!-- Edge context panel -->
+    <div id="ctx-edge" class="ctx-panel">
+      <span class="ctx-label" id="ctx-edge-label"></span>
+      <div class="ctx-sep"></div>
+      <div class="ctx-group">
+        <select id="ctx-edge-type" title="Edge type">
+          <option value="dependency">dependency</option>
+          <option value="flow">flow</option>
+          <option value="constraint">constraint</option>
+        </select>
+      </div>
+      <div class="ctx-sep"></div>
+      <button id="ctx-edge-delete" class="danger" title="Delete edge">Delete</button>
+    </div>
+
+    <!-- Pipeline context panel -->
+    <div id="ctx-pipeline" class="ctx-panel">
+      <span class="ctx-label" id="ctx-pipe-name"></span>
+      <div class="ctx-sep"></div>
+      <span class="ctx-hint" id="ctx-pipe-range"></span>
+      <div class="ctx-sep"></div>
+      <button id="ctx-pipe-delete" class="danger" title="Delete pipeline">Delete</button>
+    </div>
+
+    <!-- Add-component context panel -->
+    <div id="ctx-add-component" class="ctx-panel">
+      <span class="ctx-hint">Add component &mdash; pick type &amp; label, then click on the map</span>
+      <div class="ctx-sep"></div>
+      <div class="ctx-group">
+        <select id="ctx-add-type" title="Component type">
+          <option value="component">component</option>
+          <option value="user-need">user-need</option>
+          <option value="pipeline">pipeline</option>
+          <option value="note">note</option>
+          <option value="anchor">anchor</option>
+          <option value="market">market</option>
+          <option value="ecosystem">ecosystem</option>
+        </select>
+      </div>
+      <div class="ctx-group">
+        <input type="text" id="ctx-add-label" placeholder="Label..." title="Component label" value="New Component">
+      </div>
+      <div class="ctx-sep"></div>
+      <button id="ctx-add-cancel">Cancel</button>
+    </div>
+
+    <!-- Placement context panel (edge/evolvesTo target picking) -->
+    <div id="ctx-placement" class="ctx-panel">
+      <span class="ctx-hint" id="ctx-placement-hint"></span>
+      <div class="ctx-sep"></div>
+      <button id="ctx-placement-cancel">Cancel</button>
+    </div>
+  </div>
+
+  <!-- ── SVG Container ──────────────────────────────────────────────── -->
+  <div id="svg-wrapper">
+    {{SVG_CONTENT}}
+  </div>
+</div>
+
+<!-- ── JSON Injection Points ────────────────────────────────────────── -->
+<script id="wardley-data" type="application/json">
+{{MAP_JSON}}
+</script>
+<script id="render-constants" type="application/json">
+{{CONSTANTS_JSON}}
+</script>
+<script id="render-config" type="application/json">
+{{RENDER_CONFIG_JSON}}
+</script>
+
+<!-- ── Bundled Interactive Script (injected at build time) ───────────── -->
+{{BUNDLE_SCRIPT}}
+</body>
+</html>

@@ -208,6 +208,14 @@ export interface RenderOptions {
   readonly avoidCollisions?: boolean;
 
   /**
+   * Enable interactive SVG elements (data-* attributes, hit areas, handles,
+   * plot-area rect). Used by the HTML renderer for drag-and-drop.
+   * When true, composeSVG adds an invisible `<rect data-plot-area>` covering
+   * the drawable area for client-side coordinate conversion.
+   */
+  readonly interactive?: boolean;
+
+  /**
    * **Data filter (pre-render):** Component types to exclude from rendering.
    * Filtered components are removed before geometry is computed, affecting ALL layers.
    * @see FiltersSchema.excludeComponentTypes for full distinction vs filters.layers

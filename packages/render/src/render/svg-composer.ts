@@ -36,15 +36,12 @@ import { getOrderedLayers } from "./registry.js";
 
 // ── SVG helpers ──────────────────────────────────────────────────────
 
-/** Escape text for XML/SVG attribute/content safety */
-export function esc(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
+/**
+ * Escape text for XML/SVG attribute/content safety.
+ * Imported from svg-primitives.ts — the single source of truth.
+ */
+import { esc } from "./svg-primitives.js";
+export { esc };
 
 // ── Background pseudo-layer ──────────────────────────────────────────
 
@@ -105,6 +102,14 @@ export function composeSVG(
 
   // Background (always first, before named layers)
   parts.push(renderBackground(ctx));
+
+  // Interactive mode: invisible plot-area rect for coordinate conversion
+  if (ctx.options.interactive) {
+    const { left, top, width, height } = ctx.plot;
+    parts.push(
+      `<rect data-plot-area x="${left}" y="${top}" width="${width}" height="${height}" fill="none" pointer-events="none" />`
+    );
+  }
 
   // Render each layer in z-order
   for (const layer of orderedLayers) {

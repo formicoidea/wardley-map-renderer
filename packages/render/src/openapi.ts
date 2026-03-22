@@ -103,6 +103,7 @@ const FlowSchema = z.object({
 const RelationTypeEnum = z.enum(["DependsOn", "Flow", "Constraint"]).openapi("RelationType");
 
 const RelationSchema = z.object({
+  id: z.string(),
   source: z.string(),
   target: z.string(),
   type: RelationTypeEnum.default("DependsOn"),
@@ -299,10 +300,34 @@ const AcceleratorSchema = z.object({
 }).openapi("Accelerator");
 
 const StepSchema = z.object({
+  id: z.string(),
   number: z.number().int().min(1),
   position: PositionSchema,
   color: z.string().optional(),
 }).openapi("Step");
+
+// ── Diff-op schemas (interactive editing) ──────────────────────
+const MoveLabelPayloadSchema = z.object({
+  id: z.string().min(1).openapi({ description: "The component id whose label is being repositioned" }),
+  dx: z.number().openapi({ description: "Horizontal offset relative to the node center (normalized coordinates)" }),
+  dy: z.number().openapi({ description: "Vertical offset relative to the node center (normalized coordinates)" }),
+}).openapi("MoveLabelPayload");
+
+const MoveLabelOpSchema = z.object({
+  op: z.literal("move_label"),
+  payload: MoveLabelPayloadSchema,
+}).openapi("MoveLabelOp");
+
+const MoveStepPayloadSchema = z.object({
+  id: z.string().openapi({ description: "The step id identifying the step sticker to move" }),
+  evolution: z.number().min(0).max(1).openapi({ description: "New evolution position [0, 1]" }),
+  visibility: z.number().min(0).max(1).openapi({ description: "New visibility position [0, 1]" }),
+}).openapi("MoveStepPayload");
+
+const MoveStepOpSchema = z.object({
+  op: z.literal("move_step"),
+  payload: MoveStepPayloadSchema,
+}).openapi("MoveStepOp");
 
 const WardleyMapSchema = z.object({
   title: z.string(),

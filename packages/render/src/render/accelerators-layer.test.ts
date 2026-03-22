@@ -77,20 +77,19 @@ describe("renderAcceleratorsLayer", () => {
     const ctx = buildRenderContext(map);
     const result = renderAcceleratorsLayer(ctx);
 
-    // Should produce 2 SVG fragments: path + text
-    expect(result).toHaveLength(2);
+    // Primitives return combined path+text per accelerator
+    expect(result).toHaveLength(1);
 
     // Arrow path — no rotate for accelerator
-    const pathFragment = result[0];
-    expect(pathFragment).toContain("<path");
-    expect(pathFragment).toContain("translate(");
-    expect(pathFragment).not.toContain("rotate(");
+    const fragment = result[0];
+    expect(fragment).toContain("<path");
+    expect(fragment).toContain("translate(");
+    expect(fragment).not.toContain("rotate(");
 
     // Label text
-    const textFragment = result[1];
-    expect(textFragment).toContain("<text");
-    expect(textFragment).toContain("Open Source");
-    expect(textFragment).toContain('text-anchor="start"');
+    expect(fragment).toContain("<text");
+    expect(fragment).toContain("Open Source");
+    expect(fragment).toContain('text-anchor="start"');
   });
 
   it("renders a deaccelerator arrow with rotate(180)", () => {
@@ -110,18 +109,18 @@ describe("renderAcceleratorsLayer", () => {
     const ctx = buildRenderContext(map);
     const result = renderAcceleratorsLayer(ctx);
 
-    expect(result).toHaveLength(2);
+    // Primitives return combined path+text per accelerator
+    expect(result).toHaveLength(1);
 
     // Arrow path — rotate(180) for deaccelerator
-    const pathFragment = result[0];
-    expect(pathFragment).toContain("<path");
-    expect(pathFragment).toContain("rotate(180)");
+    const fragment = result[0];
+    expect(fragment).toContain("<path");
+    expect(fragment).toContain("rotate(180)");
 
     // Label text — anchor end (left of arrow for deaccelerator)
-    const textFragment = result[1];
-    expect(textFragment).toContain("<text");
-    expect(textFragment).toContain("Legacy Lock-in");
-    expect(textFragment).toContain('text-anchor="end"');
+    expect(fragment).toContain("<text");
+    expect(fragment).toContain("Legacy Lock-in");
+    expect(fragment).toContain('text-anchor="end"');
   });
 
   it("renders mixed accelerators and deaccelerators", () => {
@@ -150,13 +149,13 @@ describe("renderAcceleratorsLayer", () => {
     const ctx = buildRenderContext(map);
     const result = renderAcceleratorsLayer(ctx);
 
-    // 2 items × 2 fragments (path + text) = 4
-    expect(result).toHaveLength(4);
+    // 2 items × 1 combined fragment = 2
+    expect(result).toHaveLength(2);
 
     // First accelerator: no rotation
     expect(result[0]).not.toContain("rotate(");
     // Second deaccelerator: rotate(180)
-    expect(result[2]).toContain("rotate(180)");
+    expect(result[1]).toContain("rotate(180)");
   });
 
   it("positions arrows using evoToX/visToY coordinate conversion", () => {

@@ -37,7 +37,7 @@ const MINIMAL_MAP: WardleyMap = WardleyMapSchema.parse({
       position: { evolution: { scalar: 0.7 }, visibility: { scalar: 0.6 } },
     },
   ],
-  relations: [{ source: "c1", target: "c2" }],
+  relations: [{ id: "rel-c1-c2", source: "c1", target: "c2" }],
 });
 
 // ── esc() helper ─────────────────────────────────────────────────────
@@ -134,6 +134,48 @@ describe("composeSVG()", () => {
     const svg = composeSVG(ctx, [multiLayer]);
     expect(svg).toContain('x2="100"');
     expect(svg).toContain('x2="200"');
+  });
+});
+
+// ── Interactive mode: data-plot-area rect ─────────────────────────────
+
+describe("composeSVG() interactive plot-area rect", () => {
+  it("adds data-plot-area rect when interactive=true", () => {
+    const ctx = buildRenderContext(MINIMAL_MAP, { interactive: true });
+    const svg = composeSVG(ctx, []);
+    expect(svg).toContain("data-plot-area");
+    // Verify rect dimensions match the computed plot area
+    expect(svg).toContain(`x="${ctx.plot.left}"`);
+    expect(svg).toContain(`y="${ctx.plot.top}"`);
+    expect(svg).toContain(`width="${ctx.plot.width}"`);
+    expect(svg).toContain(`height="${ctx.plot.height}"`);
+    expect(svg).toContain('fill="none"');
+    expect(svg).toContain('pointer-events="none"');
+  });
+
+  it("does NOT add data-plot-area rect when interactive is false/undefined", () => {
+    const ctx = buildRenderContext(MINIMAL_MAP);
+    const svg = composeSVG(ctx, []);
+    expect(svg).not.toContain("data-plot-area");
+
+    const ctx2 = buildRenderContext(MINIMAL_MAP, { interactive: false });
+    const svg2 = composeSVG(ctx2, []);
+    expect(svg2).not.toContain("data-plot-area");
+  });
+
+  it("places data-plot-area rect before layer groups", () => {
+    const ctx = buildRenderContext(MINIMAL_MAP, { interactive: true });
+    const testLayer: LayerRegistration = {
+      name: "nodes",
+      order: 60,
+      render: () => ["<!-- NODES -->"],
+    };
+    const svg = composeSVG(ctx, [testLayer]);
+    const plotIdx = svg.indexOf("data-plot-area");
+    const layerIdx = svg.indexOf('data-layer="nodes"');
+    expect(plotIdx).toBeGreaterThan(-1);
+    expect(layerIdx).toBeGreaterThan(-1);
+    expect(plotIdx).toBeLessThan(layerIdx);
   });
 });
 

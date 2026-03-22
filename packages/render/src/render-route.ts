@@ -10,12 +10,14 @@
 import type { Context } from "hono";
 import { WardleyMapSchema, sanitizeMap } from "./schema.js";
 import { renderToSVG, renderToPNG } from "./render-orchestrator.js";
+import { renderToHTML } from "./render-html.js";
 import { HttpProblem } from "./middleware/error-handler.js";
 import { ProblemTypes } from "./middleware/problem-details.js";
 
 // ── Content Negotiation ──────────────────────────────────────────────
 
-const SUPPORTED_FORMATS = new Map<string, "svg" | "png">([
+const SUPPORTED_FORMATS = new Map<string, "svg" | "png" | "html">([
+  ["text/html", "html"],
   ["image/svg+xml", "svg"],
   ["image/png", "png"],
   ["image/*", "png"],
@@ -24,9 +26,9 @@ const SUPPORTED_FORMATS = new Map<string, "svg" | "png">([
 
 /**
  * Parse the Accept header and determine the best supported format.
- * Returns "svg", "png", or null if no supported format matches.
+ * Returns "html", "svg", "png", or null if no supported format matches.
  */
-export function negotiateFormat(accept: string | undefined): "svg" | "png" | null {
+export function negotiateFormat(accept: string | undefined): "svg" | "png" | "html" | null {
   if (!accept) return "png";
 
   const types = accept
@@ -55,6 +57,7 @@ export function negotiateFormat(accept: string | undefined): "svg" | "png" | nul
  *
  * Accepts WardleyMap JSON as the POST body.
  * Uses the Accept header for content negotiation:
+ *   - text/html      → Interactive HTML artifact with embedded SVG
  *   - image/svg+xml  → SVG
  *   - image/png      → PNG (default)
  *   - unsupported    → 406 Not Acceptable
@@ -103,7 +106,7 @@ export async function renderRoute(c: Context): Promise<Response> {
   if (format === null) {
     throw new HttpProblem(406, "Not Acceptable", {
       type: ProblemTypes.NOT_ACCEPTABLE,
-      detail: "Supported formats: image/svg+xml, image/png. Set Accept header accordingly.",
+      detail: "Supported formats: text/html, image/svg+xml, image/png. Set Accept header accordingly.",
     });
   }
 
@@ -127,7 +130,16 @@ export async function renderRoute(c: Context): Promise<Response> {
 
   // ── Render via modular pipeline ─────────────────────────
   try {
-    if (format === "svg") {
+    if (format === "html") {
+      const html = await renderToHTML(map, { ...renderOptions, interactive: true });
+      return new Response(html, {
+        status: 200,
+        headers: {
+          "Content-Type": "text/html; charset=utf-8",
+          "Cache-Control": "no-store",
+        },
+      });
+    } else if (format === "svg") {
       const svg = renderToSVG(map, renderOptions);
       return new Response(svg, {
         status: 200,

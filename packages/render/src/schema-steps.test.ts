@@ -3,6 +3,7 @@ import { StepSchema, WardleyMapSchema } from "./schema.js";
 
 describe("StepSchema", () => {
   const validStep = {
+    id: "step-1",
     number: 1,
     position: {
       evolution: { scalar: 0.5 },
@@ -74,6 +75,7 @@ describe("WardleyMapSchema.steps", () => {
       ...minimalMap,
       steps: [
         {
+          id: "step-1",
           number: 1,
           position: {
             evolution: { scalar: 0.2 },
@@ -81,6 +83,7 @@ describe("WardleyMapSchema.steps", () => {
           },
         },
         {
+          id: "step-2",
           number: 2,
           position: {
             evolution: { scalar: 0.6 },

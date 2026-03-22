@@ -39,7 +39,7 @@ const BASE_MAP = {
       position: { evolution: { scalar: 0.5 }, visibility: { scalar: 0.5 } },
     },
   ],
-  relations: [{ source: "anchor1", target: "comp1", type: "DependsOn" }],
+  relations: [{ id: "rel-anchor1-comp1", source: "anchor1", target: "comp1", type: "DependsOn" }],
 };
 
 /** POST /render with JSON body and SVG Accept header */

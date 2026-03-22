@@ -65,6 +65,7 @@ describe("StepsLayer — no steps", () => {
 describe("StepsLayer — single step", () => {
   const steps = [
     {
+      id: "step-1",
       number: 1,
       position: { evolution: { scalar: 0.3 }, visibility: { scalar: 0.4 } },
     },
@@ -113,7 +114,10 @@ describe("StepsLayer — single step", () => {
 
   it("renders exactly 2 elements (circle + text)", () => {
     const parts = renderSteps({ steps });
-    expect(parts).toHaveLength(2);
+    // Primitives return combined circle+text as single string; count SVG elements
+    expect(parts).toHaveLength(1);
+    expect(parts[0]).toContain("<circle");
+    expect(parts[0]).toContain("<text");
   });
 });
 
@@ -123,6 +127,7 @@ describe("StepsLayer — custom colour", () => {
   it("uses step.color when provided", () => {
     const steps = [
       {
+        id: "step-2",
         number: 2,
         position: { evolution: { scalar: 0.5 }, visibility: { scalar: 0.5 } },
         color: "#3366ff",
@@ -137,6 +142,7 @@ describe("StepsLayer — custom colour", () => {
   it("resolves named colour tokens via resolveColor", () => {
     const steps = [
       {
+        id: "step-3",
         number: 3,
         position: { evolution: { scalar: 0.5 }, visibility: { scalar: 0.5 } },
         color: "blue-600",
@@ -153,14 +159,17 @@ describe("StepsLayer — custom colour", () => {
 describe("StepsLayer — multiple steps", () => {
   const steps = [
     {
+      id: "step-1",
       number: 1,
       position: { evolution: { scalar: 0.2 }, visibility: { scalar: 0.3 } },
     },
     {
+      id: "step-2",
       number: 2,
       position: { evolution: { scalar: 0.6 }, visibility: { scalar: 0.7 } },
     },
     {
+      id: "step-3",
       number: 3,
       position: { evolution: { scalar: 0.8 }, visibility: { scalar: 0.9 } },
       color: "#00cc00",
@@ -169,7 +178,8 @@ describe("StepsLayer — multiple steps", () => {
 
   it("renders 6 elements (2 per step × 3 steps)", () => {
     const parts = renderSteps({ steps });
-    expect(parts).toHaveLength(6);
+    // Primitives return combined circle+text per step
+    expect(parts).toHaveLength(3);
   });
 
   it("contains all step numbers", () => {
@@ -181,8 +191,8 @@ describe("StepsLayer — multiple steps", () => {
 
   it("step 3 uses custom colour", () => {
     const parts = renderSteps({ steps });
-    // Step 3's circle (index 4) should use green
-    expect(parts[4]).toContain('fill="#00cc00"');
+    // Step 3's fragment (index 2) should use green
+    expect(parts[2]).toContain('fill="#00cc00"');
   });
 });
 
@@ -192,6 +202,7 @@ describe("StepsLayer — position mapping", () => {
   it("maps evolution and visibility to pixel coordinates", () => {
     const steps = [
       {
+        id: "step-1",
         number: 1,
         position: { evolution: { scalar: 0.5 }, visibility: { scalar: 0.5 } },
       },
@@ -204,9 +215,10 @@ describe("StepsLayer — position mapping", () => {
     const expectedX = ctx.evoToX(0.5);
     const expectedY = ctx.visToY(0.5);
 
+    // Both circle and text are in parts[0] (combined by primitives)
     expect(parts[0]).toContain(`cx="${expectedX}"`);
     expect(parts[0]).toContain(`cy="${expectedY}"`);
-    expect(parts[1]).toContain(`x="${expectedX}"`);
-    expect(parts[1]).toContain(`y="${expectedY}"`);
+    expect(parts[0]).toContain(`x="${expectedX}"`);
+    expect(parts[0]).toContain(`y="${expectedY}"`);
   });
 });

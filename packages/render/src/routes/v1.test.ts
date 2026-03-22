@@ -28,7 +28,7 @@ const VALID_MAP = {
       position: { evolution: { scalar: 0.65 }, visibility: { scalar: 0.8 } },
     },
   ],
-  relations: [{ source: "user", target: "web-app" }],
+  relations: [{ id: "rel-user-web-app", source: "user", target: "web-app" }],
 };
 
 describe("API versioning under /v1/", () => {
@@ -249,7 +249,7 @@ describe("POST /v1/render — route handler", () => {
           position: { evolution: { scalar: 0.5 }, visibility: { scalar: 0.5 } },
         },
       ],
-      relations: [{ source: "a", target: "b" }],
+      relations: [{ id: "rel-a-b", source: "a", target: "b" }],
     };
     const res = await app.request("/v1/render", {
       method: "POST",

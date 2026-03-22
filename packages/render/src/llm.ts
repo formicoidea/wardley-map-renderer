@@ -51,7 +51,7 @@ Respond with ONLY valid JSON matching this schema. No markdown, no explanation, 
     }
   ],
   "relations": [
-    { "source": "component-id", "target": "component-id", "type": "DependsOn", "flow": { "label": "optional-flow-label", "style": "solid" } }
+    { "id": "unique-relation-id", "source": "component-id", "target": "component-id", "type": "DependsOn", "flow": { "label": "optional-flow-label", "style": "solid" } }
   ]
 }`;
 

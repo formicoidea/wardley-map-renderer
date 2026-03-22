@@ -78,8 +78,8 @@ function makeTestMap(renderConfig: Record<string, unknown> = {}): WardleyMap {
         },
       ],
       relations: [
-        { source: "anchor", target: "service" },
-        { source: "service", target: "commodity" },
+        { id: "rel-anchor-service", source: "anchor", target: "service" },
+        { id: "rel-service-commodity", source: "service", target: "commodity" },
       ],
       renderConfig,
     })

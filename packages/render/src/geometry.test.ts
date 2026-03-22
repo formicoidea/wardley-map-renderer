@@ -30,7 +30,7 @@ function makeMap(overrides: Partial<WardleyMap> = {}): WardleyMap {
   };
 }
 
-/** Create a pipeline component with geometry */
+/** Create a pipeline component with geometry (position = center of bounds) */
 function makePipeline(
   id: string,
   evoStart: number,
@@ -44,8 +44,8 @@ function makePipeline(
     label: { name: `Pipeline ${id}` },
     type: "pipeline",
     position: {
-      evolution: { scalar: evoStart },
-      visibility: { scalar: visEnd },
+      evolution: { scalar: (evoStart + evoEnd) / 2 },
+      visibility: { scalar: (visStart + visEnd) / 2 },
     },
     pipelineGeometry: {
       evoStart,
@@ -330,7 +330,7 @@ describe("allEdgeSegments", () => {
           },
         },
       ],
-      relations: [{ source: "a", target: "b", type: "DependsOn" }],
+      relations: [{ id: "rel-a-b", source: "a", target: "b", type: "DependsOn" }],
     });
     const ctx = createRenderContext(map);
     const positions = allComponentPositions(map, ctx);
@@ -356,7 +356,7 @@ describe("allEdgeSegments", () => {
           },
         },
       ],
-      relations: [{ source: "a", target: "missing", type: "DependsOn" }],
+      relations: [{ id: "rel-a-missing", source: "a", target: "missing", type: "DependsOn" }],
     });
     const ctx = createRenderContext(map);
     const positions = allComponentPositions(map, ctx);

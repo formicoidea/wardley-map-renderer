@@ -12,6 +12,8 @@
     }
   },
   "scripts": {
+    "bundle:interactive": "tsx scripts/bundle-interactive.ts",
+    "prebuild": "tsx scripts/bundle-interactive.ts",
     "build": "tsc",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
@@ -27,5 +29,6 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "esbuild": "^0.25.0"
   }
 }

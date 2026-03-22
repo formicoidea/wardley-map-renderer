@@ -20,21 +20,7 @@
  */
 
 import type { RenderContext, LayerRenderer } from "./types.js";
-import type { RelationType } from "../schema.js";
-
-// ── Visual constants ────────────────────────────────────────────────
-
-/** Default visual style per relation type */
-interface RelationVisualStyle {
-  readonly color: string;
-  readonly dashArray: string; // empty string = solid
-}
-
-const RELATION_TYPE_STYLES: Record<RelationType, RelationVisualStyle> = {
-  DependsOn: { color: "#999999", dashArray: "" },
-  Flow:      { color: "#2563eb", dashArray: "8,4" },
-  Constraint:{ color: "#dc2626", dashArray: "3,3" },
-};
+import { renderEdge } from "./svg-primitives.js";
 
 // ── Layer renderer ──────────────────────────────────────────────────
 
@@ -44,6 +30,9 @@ const RELATION_TYPE_STYLES: Record<RelationType, RelationVisualStyle> = {
  * Each edge from the RenderContext has pre-computed pixel endpoints
  * and a reference to the original Relation (which may carry a Flow
  * with style metadata, or a relation type for visual differentiation).
+ *
+ * Delegates SVG fragment generation to svg-primitives.renderEdge()
+ * for zero renderer drift between server and client.
  *
  * @param ctx - RenderContext with pre-computed edge geometry
  * @returns Array of SVG fragment strings
@@ -56,6 +45,7 @@ export const renderEdgesLayer: LayerRenderer = (
   const parts: string[] = [];
   const excluded = new Set(ctx.resolvedConfig.excludeComponentTypes);
   const baseStrokeWidth = ctx.resolvedConfig.strokeWidth;
+  const interactive = ctx.options?.interactive === true;
 
   for (const edge of ctx.edges) {
     const { x1, y1, x2, y2, relation } = edge;
@@ -68,32 +58,15 @@ export const renderEdgesLayer: LayerRenderer = (
       if (tgtComp && excluded.has(tgtComp.type)) continue;
     }
 
-    // Resolve base visual style from relation type
-    const relType = relation.type ?? "DependsOn";
-    const typeStyle = RELATION_TYPE_STYLES[relType] ?? RELATION_TYPE_STYLES.DependsOn;
-
-    let strokeColor = typeStyle.color;
-    let strokeWidth = baseStrokeWidth;
-    let dashArray = typeStyle.dashArray;
-
-    // Flow metadata can override line style (solid/dashed/bold)
-    const flowStyle = relation.flow?.style ?? "solid";
-    switch (flowStyle) {
-      case "dashed":
-        dashArray = "6,4";
-        break;
-      case "bold":
-        strokeWidth = baseStrokeWidth * 2;
-        break;
-      // "solid" keeps the type's default dash pattern
-    }
-
-    const dashAttr = dashArray ? ` stroke-dasharray="${dashArray}"` : "";
-
-    parts.push(
-      `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" ` +
-        `stroke="${strokeColor}" stroke-width="${strokeWidth}"${dashAttr} />`
-    );
+    // Delegate to shared svg-primitives.ts
+    parts.push(renderEdge({
+      x1, y1, x2, y2,
+      relationType: relation.type ?? "DependsOn",
+      flowStyle: (relation.flow?.style as "solid" | "dashed" | "bold" | undefined) ?? "solid",
+      baseStrokeWidth,
+      relationId: relation.id,
+      interactive,
+    }));
   }
 
   return parts;

@@ -15,6 +15,8 @@ import {
   resolvePipelines,
   buildPipelineMembership,
   resolveHandleEvolution,
+  pipelineCenter,
+  recomputeGeometryFromCenter,
   pipelineToRect,
   pipelinesToRects,
   clampEvolutionToPipeline,
@@ -61,13 +63,14 @@ function makePipeline(
   label: string,
   geo: PipelineGeometry
 ): Component {
+  // Pipeline position represents center of geometry bounds
   return {
     id,
     label: { name: label },
     type: "pipeline",
     position: {
-      evolution: { scalar: geo.evoStart },
-      visibility: { scalar: geo.visEnd },
+      evolution: { scalar: (geo.evoStart + geo.evoEnd) / 2 },
+      visibility: { scalar: (geo.visStart + geo.visEnd) / 2 },
     },
     pipelineGeometry: geo,
   } as Component;
@@ -244,6 +247,82 @@ describe("resolveHandleEvolution", () => {
       visEnd: 0.8,
     };
     expect(resolveHandleEvolution(geo)).toBeCloseTo(0.5);
+  });
+});
+
+// ── pipelineCenter ─────────────────────────────────────────────────
+
+describe("pipelineCenter", () => {
+  it("returns center of pipeline geometry bounds", () => {
+    const center = pipelineCenter(PIPE_GEO);
+    // evoStart=0.2, evoEnd=0.7 → center=0.45
+    // visStart=0.4, visEnd=0.6 → center=0.5
+    expect(center.evolution).toBeCloseTo(0.45);
+    expect(center.visibility).toBeCloseTo(0.5);
+  });
+
+  it("returns center for symmetric geometry", () => {
+    const geo: PipelineGeometry = {
+      evoStart: 0.3,
+      evoEnd: 0.7,
+      visStart: 0.2,
+      visEnd: 0.8,
+    };
+    const center = pipelineCenter(geo);
+    expect(center.evolution).toBeCloseTo(0.5);
+    expect(center.visibility).toBeCloseTo(0.5);
+  });
+
+  it("pipeline position matches pipelineCenter output", () => {
+    const pipe = makePipeline("p1", "P1", PIPE_GEO);
+    const center = pipelineCenter(PIPE_GEO);
+    expect(evo(pipe)).toBeCloseTo(center.evolution);
+    expect(vis(pipe)).toBeCloseTo(center.visibility);
+  });
+});
+
+// ── recomputeGeometryFromCenter ────────────────────────────────────
+
+describe("recomputeGeometryFromCenter", () => {
+  it("preserves dimensions when center is unchanged", () => {
+    const center = pipelineCenter(PIPE_GEO);
+    const result = recomputeGeometryFromCenter(PIPE_GEO, center);
+    expect(result.evoStart).toBeCloseTo(PIPE_GEO.evoStart);
+    expect(result.evoEnd).toBeCloseTo(PIPE_GEO.evoEnd);
+    expect(result.visStart).toBeCloseTo(PIPE_GEO.visStart);
+    expect(result.visEnd).toBeCloseTo(PIPE_GEO.visEnd);
+  });
+
+  it("shifts bounds when center moves", () => {
+    // PIPE_GEO: evo 0.2-0.7 (width 0.5), vis 0.4-0.6 (height 0.2)
+    const result = recomputeGeometryFromCenter(PIPE_GEO, {
+      evolution: 0.5,
+      visibility: 0.5,
+    });
+    // halfEvo = 0.25, halfVis = 0.1
+    expect(result.evoStart).toBeCloseTo(0.25);
+    expect(result.evoEnd).toBeCloseTo(0.75);
+    expect(result.visStart).toBeCloseTo(0.4);
+    expect(result.visEnd).toBeCloseTo(0.6);
+  });
+
+  it("clamps bounds to [0,1] range", () => {
+    const result = recomputeGeometryFromCenter(PIPE_GEO, {
+      evolution: 0.0,
+      visibility: 0.0,
+    });
+    expect(result.evoStart).toBe(0);
+    expect(result.evoEnd).toBeCloseTo(0.25); // halfEvo=0.25, 0+0.25
+    expect(result.visStart).toBe(0);
+    expect(result.visEnd).toBeCloseTo(0.1); // halfVis=0.1, 0+0.1
+  });
+
+  it("preserves handleEvolution from original geometry", () => {
+    const result = recomputeGeometryFromCenter(PIPE_GEO, {
+      evolution: 0.5,
+      visibility: 0.5,
+    });
+    expect(result.handleEvolution).toBe(PIPE_GEO.handleEvolution);
   });
 });
 
@@ -474,6 +553,26 @@ describe("integration: MapKeep pipeline data", () => {
 
     // Handle should be at explicit position 0.245
     expect(resolveHandleEvolution(pipelines[0].geometry)).toBe(0.245);
+  });
+
+  it("pipeline position represents center of geometry bounds", () => {
+    const pipeGeo: PipelineGeometry = {
+      evoStart: 0.2,
+      evoEnd: 0.8,
+      visStart: 0.3,
+      visEnd: 0.7,
+    };
+    const pipe = makePipeline("pipe-center", "Center Test", pipeGeo);
+    const center = pipelineCenter(pipeGeo);
+
+    // Pipeline position should be center of geometry
+    expect(evo(pipe)).toBeCloseTo(center.evolution); // 0.5
+    expect(vis(pipe)).toBeCloseTo(center.visibility); // 0.5
+
+    // Position and geometry coexist
+    expect(pipe.pipelineGeometry).toBeDefined();
+    expect(pipe.pipelineGeometry!.evoStart).toBe(0.2);
+    expect(pipe.pipelineGeometry!.evoEnd).toBe(0.8);
   });
 
   it("handles Feedback for the model pipeline with 3 sub-components", () => {

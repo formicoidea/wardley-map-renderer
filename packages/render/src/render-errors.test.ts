@@ -58,7 +58,7 @@ const VALID_MAP = {
       position: { evolution: { scalar: 0.6 }, visibility: { scalar: 0.5 } },
     },
   ],
-  relations: [{ source: "user", target: "svc" }],
+  relations: [{ id: "rel-user-svc", source: "user", target: "svc" }],
 };
 
 // ── Helper ──────────────────────────────────────────────────────────
@@ -166,13 +166,15 @@ describe("POST /render error handling", () => {
     expect(json.detail).toContain("image/png");
   });
 
-  it("returns 406 JSON for text/html Accept", async () => {
+  it("returns 200 HTML for text/html Accept", async () => {
     const res = await postRender(app, VALID_MAP, {
       Accept: "text/html",
     });
-    expect(res.status).toBe(406);
-    const json = await res.json();
-    expect(json).toHaveProperty("title");
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toContain("text/html");
+    const html = await res.text();
+    expect(html).toContain("<!DOCTYPE html>");
+    expect(html).toContain("<svg");
   });
 
   // ── 415 Unsupported Media Type ──────────────────────────

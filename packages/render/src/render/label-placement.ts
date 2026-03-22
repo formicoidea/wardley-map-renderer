@@ -30,6 +30,8 @@ export interface LabelPlacement {
   nodeCy?: number;
   /** Whether this label has a user-specified labelPosition (skip repositioning) */
   pinned?: boolean;
+  /** Component ID — carried through for interactive label hit targets */
+  componentId?: string;
 }
 
 /** A line segment representing a relation edge in pixel coordinates */

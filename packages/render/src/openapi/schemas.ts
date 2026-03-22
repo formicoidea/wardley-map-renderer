@@ -54,6 +54,7 @@ import {
   AcceleratorSchema,
   StepSchema,
 } from "../schema.js";
+import { MoveLabelPayload, MoveLabelOp, MoveStepPayload, MoveStepOp } from "../diff-ops.js";
 import { ProblemDetailSchema, HealthResponseSchema } from "./routes.js";
 
 // ── Registered schema references (populated by registerSchemas) ──
@@ -173,6 +174,7 @@ export function registerSchemas(): void {
   registry.register("Relation", RelationSchema.openapi({
     description: "A directed relation (edge) between two components.",
     example: {
+      id: "rel-web-app-platform",
       source: "web-app",
       target: "platform",
       type: "DependsOn",
@@ -225,8 +227,45 @@ export function registerSchemas(): void {
   registry.register("Step", StepSchema.openapi({
     description: "A numbered step sticker placed on the map. Step numbers are rendered as circled markers; descriptive text is managed client-side.",
     example: {
+      id: "step-1",
       number: 1,
       position: { evolution: { scalar: 0.4 }, visibility: { scalar: 0.3 } },
+    },
+  }));
+
+  // ── Diff-op schemas (interactive editing) ──────────────────
+
+  registry.register("MoveLabelPayload", MoveLabelPayload.openapi({
+    description: "Payload for the move_label diff operation. Repositions a component's label offset relative to its node.",
+    example: {
+      id: "comp-1",
+      dx: 0.02,
+      dy: -0.01,
+    },
+  }));
+
+  registry.register("MoveLabelOp", MoveLabelOp.openapi({
+    description: "Diff operation to move a component label to a new offset position.",
+    example: {
+      op: "move_label",
+      payload: { id: "comp-1", dx: 0.02, dy: -0.01 },
+    },
+  }));
+
+  registry.register("MoveStepPayload", MoveStepPayload.openapi({
+    description: "Payload for the move_step diff operation. Repositions a numbered step sticker on the map.",
+    example: {
+      id: "step-1",
+      evolution: 0.5,
+      visibility: 0.4,
+    },
+  }));
+
+  registry.register("MoveStepOp", MoveStepOp.openapi({
+    description: "Diff operation to move a step sticker to a new position on the map.",
+    example: {
+      op: "move_step",
+      payload: { id: "step-1", evolution: 0.5, visibility: 0.4 },
     },
   }));
 
@@ -275,8 +314,8 @@ export function registerSchemas(): void {
         },
       ],
       relations: [
-        { source: "user", target: "web-app", type: "DependsOn" },
-        { source: "web-app", target: "platform", type: "DependsOn" },
+        { id: "rel-user-web-app", source: "user", target: "web-app", type: "DependsOn" },
+        { id: "rel-web-app-platform", source: "web-app", target: "platform", type: "DependsOn" },
       ],
     },
   }));

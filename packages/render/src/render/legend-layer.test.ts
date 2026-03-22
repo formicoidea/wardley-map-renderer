@@ -23,7 +23,7 @@ function makeMap(overrides: Record<string, unknown> = {}): WardleyMap {
       { id: "a", label: { name: "User" }, type: "anchor", position: { evolution: { scalar: 0.5 }, visibility: { scalar: 0.1 } } },
       { id: "b", label: { name: "Service" }, type: "component", position: { evolution: { scalar: 0.6 }, visibility: { scalar: 0.5 } } },
     ],
-    relations: [{ source: "a", target: "b" }],
+    relations: [{ id: "rel-a-b", source: "a", target: "b" }],
     ...overrides,
   }));
 }
@@ -52,7 +52,7 @@ function makeAllTypesMap(): WardleyMap {
       { id: "f", label: { name: "Trading" }, type: "market", position: { evolution: { scalar: 0.7 }, visibility: { scalar: 0.4 } } },
       { id: "g", label: { name: "Cloud" }, type: "ecosystem", position: { evolution: { scalar: 0.8 }, visibility: { scalar: 0.6 } } },
     ],
-    relations: [{ source: "a", target: "b" }],
+    relations: [{ id: "rel-a-b", source: "a", target: "b" }],
   }));
 }
 
@@ -187,7 +187,7 @@ describe("LegendLayer — type+color", () => {
         { id: "f", label: { name: "Trading" }, type: "market", position: { evolution: { scalar: 0.7 }, visibility: { scalar: 0.4 } } },
         { id: "g", label: { name: "Cloud" }, type: "ecosystem", position: { evolution: { scalar: 0.8 }, visibility: { scalar: 0.6 } } },
       ],
-      relations: [{ source: "a", target: "b" }],
+      relations: [{ id: "rel-a-b", source: "a", target: "b" }],
     }));
     const ctx = buildRenderContext(allMap);
     const parts = renderLegendLayer(ctx);
@@ -493,7 +493,7 @@ describe("LegendLayer — steps entries", () => {
       ],
       relations: [],
       steps: [
-        { number: 1, position: { evolution: { scalar: 0.3 }, visibility: { scalar: 0.3 } } },
+        { id: "step-1", number: 1, position: { evolution: { scalar: 0.3 }, visibility: { scalar: 0.3 } } },
       ],
     }));
     const ctx = buildRenderContext(map);
@@ -564,7 +564,7 @@ describe("LegendLayer — i18n for new elements", () => {
         { id: "acc1", label: "Go", position: { evolution: { scalar: 0.5 }, visibility: { scalar: 0.5 } }, type: "accelerator" },
       ],
       steps: [
-        { number: 1, position: { evolution: { scalar: 0.3 }, visibility: { scalar: 0.3 } } },
+        { id: "step-1", number: 1, position: { evolution: { scalar: 0.3 }, visibility: { scalar: 0.3 } } },
       ],
     }));
     const ctx = buildRenderContext(map);

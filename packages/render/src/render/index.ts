@@ -62,6 +62,9 @@ export {
   esc,
 } from "./svg-composer.js";
 
+// ── SVG Primitives (shared rendering fragments) ─────────────────────
+export * from "./svg-primitives.js";
+
 // ── Layer renderers (Phase 2) ───────────────────────────────────────
 export { renderTitleLayer } from "./title-layer.js";
 export { renderAxesLayer } from "./axes-layer.js";

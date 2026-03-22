@@ -143,6 +143,59 @@ export function buildPipelineMembership(
   return membership;
 }
 
+// ── Pipeline center ────────────────────────────────────────────────
+
+/**
+ * Compute the center point of a pipeline's geometry bounds.
+ *
+ * A pipeline's `position` represents its center — the midpoint of
+ * its evoStart/evoEnd and visStart/visEnd bounds. This function
+ * extracts that center from the geometry.
+ *
+ * @param geo - Pipeline geometry
+ * @returns Center point as { evolution, visibility } in [0-1] space
+ */
+export function pipelineCenter(geo: PipelineGeometry): {
+  evolution: number;
+  visibility: number;
+} {
+  return {
+    evolution: (geo.evoStart + geo.evoEnd) / 2,
+    visibility: (geo.visStart + geo.visEnd) / 2,
+  };
+}
+
+/**
+ * Recompute pipeline geometry bounds from a new center position,
+ * preserving the original width and height.
+ *
+ * Used when dragging a pipeline to a new position: the center moves
+ * and the bounds are recomputed from the half-widths.
+ *
+ * Values are clamped to [0, 1] range.
+ *
+ * @param geo - Original pipeline geometry (for dimensions)
+ * @param newCenter - New center { evolution, visibility } in [0-1] space
+ * @returns New pipeline geometry with updated bounds
+ */
+export function recomputeGeometryFromCenter(
+  geo: PipelineGeometry,
+  newCenter: { evolution: number; visibility: number }
+): PipelineGeometry {
+  const halfEvo = (geo.evoEnd - geo.evoStart) / 2;
+  const halfVis = (geo.visEnd - geo.visStart) / 2;
+
+  const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
+
+  return {
+    ...geo,
+    evoStart: clamp01(newCenter.evolution - halfEvo),
+    evoEnd: clamp01(newCenter.evolution + halfEvo),
+    visStart: clamp01(newCenter.visibility - halfVis),
+    visEnd: clamp01(newCenter.visibility + halfVis),
+  };
+}
+
 // ── Handle positioning ─────────────────────────────────────────────
 
 /**

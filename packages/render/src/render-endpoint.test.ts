@@ -21,7 +21,7 @@ const VALID_MAP = {
     { id: "c1", label: { name: "User" }, type: "anchor", position: { evolution: { scalar: 0.9 }, visibility: { scalar: 0.1 } } },
     { id: "c2", label: { name: "Web App" }, type: "component", nature: "activity", position: { evolution: { scalar: 0.6 }, visibility: { scalar: 0.3 } } },
   ],
-  relations: [{ source: "c1", target: "c2", type: "DependsOn" }],
+  relations: [{ id: "rel-c1-c2", source: "c1", target: "c2", type: "DependsOn" }],
 };
 
 function post(accept?: string) {

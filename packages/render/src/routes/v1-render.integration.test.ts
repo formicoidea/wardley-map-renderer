@@ -35,7 +35,7 @@ const VALID_MAP = {
     },
   ],
   relations: [
-    { source: "user", target: "webapp", type: "DependsOn" },
+    { id: "rel-user-webapp", source: "user", target: "webapp", type: "DependsOn" },
   ],
 };
 

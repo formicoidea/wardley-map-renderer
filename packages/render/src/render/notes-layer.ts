@@ -13,22 +13,15 @@
  */
 
 import type { RenderContext, LayerRenderer } from "./types.js";
-import { esc } from "./svg-composer.js";
-
-// ── Visual constants ─────────────────────────────────────────────────
-
-const NOTE_FONT_SIZE = 11;
-const NOTE_LINE_HEIGHT = 15;
-const NOTE_COLOR = "#666666";
-const NOTE_FONT_STYLE = "italic";
+import { renderNote } from "./svg-primitives.js";
 
 // ── Layer renderer ───────────────────────────────────────────────────
 
 /**
  * Render note components as styled text annotations.
  *
- * Notes use their label as display text (or description if available).
- * Multi-line content is split on newlines with vertical spacing via tspan.
+ * Delegates SVG fragment generation to svg-primitives.renderNote()
+ * for zero renderer drift between server and client.
  *
  * @param ctx - RenderContext with pre-computed node geometry
  * @returns Array of SVG fragment strings
@@ -44,36 +37,10 @@ export const renderNotesLayer: LayerRenderer = (
 
   for (const node of ctx.nodes) {
     const comp = node.component;
-
-    // Only render note-type components
     if (comp.type !== "note") continue;
 
-    // Use description if available, otherwise fall back to label
     const text = comp.description?.trim() || comp.label.name;
-    const lines = text.split("\n");
-
-    if (lines.length === 1) {
-      // Single-line note: simple text element
-      parts.push(
-        `<text x="${node.cx}" y="${node.cy}" text-anchor="start" ` +
-          `font-family="${fontFamily}" font-size="${NOTE_FONT_SIZE}" ` +
-          `font-style="${NOTE_FONT_STYLE}" fill="${NOTE_COLOR}">${esc(lines[0])}</text>`
-      );
-    } else {
-      // Multi-line note: text element with tspan children
-      const tspans = lines
-        .map(
-          (line, i) =>
-            `<tspan x="${node.cx}" dy="${i === 0 ? 0 : NOTE_LINE_HEIGHT}">${esc(line)}</tspan>`
-        )
-        .join("");
-
-      parts.push(
-        `<text x="${node.cx}" y="${node.cy}" text-anchor="start" ` +
-          `font-family="${fontFamily}" font-size="${NOTE_FONT_SIZE}" ` +
-          `font-style="${NOTE_FONT_STYLE}" fill="${NOTE_COLOR}">${tspans}</text>`
-      );
-    }
+    parts.push(renderNote({ cx: node.cx, cy: node.cy, text, fontFamily }));
   }
 
   return parts;

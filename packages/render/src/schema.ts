@@ -193,6 +193,7 @@ export const FlowSchema = z.object({
 });
 
 export const RelationSchema = z.object({
+  id: z.string(), // unique relation identifier (required)
   source: z.string(), // component id (dependency origin — the depender)
   target: z.string(), // component id (dependency destination — the depended-upon)
   type: RelationTypeEnum.default("DependsOn"),
@@ -1633,6 +1634,8 @@ export const AcceleratorSchema = z.object({
  * step number lives outside the JSON (managed client-side).
  */
 export const StepSchema = z.object({
+  /** Unique identifier for the step (used by diff-ops for targeting). */
+  id: z.string(),
   /** Step number displayed inside the sticker (e.g. 1, 2, 3…). */
   number: z.number().int().min(1),
   /** Position on the map (evolution × visibility). */
@@ -2035,6 +2038,9 @@ export function sanitizeMap(raw: WardleyMap): WardleyMap {
       if (pg.visStart > pg.visEnd) {
         [pg.visStart, pg.visEnd] = [pg.visEnd, pg.visStart];
       }
+      // Pipeline position represents center of geometry bounds
+      c.position.evolution.scalar = (pg.evoStart + pg.evoEnd) / 2;
+      c.position.visibility.scalar = (pg.visStart + pg.visEnd) / 2;
     }
 
     // Auto-populate pipelineGeometry from flat fields if missing
@@ -2061,11 +2067,17 @@ export function sanitizeMap(raw: WardleyMap): WardleyMap {
 
   // Migrate legacy from/to → source/target and normalize relation types
   const componentIds = new Set(map.components.map((c) => c.id));
-  for (const r of map.relations) {
+  for (let i = 0; i < map.relations.length; i++) {
+    const r = map.relations[i];
     const rawRel = r as any;
     // Legacy from/to field migration (in case raw data sneaks through parse)
     if (!r.source && rawRel.from) r.source = rawRel.from;
     if (!r.target && rawRel.to) r.target = rawRel.to;
+
+    // Auto-generate id if missing (legacy data)
+    if (!r.id) {
+      r.id = `rel-${r.source}-${r.target}-${i}`;
+    }
 
     // Normalize relation type
     const rawRelType = (r.type as string) ?? "DependsOn";
@@ -2163,6 +2175,7 @@ export function fromMapKeep(raw: any): WardleyMap {
     }
 
     // Map pipeline flat fields to pipelineGeometry
+    // Pipeline position represents center of geometry bounds
     if (c.type === "pipeline" && c.evoStart !== undefined) {
       base.pipelineGeometry = {
         evoStart: c.evoStart,
@@ -2170,6 +2183,11 @@ export function fromMapKeep(raw: any): WardleyMap {
         visStart: c.visStart,
         visEnd: c.visEnd,
         handleEvolution: c.handleEvolution,
+      };
+      // Override position to center of geometry bounds
+      base.position = {
+        evolution: { scalar: (c.evoStart + c.evoEnd) / 2 },
+        visibility: { scalar: (c.visStart + c.visEnd) / 2 },
       };
     }
 
@@ -2198,10 +2216,13 @@ export function fromMapKeep(raw: any): WardleyMap {
 
   const relations = rawEdges
     .filter((e: any) => (e.type ?? "DependsOn") !== "EvolveTo")
-    .map((e: any) => {
+    .map((e: any, i: number) => {
+      const source = e.source ?? e.from;
+      const target = e.target ?? e.to;
       const rel: any = {
-        source: e.source ?? e.from,
-        target: e.target ?? e.to,
+        id: e.id ?? `rel-${source}-${target}-${i}`,
+        source,
+        target,
         type: e.type ?? "DependsOn",
       };
       if (e.flow) rel.flow = e.flow;

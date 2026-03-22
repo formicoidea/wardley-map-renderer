@@ -28,7 +28,7 @@ function mapWithAccelerators(
       makeComponent({ id: "platform", name: "Platform", evolution: 0.6, visibility: 0.3 }),
       makeComponent({ id: "hosting", name: "Hosting", evolution: 0.8, visibility: 0.7, type: "component" }),
     ],
-    relations: [{ source: "platform", target: "hosting", type: "DependsOn" as const }],
+    relations: [{ id: "rel-platform-hosting", source: "platform", target: "hosting", type: "DependsOn" as const }],
     accelerators,
   });
 }
