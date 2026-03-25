@@ -5,12 +5,14 @@
   "type": "module",
   "scripts": {
     "dev": "turbo dev",
-    "build": "turbo build",
+    "build": "turbo build --filter=!@wardleyapi/owm-artifact",
     "typecheck": "turbo typecheck",
     "test": "turbo test",
     "lint": "turbo lint",
     "start": "pnpm --filter @wardleyapi/render start",
-    "batch-render": "tsx scripts/batch-render-test.ts"
+    "batch-render": "tsx scripts/batch-render-test.ts",
+    "eval": "npx promptfoo eval",
+    "eval:view": "npx promptfoo view"
   },
   "repository": {
     "type": "git",
@@ -29,6 +31,7 @@
   },
   "homepage": "https://github.com/formicoidea/WardleyAPI#readme",
   "devDependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.2.81",
     "@types/node": "^25.3.5",
     "@types/pngjs": "^6.0.5",
     "pixelmatch": "^7.1.0",

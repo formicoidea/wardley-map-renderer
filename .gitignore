@@ -50,3 +50,10 @@ coverage/
 tmp/
 tmp/renders/
 *.tmp
+
+# Exclude large output files
+evaluations/*.html
+evaluations/*.json
+
+# But keep summary reports
+!evaluations/summary-*.csv
