@@ -207,7 +207,6 @@ async function loadInterFont(): Promise<Uint8Array> {
   const path = await import("node:path");
   const fontPath = path.join(
     import.meta.dirname ?? ".",
-    "..",
     "assets",
     "fonts",
     "Inter-Regular.ttf"

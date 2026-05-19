@@ -15,7 +15,7 @@
  */
 
 import * as esbuild from "esbuild";
-import { readFileSync, mkdirSync, writeFileSync } from "node:fs";
+import { readFileSync, mkdirSync, writeFileSync, cpSync, existsSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -23,6 +23,13 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const ENTRY = resolve(__dirname, "../src/interactive/interactive.ts");
 const OUT_DIR = resolve(__dirname, "../dist");
 const OUT_FILE = resolve(OUT_DIR, "interactive-bundle.js");
+const ASSETS_SRC = resolve(__dirname, "../src/assets");
+const ASSETS_DEST = resolve(OUT_DIR, "assets");
+
+export function copyAssets(): void {
+  if (!existsSync(ASSETS_SRC)) return;
+  cpSync(ASSETS_SRC, ASSETS_DEST, { recursive: true });
+}
 
 export async function bundleInteractive(): Promise<string> {
   const result = await esbuild.build({
@@ -84,6 +91,8 @@ if (isMain) {
       writeFileSync(OUT_FILE, code, "utf-8");
       const sizeKB = (Buffer.byteLength(code) / 1024).toFixed(1);
       console.log(`[bundle-interactive] ${OUT_FILE} (${sizeKB} KB)`);
+      copyAssets();
+      console.log(`[bundle-interactive] copied src/assets/ → dist/assets/`);
     })
     .catch((err) => {
       console.error("[bundle-interactive] Failed:", err);
