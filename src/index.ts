@@ -1,9 +1,8 @@
 /**
- * @wardleyapi/render — public package entry point.
+ * wardley-render — public package entry point.
  *
- * Re-exports the render orchestrator, schema utilities, types,
- * and the Hono server app so consumers can import everything
- * from a single path.
+ * Re-exports the render orchestrator, schema utilities, and types.
+ * Pure render module — no HTTP, no LLM, no transport layer.
  */
 
 // ── Orchestrator (render pipeline) ───────────────────────────────
@@ -289,22 +288,3 @@ export {
   type PhaseMapping,
 } from "./phase-mapping.js";
 
-// ── RFC 7807 Problem Details ─────────────────────────────────────
-export {
-  ProblemTypes,
-  PROBLEM_CONTENT_TYPE,
-  PROBLEM_HINTS,
-  ProblemDetailSchema,
-  ValidationProblemDetailSchema,
-  createProblemDetail,
-  createValidationProblem,
-  type ProblemDetail,
-  type ProblemDetail as ProblemDetailType,
-  type ValidationProblemDetail,
-  type ProblemType,
-} from "./middleware/problem-details.js";
-
-export { HttpProblem } from "./middleware/error-handler.js";
-
-// ── Server (Hono app) ────────────────────────────────────────────
-export { app } from "./server.js";
