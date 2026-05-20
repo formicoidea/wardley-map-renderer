@@ -190,8 +190,8 @@ describe("resolveTheme — explicit-empty vs absent propagated through full pipe
 
   it("empty string xAxis via background.evolutionXAxis.xAxis stays empty in resolved axisLabels", () => {
     const rc = resolveTheme({
-      styling: { background: {
-        evolutionXAxis: { xAxis: "" },
+      style: { background: {
+        axisEvolution: { default: { label: { text: "" } } },
       } },
     });
     // '' must survive the resolveTheme pipeline without being replaced by the locale default
@@ -201,20 +201,20 @@ describe("resolveTheme — explicit-empty vs absent propagated through full pipe
   });
 
   it("absent xAxis resolves to locale default via resolveTheme (en)", () => {
-    const rc = resolveTheme({ axes: { locale: "en" } });
+    const rc = resolveTheme({ rendering: { locale: "en" } });
     expect(rc.axisLabels.xAxis).toBe("Evolution");
   });
 
   it("absent xAxis resolves to fr locale default when locale is 'fr'", () => {
-    const rc = resolveTheme({ axes: { locale: "fr" } });
+    const rc = resolveTheme({ rendering: { locale: "fr" } });
     expect(rc.axisLabels.xAxis).toBe("Évolution");
   });
 
   it("non-empty xAxis wins over fr locale via resolveTheme", () => {
     const rc = resolveTheme({
-      axes: { locale: "fr" },
-      styling: { background: {
-        evolutionXAxis: { xAxis: "Axe personnalisé" },
+      rendering: { locale: "fr" },
+      style: { background: {
+        axisEvolution: { default: { label: { text: "Axe personnalisé" } } },
       } },
     });
     expect(rc.axisLabels.xAxis).toBe("Axe personnalisé");
@@ -224,10 +224,10 @@ describe("resolveTheme — explicit-empty vs absent propagated through full pipe
 
   it("empty string phases[1] via background.evolutionPhases.phases stays empty in resolved axisLabels", () => {
     const rc = resolveTheme({
-      styling: { background: {
-        evolutionPhases: {
-          phases: ["Genesis", "", "Product", "Commodity"],
-        },
+      style: { background: {
+        phases: { default: { labels: [
+          { text: "Genesis" }, { text: "" }, { text: "Product" }, { text: "Commodity" },
+        ] } },
       } },
     });
     expect(rc.axisLabels.phases[1]).toBe("");
@@ -237,11 +237,9 @@ describe("resolveTheme — explicit-empty vs absent propagated through full pipe
 
   it("undefined phases[0] via background.evolutionPhases.phases resolves to fr locale default", () => {
     const rc = resolveTheme({
-      axes: { locale: "fr" },
-      styling: { background: {
-        evolutionPhases: {
-          phases: [undefined, "Custom"],
-        },
+      rendering: { locale: "fr" },
+      style: { background: {
+        phases: { default: { labels: [{}, { text: "Custom" }] } },
       } },
     });
     expect(rc.axisLabels.phases[0]).toBe("Genèse"); // undefined → fr preset
@@ -250,11 +248,9 @@ describe("resolveTheme — explicit-empty vs absent propagated through full pipe
 
   it("non-empty phases string wins over locale preset via resolveTheme", () => {
     const rc = resolveTheme({
-      axes: { locale: "fr" },
-      styling: { background: {
-        evolutionPhases: {
-          phases: [undefined, undefined, "Ma Phase", undefined],
-        },
+      rendering: { locale: "fr" },
+      style: { background: {
+        phases: { default: { labels: [{}, {}, { text: "Ma Phase" }, {}] } },
       } },
     });
     expect(rc.axisLabels.phases[2]).toBe("Ma Phase");
