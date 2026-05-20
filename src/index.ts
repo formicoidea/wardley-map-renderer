@@ -207,24 +207,6 @@ export {
   type RenderableType,
 } from "./renderable-type.js";
 
-// ── Author/viewer conflict resolution ────────────────────────────
-export {
-  // 2-tier (backward compat)
-  resolveConflict,
-  AUTHOR_INTENT_FIELDS,
-  VIEWER_PREFERENCE_FIELDS,
-  type AuthorIntentField,
-  type ViewerPreferenceField,
-  // 4-tier (tiered precedence — data-driven from TIERED_RENDER_CONFIG_TAXONOMY)
-  resolveConfig,
-  PLATFORM_CONSTRAINT_FIELDS,
-  LAYOUT_STRUCTURAL_FIELDS,
-  // Diagnostics (Sub-AC 1 of AC 6: type + schema definitions)
-  RenderDiagnosticsSchema,
-  EMPTY_RENDER_DIAGNOSTICS,
-  type RenderDiagnostics,
-} from "./resolve-conflict.js";
-
 // ── Config constraint graph — declarative field-interaction grammar ───────────
 export {
   // Sub-AC 1: declarative schema types
@@ -252,29 +234,6 @@ export {
   type ExecutableConstraint,
   type ExecutableConstraintGraph,
 } from "./config-constraint-graph.js";
-
-// ── Config constraint evaluation — Sub-AC 3: violationPolicy wiring ──────────
-export {
-  evaluateConstraints,
-  validateRenderConfig,
-  CONSTRAINT_CLIP_HANDLERS,
-  ConstraintViolationError,
-  type ConstraintPolicy,
-  type ConstraintEvaluationOptions,
-  type RenderConfigValidationError,
-  type RenderConfigValidationResult,
-} from "./render-config-constraints.js";
-
-// ── Runtime diagnostics — Sub-AC 2 of AC 6: unrecognized type detection ──────
-export {
-  collectConfigDiagnostics,
-  createDiagnosticsCollector,
-  EMPTY_RESOLVE_DIAGNOSTICS,
-  type RenderableTypeRecognitionLevel,
-  type UnrecognizedTypeEntry,
-  type ResolveDiagnostics,
-  type DiagnosticsCollector,
-} from "./resolve-diagnostics.js";
 
 // ── Phase mapping — range-based style resolution ──────────────────
 export {
