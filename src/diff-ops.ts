@@ -66,11 +66,17 @@ const PipelineGeometryPayload = z.object({
   visEnd: VisibilityValue,
 });
 
+// Node taxonomy enums (mirror schema.ts: type → subtype → nature).
+const NodeType = z.enum(["anchor", "component", "pipeline"]);
+const NodeSubtype = z.enum(["userNeed", "market", "ecosystem", "solution", "functional", "supplier"]);
+const NodeNature = z.enum(["personae", "generic", "group", "natural", "anthropic", "practice", "data", "activity", "knowledge"]);
+
 export const AddComponentPayload = z.object({
   id: ComponentId,
   name: z.string().min(1),
-  type: z.enum(["component", "anchor", "market", "pipeline"]).default("component"),
-  nature: z.enum(["activity", "practice", "data", "knowledge", "natural_need", "technical_system_need"]).optional(),
+  type: NodeType.default("component"),
+  subtype: NodeSubtype.optional(),
+  nature: NodeNature.optional(),
   evolution: EvolutionValue,
   visibility: VisibilityValue,
   pipelineGeometry: PipelineGeometryPayload.optional(),
@@ -114,11 +120,11 @@ export type DeleteEdgePayload = z.infer<typeof DeleteEdgePayload>;
 
 // ── Change Component Type ───────────────────────────────────────────
 
-const ComponentType = z.enum(["component", "user-need", "pipeline", "note", "anchor", "market", "ecosystem"]);
-
 export const ChangeComponentTypePayload = z.object({
   id: ComponentId,
-  type: ComponentType,
+  type: NodeType,
+  /** Optional component subtype (set/cleared together with the type). */
+  subtype: NodeSubtype.optional(),
 });
 export type ChangeComponentTypePayload = z.infer<typeof ChangeComponentTypePayload>;
 
@@ -320,6 +326,7 @@ function applyAddComponent(map: WardleyMap, payload: AddComponentPayload): boole
     id: payload.id,
     label: { name: payload.name },
     type: payload.type,
+    subtype: payload.subtype,
     nature: payload.nature,
     position: {
       evolution: { scalar: payload.evolution },
@@ -462,6 +469,7 @@ function applyChangeComponentType(map: WardleyMap, payload: ChangeComponentTypeP
 
   const wasPipeline = comp.type === "pipeline" && !!comp.pipelineGeometry;
   comp.type = payload.type;
+  comp.subtype = payload.subtype;
 
   if (payload.type === "pipeline") {
     // Auto-generate default pipelineGeometry if not already present
@@ -613,16 +621,16 @@ function applyMoveLabel(map: WardleyMap, payload: MoveLabelPayload): boolean {
 // ── Step apply functions ─────────────────────────────────────────────
 
 /**
- * Move a step sticker to a new position. Mutates the map in place.
- * Finds the step by its `id` field and updates its position.
- * @returns true if the step was found and moved, false otherwise.
+ * Move the component carrying a step decorator. Mutates the map in place.
+ * A step is now a COMPONENT DECORATOR (no own position) — `payload.id` is the
+ * decorated component's id, and moving the step moves that component.
+ * @returns true if a component with a step decorator was found and moved, false otherwise.
  */
 function applyMoveStep(map: WardleyMap, payload: MoveStepPayload): boolean {
-  if (!map.steps) return false;
-  const step = map.steps.find((s) => s.id === payload.id);
-  if (!step) return false;
-  step.position.evolution.scalar = payload.evolution;
-  step.position.visibility.scalar = payload.visibility;
+  const comp = map.components.find((c) => c.id === payload.id);
+  if (!comp || !comp.step) return false;
+  comp.position.evolution.scalar = payload.evolution;
+  comp.position.visibility.scalar = payload.visibility;
   return true;
 }
 
@@ -736,7 +744,7 @@ export function expandChangeTypeCascade(map: WardleyMap, componentId: string): D
   // Find all components positionally inside this pipeline
   for (const c of map.components) {
     if (c.id === componentId) continue;
-    if (c.type === "pipeline" || c.type === "note") continue;
+    if (c.type === "pipeline") continue;
 
     const cEvo = c.position.evolution.scalar;
     const cVis = c.position.visibility.scalar;

@@ -46,7 +46,7 @@ describe("LabelsLayer", () => {
 
   it("renders labels for market type", () => {
     const map = makeMapWithTypes([
-      { id: "m1", name: "Cloud Market", type: "market" },
+      { id: "m1", name: "Cloud Market", type: "component", subtype: "market" },
     ]);
     const ctx = buildRenderContext(map);
     const parts = renderLabelsLayer(ctx);
@@ -56,7 +56,7 @@ describe("LabelsLayer", () => {
 
   it("renders labels for ecosystem type", () => {
     const map = makeMapWithTypes([
-      { id: "e1", name: "OSS Ecosystem", type: "ecosystem" },
+      { id: "e1", name: "OSS Ecosystem", type: "component", subtype: "ecosystem" },
     ]);
     const ctx = buildRenderContext(map);
     const parts = renderLabelsLayer(ctx);
@@ -68,8 +68,8 @@ describe("LabelsLayer", () => {
     const map = makeMapWithTypes([
       { id: "a1", name: "User", type: "anchor" },
       { id: "c1", name: "Platform", type: "component" },
-      { id: "m1", name: "Cloud Market", type: "market" },
-      { id: "e1", name: "Dev Ecosystem", type: "ecosystem" },
+      { id: "m1", name: "Cloud Market", type: "component", subtype: "market" },
+      { id: "e1", name: "Dev Ecosystem", type: "component", subtype: "ecosystem" },
     ]);
     const ctx = buildRenderContext(map);
     const parts = renderLabelsLayer(ctx);
@@ -80,32 +80,22 @@ describe("LabelsLayer", () => {
     expect(svg).toContain("Dev Ecosystem");
   });
 
-  it("does NOT render labels for note type", () => {
-    const map = makeMapWithTypes([
-      { id: "n1", name: "A Note", type: "note" },
-    ]);
-    const ctx = buildRenderContext(map);
-    const parts = renderLabelsLayer(ctx);
-    const svg = parts.join("\n");
-    expect(svg).not.toContain("A Note");
-  });
-
-  it("respects excludeComponentTypes for market and ecosystem", () => {
+  it("excludes labels for an excluded component TYPE (component)", () => {
     const map = sanitizeMap(
       WardleyMapSchema.parse({
         title: "Exclude Test",
         components: [
-          { id: "m1", label: { name: "Hidden Market" }, type: "market", position: { evolution: { scalar: 0.5 }, visibility: { scalar: 0.3 } } },
-          { id: "e1", label: { name: "Visible Ecosystem" }, type: "ecosystem", position: { evolution: { scalar: 0.6 }, visibility: { scalar: 0.4 } } },
+          { id: "m1", label: { name: "Hidden Service" }, type: "component", position: { evolution: { scalar: 0.5 }, visibility: { scalar: 0.3 } } },
+          { id: "a1", label: { name: "Visible Anchor" }, type: "anchor", position: { evolution: { scalar: 0.6 }, visibility: { scalar: 0.4 } } },
         ],
         relations: [],
-        renderConfig: { filters: { excludeComponentTypes: ["market"] } },
+        renderConfig: { filters: { excludeComponentTypes: ["component"] } },
       })
     );
     const ctx = buildRenderContext(map);
     const parts = renderLabelsLayer(ctx);
     const svg = parts.join("\n");
-    expect(svg).not.toContain("Hidden Market");
-    expect(svg).toContain("Visible Ecosystem");
+    expect(svg).not.toContain("Hidden Service");
+    expect(svg).toContain("Visible Anchor");
   });
 });

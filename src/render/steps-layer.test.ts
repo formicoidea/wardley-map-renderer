@@ -20,21 +20,31 @@ import type { WardleyMap } from "../schema.js";
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
+// Steps are component DECORATORS now: each step spec becomes a component carrying
+// a `step` decorator at the step's position (the step has no own position/id).
 function makeMap(overrides: Record<string, unknown> = {}): WardleyMap {
-  return sanitizeMap(
-    WardleyMapSchema.parse({
-      title: "Test",
-      components: [
-        {
-          id: "a",
-          label: { name: "Svc" },
+  const steps = overrides.steps as
+    | Array<{ id?: string; number: number; position: unknown; color?: string }>
+    | undefined;
+  const components =
+    steps && steps.length > 0
+      ? steps.map((s, i) => ({
+          id: s.id ?? `s${i}`,
+          label: { name: `S${i}` },
           type: "component",
-          position: { evolution: { scalar: 0.5 }, visibility: { scalar: 0.5 } },
-        },
-      ],
-      relations: [],
-      ...overrides,
-    })
+          position: s.position,
+          step: { number: s.number, ...(s.color ? { color: s.color } : {}) },
+        }))
+      : [
+          {
+            id: "a",
+            label: { name: "Svc" },
+            type: "component",
+            position: { evolution: { scalar: 0.5 }, visibility: { scalar: 0.5 } },
+          },
+        ];
+  return sanitizeMap(
+    WardleyMapSchema.parse({ title: "Test", components, relations: [] })
   );
 }
 

@@ -1,111 +1,57 @@
 import { describe, it, expect } from "vitest";
-import { StepSchema, WardleyMapSchema } from "./schema.js";
+import { StepDecoratorSchema, ComponentSchema } from "./schema.js";
 
-describe("StepSchema", () => {
-  const validStep = {
-    id: "step-1",
-    number: 1,
-    position: {
-      evolution: { scalar: 0.5 },
-      visibility: { scalar: 0.3 },
-    },
-  };
-
-  it("parses a valid step without color", () => {
-    const result = StepSchema.parse(validStep);
+describe("StepDecoratorSchema", () => {
+  it("parses a valid step decorator without color", () => {
+    const result = StepDecoratorSchema.parse({ number: 1 });
     expect(result.number).toBe(1);
-    expect(result.position.evolution.scalar).toBe(0.5);
-    expect(result.position.visibility.scalar).toBe(0.3);
     expect(result.color).toBeUndefined();
   });
 
-  it("parses a valid step with color", () => {
-    const result = StepSchema.parse({ ...validStep, color: "#ff0000" });
-    expect(result.color).toBe("#ff0000");
+  it("parses a valid step decorator with color", () => {
+    expect(StepDecoratorSchema.parse({ number: 1, color: "#ff0000" }).color).toBe("#ff0000");
   });
 
   it("accepts CSS color names", () => {
-    const result = StepSchema.parse({ ...validStep, color: "red" });
-    expect(result.color).toBe("red");
+    expect(StepDecoratorSchema.parse({ number: 1, color: "red" }).color).toBe("red");
   });
 
   it("rejects missing number", () => {
-    const { number: _, ...noNumber } = validStep;
-    expect(() => StepSchema.parse(noNumber)).toThrow();
-  });
-
-  it("rejects missing position", () => {
-    const { position: _, ...noPos } = validStep;
-    expect(() => StepSchema.parse(noPos)).toThrow();
+    expect(() => StepDecoratorSchema.parse({})).toThrow();
   });
 
   it("rejects non-integer number", () => {
-    expect(() => StepSchema.parse({ ...validStep, number: 1.5 })).toThrow();
+    expect(() => StepDecoratorSchema.parse({ number: 1.5 })).toThrow();
   });
 
   it("rejects number less than 1", () => {
-    expect(() => StepSchema.parse({ ...validStep, number: 0 })).toThrow();
+    expect(() => StepDecoratorSchema.parse({ number: 0 })).toThrow();
   });
 
   it("accepts large step numbers", () => {
-    const result = StepSchema.parse({ ...validStep, number: 99 });
-    expect(result.number).toBe(99);
+    expect(StepDecoratorSchema.parse({ number: 99 }).number).toBe(99);
   });
 });
 
-describe("WardleyMapSchema.steps", () => {
-  const minimalMap = {
-    title: "Test",
-    components: [],
-    relations: [],
+describe("ComponentSchema.step decorator", () => {
+  const base = {
+    id: "c1",
+    label: { name: "X" },
+    type: "component",
+    position: { evolution: { scalar: 0.5 }, visibility: { scalar: 0.3 } },
   };
 
-  it("accepts a map without steps (backward compat)", () => {
-    const result = WardleyMapSchema.parse(minimalMap);
-    expect(result.steps).toBeUndefined();
+  it("accepts a component without a step (backward compat)", () => {
+    expect(ComponentSchema.parse(base).step).toBeUndefined();
   });
 
-  it("accepts a map with empty steps array", () => {
-    const result = WardleyMapSchema.parse({ ...minimalMap, steps: [] });
-    expect(result.steps).toEqual([]);
+  it("accepts a component with a step decorator", () => {
+    const result = ComponentSchema.parse({ ...base, step: { number: 2, color: "blue" } });
+    expect(result.step?.number).toBe(2);
+    expect(result.step?.color).toBe("blue");
   });
 
-  it("accepts a map with steps", () => {
-    const map = {
-      ...minimalMap,
-      steps: [
-        {
-          id: "step-1",
-          number: 1,
-          position: {
-            evolution: { scalar: 0.2 },
-            visibility: { scalar: 0.1 },
-          },
-        },
-        {
-          id: "step-2",
-          number: 2,
-          position: {
-            evolution: { scalar: 0.6 },
-            visibility: { scalar: 0.5 },
-          },
-          color: "blue",
-        },
-      ],
-    };
-    const result = WardleyMapSchema.parse(map);
-    expect(result.steps).toHaveLength(2);
-    expect(result.steps![0].number).toBe(1);
-    expect(result.steps![0].color).toBeUndefined();
-    expect(result.steps![1].number).toBe(2);
-    expect(result.steps![1].color).toBe("blue");
-  });
-
-  it("rejects steps with invalid entries", () => {
-    const map = {
-      ...minimalMap,
-      steps: [{ color: "red" }], // missing required fields
-    };
-    expect(() => WardleyMapSchema.parse(map)).toThrow();
+  it("rejects an invalid step decorator (missing number)", () => {
+    expect(() => ComponentSchema.parse({ ...base, step: { color: "red" } })).toThrow();
   });
 });

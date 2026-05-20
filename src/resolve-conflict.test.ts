@@ -163,13 +163,13 @@ describe("resolveConflict", () => {
   });
 
   it("author-intent: filters from authorConfig wins", () => {
-    const authorFilters = { excludeComponentTypes: ["note" as const] };
+    const authorFilters = { excludeComponentTypes: ["pipeline" as const] };
     const viewerFilters = { excludeComponentTypes: ["anchor" as const] };
     const result = merge(
       { filters: viewerFilters }, // viewer ignored
       { filters: authorFilters },                           // author wins
     );
-    expect(result.filters?.excludeComponentTypes).toEqual(["note"]);
+    expect(result.filters?.excludeComponentTypes).toEqual(["pipeline"]);
   });
 
   it("author-intent: legend from authorConfig wins", () => {

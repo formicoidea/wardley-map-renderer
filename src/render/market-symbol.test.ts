@@ -20,7 +20,8 @@ function makeMarketComponent(overrides: Partial<Component> = {}): Component {
     id: "mkt-1",
     label: { name: "Cloud Market" },
     position: { evolution: 0.7, visibility: 0.3 },
-    type: "market",
+    type: "component",
+    subtype: "market",
     ...overrides,
   } as Component;
 }
@@ -175,11 +176,11 @@ describe("MarketSymbol rendering", () => {
     expect(svg).toContain('stroke="#0066cc"');
   });
 
-  it("is excluded when excludeComponentTypes includes market", () => {
+  it("is excluded when excludeComponentTypes includes its type (component)", () => {
     const comp = makeMarketComponent();
     const node: NodeGeometry = { id: "mkt-1", cx: 400, cy: 200, component: comp };
     const ctx = makeMinimalContext([node], {
-      excludeComponentTypes: ["market"],
+      excludeComponentTypes: ["component"],
     });
 
     const parts = renderNodesLayer(ctx);

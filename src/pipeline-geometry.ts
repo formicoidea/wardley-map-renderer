@@ -98,9 +98,9 @@ export function resolvePipelines(map: WardleyMap): ResolvedPipeline[] {
     (c) => c.type === "pipeline" && c.pipelineGeometry != null
   );
 
-  // Candidate sub-components (everything except pipelines and notes)
+  // Candidate sub-components (everything except pipelines)
   const candidates = map.components.filter(
-    (c) => c.type !== "pipeline" && c.type !== "note"
+    (c) => c.type !== "pipeline"
   );
 
   for (const pipe of pipelineComps) {

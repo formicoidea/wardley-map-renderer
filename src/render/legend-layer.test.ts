@@ -42,15 +42,14 @@ function makeAllTypesMap(): WardleyMap {
     components: [
       { id: "a", label: { name: "User" }, type: "anchor", position: { evolution: { scalar: 0.5 }, visibility: { scalar: 0.1 } } },
       { id: "b", label: { name: "Service" }, type: "component", position: { evolution: { scalar: 0.6 }, visibility: { scalar: 0.5 } } },
-      { id: "c", label: { name: "Need" }, type: "user-need", position: { evolution: { scalar: 0.3 }, visibility: { scalar: 0.2 } } },
+      { id: "c", label: { name: "Need" }, type: "component", subtype: "userNeed", position: { evolution: { scalar: 0.3 }, visibility: { scalar: 0.2 } } },
       {
         id: "d", label: { name: "Platform" }, type: "pipeline",
         position: { evolution: { scalar: 0.5 }, visibility: { scalar: 0.7 } },
         pipelineGeometry: { evoStart: 0.2, evoEnd: 0.8, visStart: 0.6, visEnd: 0.8 },
       },
-      { id: "e", label: { name: "Note" }, type: "note", position: { evolution: { scalar: 0.1 }, visibility: { scalar: 0.9 } } },
-      { id: "f", label: { name: "Trading" }, type: "market", position: { evolution: { scalar: 0.7 }, visibility: { scalar: 0.4 } } },
-      { id: "g", label: { name: "Cloud" }, type: "ecosystem", position: { evolution: { scalar: 0.8 }, visibility: { scalar: 0.6 } } },
+      { id: "f", label: { name: "Trading" }, type: "component", subtype: "market", position: { evolution: { scalar: 0.7 }, visibility: { scalar: 0.4 } } },
+      { id: "g", label: { name: "Cloud" }, type: "component", subtype: "ecosystem", position: { evolution: { scalar: 0.8 }, visibility: { scalar: 0.6 } } },
     ],
     relations: [{ id: "rel-a-b", source: "a", target: "b" }],
   }));
@@ -132,12 +131,12 @@ describe("LegendLayer — type+color", () => {
     const ctx = buildRenderContext(
       sanitizeMap(WardleyMapSchema.parse({
         ...JSON.parse(JSON.stringify(map)),
-        renderConfig: { filters: { excludeComponentTypes: ["note"] } },
+        renderConfig: { filters: { excludeComponentTypes: ["pipeline"] } },
       }))
     );
     const parts = renderLegendLayer(ctx);
     const svg = parts.join("");
-    expect(svg).not.toContain(">Note<");
+    expect(svg).not.toContain("Pipeline");
     // Other types still present
     expect(svg).toContain("Component");
   });
@@ -146,7 +145,7 @@ describe("LegendLayer — type+color", () => {
     const map = makeMap({
       renderConfig: { styling: { palette: { _default: "#2563eb", "user-need": "#dc2626" } } },
       components: [
-        { id: "a", label: { name: "Need" }, type: "user-need", position: { evolution: { scalar: 0.3 }, visibility: { scalar: 0.2 } } },
+        { id: "a", label: { name: "Need" }, type: "component", subtype: "userNeed", position: { evolution: { scalar: 0.3 }, visibility: { scalar: 0.2 } } },
         { id: "b", label: { name: "Svc" }, type: "component", position: { evolution: { scalar: 0.6 }, visibility: { scalar: 0.5 } } },
       ],
     });
@@ -167,7 +166,7 @@ describe("LegendLayer — type+color", () => {
     expect(svg).toContain('stroke="#000000"');
   });
 
-  it("all 7 types present → 7 type entries + relation + evolve entries", () => {
+  it("all renderable types present → type entries + relation + evolve entries", () => {
     const allMap = sanitizeMap(WardleyMapSchema.parse({
       title: "Full",
       components: [
@@ -177,27 +176,25 @@ describe("LegendLayer — type+color", () => {
           position: { evolution: { scalar: 0.2 }, visibility: { scalar: 0.5 } },
           evolvesTo: [{ position: { evolution: { scalar: 0.7 }, visibility: { scalar: 0.5 } }, evolveType: "natural" }],
         },
-        { id: "c", label: { name: "Need" }, type: "user-need", position: { evolution: { scalar: 0.3 }, visibility: { scalar: 0.2 } } },
+        { id: "c", label: { name: "Need" }, type: "component", subtype: "userNeed", position: { evolution: { scalar: 0.3 }, visibility: { scalar: 0.2 } } },
         {
           id: "d", label: { name: "Platform" }, type: "pipeline",
           position: { evolution: { scalar: 0.5 }, visibility: { scalar: 0.7 } },
           pipelineGeometry: { evoStart: 0.2, evoEnd: 0.8, visStart: 0.6, visEnd: 0.8 },
         },
-        { id: "e", label: { name: "N" }, type: "note", position: { evolution: { scalar: 0.1 }, visibility: { scalar: 0.9 } } },
-        { id: "f", label: { name: "Trading" }, type: "market", position: { evolution: { scalar: 0.7 }, visibility: { scalar: 0.4 } } },
-        { id: "g", label: { name: "Cloud" }, type: "ecosystem", position: { evolution: { scalar: 0.8 }, visibility: { scalar: 0.6 } } },
+        { id: "f", label: { name: "Trading" }, type: "component", subtype: "market", position: { evolution: { scalar: 0.7 }, visibility: { scalar: 0.4 } } },
+        { id: "g", label: { name: "Cloud" }, type: "component", subtype: "ecosystem", position: { evolution: { scalar: 0.8 }, visibility: { scalar: 0.6 } } },
       ],
       relations: [{ id: "rel-a-b", source: "a", target: "b" }],
     }));
     const ctx = buildRenderContext(allMap);
     const parts = renderLegendLayer(ctx);
     const svg = parts.join("");
-    // 7 types
+    // renderable types
     expect(svg).toContain("Component");
     expect(svg).toContain("User Need");
     expect(svg).toContain("Pipeline");
     expect(svg).toContain("User / Stakeholder");
-    expect(svg).toContain(">Note<");
     expect(svg).toContain("Market");
     expect(svg).toContain("Ecosystem");
     // 1 dependency edge
@@ -285,7 +282,7 @@ describe("LegendLayer — method entries (resolved textual values)", () => {
         {
           id: "a", label: { name: "Svc" }, type: "component",
           position: { evolution: { scalar: 0.5 }, visibility: { scalar: 0.5 } },
-          method: { type: "buying-policy", preconisation: "Uncharted" },
+          method: { category: "buying-policy", recommendation: "Uncharted" },
         },
       ],
       relations: [],
@@ -306,7 +303,7 @@ describe("LegendLayer — method entries (resolved textual values)", () => {
         {
           id: "a", label: { name: "Svc" }, type: "component",
           position: { evolution: { scalar: 0.5 }, visibility: { scalar: 0.5 } },
-          method: { type: "project-management", preconisation: "Uncharted" },
+          method: { category: "project-management", recommendation: "Uncharted" },
         },
       ],
       relations: [],
@@ -326,7 +323,7 @@ describe("LegendLayer — method entries (resolved textual values)", () => {
         {
           id: "a", label: { name: "Svc" }, type: "component",
           position: { evolution: { scalar: 0.5 }, visibility: { scalar: 0.5 } },
-          method: { type: "custom-method", preconisation: "phase1" },
+          method: { category: "custom-method", recommendation: "phase1" },
         },
       ],
       relations: [],
@@ -347,8 +344,8 @@ describe("LegendLayer — method entries (resolved textual values)", () => {
     const map = sanitizeMap(WardleyMapSchema.parse({
       title: "Methods",
       components: [
-        { id: "a", label: { name: "A" }, type: "component", position: { evolution: { scalar: 0.3 }, visibility: { scalar: 0.3 } }, method: { type: "buying-policy", preconisation: "Uncharted" } },
-        { id: "b", label: { name: "B" }, type: "component", position: { evolution: { scalar: 0.6 }, visibility: { scalar: 0.6 } }, method: { type: "attitudes", preconisation: "Transitional" } },
+        { id: "a", label: { name: "A" }, type: "component", position: { evolution: { scalar: 0.3 }, visibility: { scalar: 0.3 } }, method: { category: "buying-policy", recommendation: "Uncharted" } },
+        { id: "b", label: { name: "B" }, type: "component", position: { evolution: { scalar: 0.6 }, visibility: { scalar: 0.6 } }, method: { category: "attitudes", recommendation: "Transitional" } },
       ],
       relations: [],
     }));
@@ -367,7 +364,7 @@ describe("LegendLayer — method entries (resolved textual values)", () => {
         {
           id: "a", label: { name: "A" }, type: "component",
           position: { evolution: { scalar: 0.5 }, visibility: { scalar: 0.5 } },
-          method: { type: "custom-method", preconisation: "trial" },
+          method: { category: "custom-method", recommendation: "trial" },
         },
       ],
       relations: [],
@@ -388,7 +385,7 @@ describe("LegendLayer — method entries (resolved textual values)", () => {
         {
           id: "a", label: { name: "A" }, type: "component",
           position: { evolution: { scalar: 0.5 }, visibility: { scalar: 0.5 } },
-          method: { type: "buying-policy", preconisation: "recommended" },
+          method: { category: "buying-policy", recommendation: "recommended" },
         },
       ],
       relations: [],
@@ -424,12 +421,9 @@ describe("LegendLayer — accelerator/deaccelerator entries", () => {
     const map = sanitizeMap(WardleyMapSchema.parse({
       title: "Accel",
       components: [
-        { id: "a", label: { name: "Svc" }, type: "component", position: { evolution: { scalar: 0.5 }, visibility: { scalar: 0.5 } } },
+        { id: "a", label: { name: "Svc" }, type: "component", position: { evolution: { scalar: 0.5 }, visibility: { scalar: 0.5 } }, accelerator: true },
       ],
       relations: [],
-      accelerators: [
-        { id: "acc1", label: "Push", position: { evolution: { scalar: 0.5 }, visibility: { scalar: 0.5 } }, type: "accelerator" },
-      ],
     }));
     const ctx = buildRenderContext(map);
     const parts = renderLegendLayer(ctx);
@@ -442,12 +436,9 @@ describe("LegendLayer — accelerator/deaccelerator entries", () => {
     const map = sanitizeMap(WardleyMapSchema.parse({
       title: "Deaccel",
       components: [
-        { id: "a", label: { name: "Svc" }, type: "component", position: { evolution: { scalar: 0.5 }, visibility: { scalar: 0.5 } } },
+        { id: "a", label: { name: "Svc" }, type: "component", position: { evolution: { scalar: 0.5 }, visibility: { scalar: 0.5 } }, deaccelerator: true },
       ],
       relations: [],
-      accelerators: [
-        { id: "d1", label: "Drag", position: { evolution: { scalar: 0.5 }, visibility: { scalar: 0.5 } }, type: "deaccelerator" },
-      ],
     }));
     const ctx = buildRenderContext(map);
     const parts = renderLegendLayer(ctx);
@@ -459,13 +450,10 @@ describe("LegendLayer — accelerator/deaccelerator entries", () => {
     const map = sanitizeMap(WardleyMapSchema.parse({
       title: "Mixed",
       components: [
-        { id: "a", label: { name: "Svc" }, type: "component", position: { evolution: { scalar: 0.5 }, visibility: { scalar: 0.5 } } },
+        { id: "a", label: { name: "Push" }, type: "component", position: { evolution: { scalar: 0.3 }, visibility: { scalar: 0.3 } }, accelerator: true },
+        { id: "b", label: { name: "Drag" }, type: "component", position: { evolution: { scalar: 0.7 }, visibility: { scalar: 0.7 } }, deaccelerator: true },
       ],
       relations: [],
-      accelerators: [
-        { id: "acc1", label: "Push", position: { evolution: { scalar: 0.3 }, visibility: { scalar: 0.3 } }, type: "accelerator" },
-        { id: "d1", label: "Drag", position: { evolution: { scalar: 0.7 }, visibility: { scalar: 0.7 } }, type: "deaccelerator" },
-      ],
     }));
     const ctx = buildRenderContext(map);
     const parts = renderLegendLayer(ctx);
@@ -489,12 +477,9 @@ describe("LegendLayer — steps entries", () => {
     const map = sanitizeMap(WardleyMapSchema.parse({
       title: "Steps",
       components: [
-        { id: "a", label: { name: "Svc" }, type: "component", position: { evolution: { scalar: 0.5 }, visibility: { scalar: 0.5 } } },
+        { id: "a", label: { name: "Svc" }, type: "component", position: { evolution: { scalar: 0.5 }, visibility: { scalar: 0.5 } }, step: { number: 1 } },
       ],
       relations: [],
-      steps: [
-        { id: "step-1", number: 1, position: { evolution: { scalar: 0.3 }, visibility: { scalar: 0.3 } } },
-      ],
     }));
     const ctx = buildRenderContext(map);
     const parts = renderLegendLayer(ctx);
@@ -549,7 +534,9 @@ describe("LegendLayer — i18n for new elements", () => {
         {
           id: "a", label: { name: "Svc" }, type: "component",
           position: { evolution: { scalar: 0.2 }, visibility: { scalar: 0.5 } },
-          method: { type: "build", preconisation: "recommended" },
+          method: { category: "build", recommendation: "recommended" },
+          accelerator: true,
+          step: { number: 1 },
           evolvesTo: [{ position: { evolution: { scalar: 0.7 }, visibility: { scalar: 0.5 } }, evolveType: "natural", inertia: true }],
         },
       ],
@@ -560,12 +547,6 @@ describe("LegendLayer — i18n for new elements", () => {
           { type: "build", color: "#00a86b", legend: { Uncharted: "faire", Transitional: "acheter", Industrialized: "externaliser" } },
         ],
       },
-      accelerators: [
-        { id: "acc1", label: "Go", position: { evolution: { scalar: 0.5 }, visibility: { scalar: 0.5 } }, type: "accelerator" },
-      ],
-      steps: [
-        { id: "step-1", number: 1, position: { evolution: { scalar: 0.3 }, visibility: { scalar: 0.3 } } },
-      ],
     }));
     const ctx = buildRenderContext(map);
     const parts = renderLegendLayer(ctx);
@@ -584,7 +565,7 @@ describe("LegendLayer — Market & Ecosystem entries", () => {
     const map = sanitizeMap(WardleyMapSchema.parse({
       title: "Market",
       components: [
-        { id: "a", label: { name: "Trading" }, type: "market", position: { evolution: { scalar: 0.6 }, visibility: { scalar: 0.4 } } },
+        { id: "a", label: { name: "Trading" }, type: "component", subtype: "market", position: { evolution: { scalar: 0.6 }, visibility: { scalar: 0.4 } } },
       ],
       relations: [],
     }));
@@ -601,7 +582,7 @@ describe("LegendLayer — Market & Ecosystem entries", () => {
     const map = sanitizeMap(WardleyMapSchema.parse({
       title: "Eco",
       components: [
-        { id: "a", label: { name: "Cloud" }, type: "ecosystem", position: { evolution: { scalar: 0.8 }, visibility: { scalar: 0.5 } } },
+        { id: "a", label: { name: "Cloud" }, type: "component", subtype: "ecosystem", position: { evolution: { scalar: 0.8 }, visibility: { scalar: 0.5 } } },
       ],
       relations: [],
     }));
@@ -631,12 +612,9 @@ describe("LegendLayer — accelerator subtype isolation", () => {
     const map = sanitizeMap(WardleyMapSchema.parse({
       title: "AccOnly",
       components: [
-        { id: "a", label: { name: "Svc" }, type: "component", position: { evolution: { scalar: 0.5 }, visibility: { scalar: 0.5 } } },
+        { id: "a", label: { name: "Svc" }, type: "component", position: { evolution: { scalar: 0.5 }, visibility: { scalar: 0.5 } }, accelerator: true },
       ],
       relations: [],
-      accelerators: [
-        { id: "acc1", label: "Push", position: { evolution: { scalar: 0.5 }, visibility: { scalar: 0.5 } }, type: "accelerator" },
-      ],
     }));
     const ctx = buildRenderContext(map);
     const parts = renderLegendLayer(ctx);
@@ -649,12 +627,9 @@ describe("LegendLayer — accelerator subtype isolation", () => {
     const map = sanitizeMap(WardleyMapSchema.parse({
       title: "DeaccOnly",
       components: [
-        { id: "a", label: { name: "Svc" }, type: "component", position: { evolution: { scalar: 0.5 }, visibility: { scalar: 0.5 } } },
+        { id: "a", label: { name: "Svc" }, type: "component", position: { evolution: { scalar: 0.5 }, visibility: { scalar: 0.5 } }, deaccelerator: true },
       ],
       relations: [],
-      accelerators: [
-        { id: "d1", label: "Drag", position: { evolution: { scalar: 0.5 }, visibility: { scalar: 0.5 } }, type: "deaccelerator" },
-      ],
     }));
     const ctx = buildRenderContext(map);
     const parts = renderLegendLayer(ctx);

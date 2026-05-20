@@ -45,13 +45,13 @@ describe("RenderConfigV2BaseSchema — unified filters (filters.layers + filters
     const result = RenderConfigV2BaseSchema.safeParse({
       filters: {
         layers: { title: false, nodes: true, evolvesTo: true, labels: true },
-        excludeComponentTypes: ["note", "anchor"],
+        excludeComponentTypes: ["pipeline", "anchor"],
       },
     });
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data.filters?.layers?.title).toBe(false);
-      expect(result.data.filters?.excludeComponentTypes).toEqual(["note", "anchor"]);
+      expect(result.data.filters?.excludeComponentTypes).toEqual(["pipeline", "anchor"]);
     }
   });
 

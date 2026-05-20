@@ -40,7 +40,7 @@ const baseMap = {
     {
       id: "user",
       label: { name: "User" },
-      type: "user-need" as const,
+      type: "component", subtype: "userNeed" as const,
       position: { evolution: { scalar: 0.9 }, visibility: { scalar: 0.95 } },
     },
   ],
@@ -86,7 +86,7 @@ describe("RenderConfigSchema", () => {
       },
       typography: { fontFamily: "Roboto, sans-serif", labelScale: 1.5 },
       avoidCollisions: false,
-      filters: { excludeComponentTypes: ["note"] },
+      filters: { excludeComponentTypes: ["pipeline"] },
     };
     const result = RenderConfigSchema.safeParse(full);
     expect(result.success).toBe(true);
@@ -99,7 +99,7 @@ describe("RenderConfigSchema", () => {
       expect(result.data.styling?.background?.valueChainYAxis?.show).toBe(true);
       expect(result.data.styling?.background?.evolutionPhases?.showPhaseDividerAndLabel).toBe(false);
       expect(result.data.typography?.labelScale).toBe(1.5);
-      expect(result.data.filters?.excludeComponentTypes).toEqual(["note"]);
+      expect(result.data.filters?.excludeComponentTypes).toEqual(["pipeline"]);
       expect(result.data.spatial?.strokeWidth).toBe(2);
     }
   });
@@ -179,11 +179,11 @@ describe("RenderConfigSchema", () => {
 
   it("accepts multiple filters.excludeComponentTypes", () => {
     const result = RenderConfigSchema.safeParse({
-      filters: { excludeComponentTypes: ["note", "anchor"] },
+      filters: { excludeComponentTypes: ["pipeline", "anchor"] },
     });
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.filters?.excludeComponentTypes).toEqual(["note", "anchor"]);
+      expect(result.data.filters?.excludeComponentTypes).toEqual(["pipeline", "anchor"]);
     }
   });
 
@@ -766,7 +766,7 @@ describe("WardleyMapSchema with renderConfig", () => {
         },
         typography: { fontFamily: "Monospace", labelScale: 2 },
         avoidCollisions: true,
-        filters: { excludeComponentTypes: ["note"] },
+        filters: { excludeComponentTypes: ["pipeline"] },
       },
     });
     expect(result.success).toBe(true);
@@ -777,7 +777,7 @@ describe("WardleyMapSchema with renderConfig", () => {
       expect(rc.styling?.background?.color).toBe("#000000");
       expect(rc.styling?.background?.evolutionXAxis?.show).toBe(false);
       expect(rc.styling?.background?.evolutionPhases?.showPhaseDividerAndLabel).toBe(true);
-      expect(rc.filters?.excludeComponentTypes).toEqual(["note"]);
+      expect(rc.filters?.excludeComponentTypes).toEqual(["pipeline"]);
       expect(rc.styling?.palette).toEqual({ _default: "#000000", "user-need": "#ff0000" });
       expect(rc.styling?.evolveStyles?.natural?.stroke).toBe("#00ff00");
     }
@@ -1313,8 +1313,8 @@ describe("resolveTheme", () => {
   });
 
   it("applies filters.excludeComponentTypes override", () => {
-    const rc = resolveTheme({ filters: { excludeComponentTypes: ["note"] } });
-    expect(rc.excludeComponentTypes).toEqual(["note"]);
+    const rc = resolveTheme({ filters: { excludeComponentTypes: ["pipeline"] } });
+    expect(rc.excludeComponentTypes).toEqual(["pipeline"]);
   });
 
   it("applies palette override", () => {

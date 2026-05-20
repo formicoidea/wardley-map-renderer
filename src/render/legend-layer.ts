@@ -16,6 +16,7 @@
 import type { RenderContext, LayerRenderer } from "./types.js";
 import { esc } from "./svg-composer.js";
 import { resolveTypeStyle } from "../schema.js";
+import { componentRenderableType } from "../renderable-type.js";
 import { SIN60, COS60 } from "./nodes-layer.js";
 
 // ── Visual constants ──────────────────────────────────────────────────
@@ -127,13 +128,17 @@ function arrowLegendItem(label: string, direction: 1 | -1): LegendItem {
 function collectLegendItems(ctx: RenderContext): LegendItem[] {
   const items: LegendItem[] = [];
   const { typeColors, excludeComponentTypes, locale } = ctx.resolvedConfig;
-  const excluded = new Set(excludeComponentTypes);
+  const excluded = new Set<string>(excludeComponentTypes);
   const labels = TYPE_LABELS[locale] ?? TYPE_LABELS.en;
   const evolveLabels = EVOLVE_LABELS[locale] ?? EVOLVE_LABELS.en;
 
   // ── Type entries ──────────────────────────────────────────────────
-  // Collect distinct types present on the map (nodes + pipelines)
-  const presentTypes = new Set(ctx.nodes.map((n) => n.component.type));
+  // Collect distinct renderable types present on the map (nodes + pipelines).
+  // Maps each node's (type, subtype) to the appearance vocabulary so legend
+  // entries match the symbols actually drawn (market/ecosystem/user-need...).
+  const presentTypes = new Set<string>(
+    ctx.nodes.map((n) => componentRenderableType(n.component.type, n.component.subtype))
+  );
   // Pipelines may exist even without a "pipeline"-typed node
   if (ctx.pipelines.length > 0) presentTypes.add("pipeline");
 
@@ -277,7 +282,7 @@ function collectLegendItems(ctx: RenderContext): LegendItem[] {
   // ── Method indicators ───────────────────────────────────────────────
   // Colors and labels resolved from renderConfig.methods[] — textual legend values, not symbols
   const presentMethods = new Set(
-    ctx.nodes.map((n) => n.component.method?.type).filter(Boolean) as string[]
+    ctx.nodes.map((n) => n.component.method?.category).filter(Boolean) as string[]
   );
   const methodConfigs = ctx.resolvedConfig.methods;
   // Build lookup for configured methods
@@ -307,12 +312,11 @@ function collectLegendItems(ctx: RenderContext): LegendItem[] {
     });
   }
 
-  // ── Accelerators / Deaccelerators (single-pass detection) ───────────
-  const accelerators = ctx.map.accelerators ?? [];
+  // ── Accelerators / Deaccelerators (component decorators) ────────────
   let hasAccelerator = false, hasDeaccelerator = false;
-  for (const a of accelerators) {
-    if (a.type === "accelerator") hasAccelerator = true;
-    else if (a.type === "deaccelerator") hasDeaccelerator = true;
+  for (const n of ctx.nodes) {
+    if (n.component.accelerator) hasAccelerator = true;
+    if (n.component.deaccelerator) hasDeaccelerator = true;
   }
 
   if (hasAccelerator) {
@@ -325,9 +329,9 @@ function collectLegendItems(ctx: RenderContext): LegendItem[] {
     items.push(arrowLegendItem(deaccelLabel, -1));
   }
 
-  // ── Steps ───────────────────────────────────────────────────────────
-  const steps = ctx.map.steps ?? [];
-  if (steps.length > 0) {
+  // ── Steps (component decorators) ─────────────────────────────────────
+  const hasSteps = ctx.nodes.some((n) => n.component.step != null);
+  if (hasSteps) {
     const stepLabel = STEP_LABELS[locale] ?? STEP_LABELS.en;
     items.push({
       label: stepLabel,
@@ -425,9 +429,8 @@ function findBestCorner(
     const rect = cornerRect(corner);
     let score = 0;
 
-    // Score nodes (exclude notes)
+    // Score nodes
     for (const node of ctx.nodes) {
-      if (node.component.type === "note") continue;
       if (pointInRect(node.cx, node.cy, rect)) {
         score += 10;
       }

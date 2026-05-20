@@ -31,24 +31,24 @@ import { renderStep, STEP_DEFAULT_FILL } from "./svg-primitives.js";
 export const renderStepsLayer: LayerRenderer = (
   ctx: RenderContext
 ): string[] => {
-  const steps = ctx.map.steps;
-  if (!steps || steps.length === 0) return [];
-
   const parts: string[] = [];
   const fontFamily = ctx.resolvedConfig.typography.fontFamily;
   const interactive = ctx.options?.interactive === true;
 
-  for (const step of steps) {
-    const cx = ctx.evoToX(step.position.evolution.scalar);
-    const cy = ctx.visToY(step.position.visibility.scalar);
+  // Steps are now COMPONENT DECORATORS: render at the decorated component's
+  // node position, using the component id as the step target id.
+  for (const node of ctx.nodes) {
+    const step = node.component.step;
+    if (!step) continue;
     const fill = step.color ? resolveColor(step.color) : STEP_DEFAULT_FILL;
 
     parts.push(renderStep({
-      cx, cy,
+      cx: node.cx,
+      cy: node.cy,
       number: step.number,
       fill,
       fontFamily,
-      stepId: step.id,
+      stepId: node.component.id,
       interactive,
     }));
   }

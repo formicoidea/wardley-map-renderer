@@ -171,25 +171,6 @@ describe("resolvePipelines", () => {
     expect(resolvePipelines(map)).toEqual([]);
   });
 
-  it("does not include notes as sub-components", () => {
-    const pipe = makePipeline("pipe1", "Pipeline", PIPE_GEO);
-    const note: Component = {
-      id: "note1",
-      label: { name: "A note" },
-      type: "note",
-      position: {
-        evolution: { scalar: 0.4 },
-        visibility: { scalar: 0.5 },
-      },
-    } as Component;
-    const map: WardleyMap = {
-      title: "Pipe with note",
-      components: [pipe, note],
-      relations: [],
-    };
-    const resolved = resolvePipelines(map);
-    expect(resolved[0].childIds).not.toContain("note1");
-  });
 });
 
 // ── buildPipelineMembership ────────────────────────────────────────

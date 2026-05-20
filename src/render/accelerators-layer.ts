@@ -37,20 +37,25 @@ export const buildArrowPath = buildArrowPathPrimitive;
 export const renderAcceleratorsLayer: LayerRenderer = (
   ctx: RenderContext
 ): string[] => {
-  const accelerators = ctx.map.accelerators;
-  if (!accelerators || accelerators.length === 0) return [];
-
   const parts: string[] = [];
   const fontFamily = ctx.resolvedConfig.typography.fontFamily;
 
-  for (const acc of accelerators) {
-    const cx = ctx.evoToX(acc.position.evolution.scalar);
-    const cy = ctx.visToY(acc.position.visibility.scalar);
+  // Accelerator / deaccelerator are now COMPONENT DECORATORS: render at the
+  // decorated component's node position.
+  for (const node of ctx.nodes) {
+    const comp = node.component;
+    const type = comp.accelerator
+      ? "accelerator"
+      : comp.deaccelerator
+        ? "deaccelerator"
+        : undefined;
+    if (!type) continue;
 
     parts.push(renderAccelerator({
-      cx, cy,
-      label: acc.label,
-      type: acc.type as "accelerator" | "deaccelerator",
+      cx: node.cx,
+      cy: node.cy,
+      label: "",
+      type,
       fontFamily,
     }));
   }

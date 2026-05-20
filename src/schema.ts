@@ -69,30 +69,59 @@ export const EvolutionRangeSchema = z
     message: "evolutionRange[0] (min) must be ≤ evolutionRange[1] (max)",
   });
 
-// ── Component types (aligned with MapKeep + OWM standard) ──────────────────
-// 7 types: component (generic capacity), user-need, pipeline, note, anchor, market, ecosystem
-export const ComponentTypeEnum = z.enum([
-  "component",
-  "user-need",
-  "pipeline",
-  "note",
-  "anchor",
+// ── Node taxonomy: type → subtype → nature ─────────────────────────────────
+// type:    top-level node category (3 values).
+// subtype: refines a component; informationally labels a pipeline.
+// nature:  METADATA only — NO visual effect (kept for analysis/LLM value).
+// Per-type validity of subtype/nature is enforced by ComponentSchema.superRefine.
+export const ComponentTypeEnum = z.enum(["anchor", "component", "pipeline"]);
+
+/**
+ * Subtype superset. `component` uses the full set; `pipeline` accepts the subset
+ * {functional, userNeed, solution} (informational only — no child constraint).
+ */
+export const SubtypeEnum = z.enum([
+  "userNeed",
   "market",
   "ecosystem",
+  "solution",
+  "functional",
+  "supplier",
 ]);
+export type Subtype = z.infer<typeof SubtypeEnum>;
 
-// ── Nature (optional semantic annotation) ───────────────────
-// Freeform natures for future extensibility, not type-coupled
-export const NatureEnum = z
-  .enum([
-    "activity",
-    "practice",
-    "data",
-    "knowledge",
-    "natural_need",
-    "technical_system_need",
-  ])
-  .optional();
+/**
+ * Nature — metadata only (no visual effect). Allowed set depends on type/subtype:
+ *   anchor                → personae | generic | group
+ *   component / userNeed  → natural | anthropic
+ *   component / functional→ practice | data | activity | knowledge
+ */
+export const NatureEnum = z.enum([
+  "personae",
+  "generic",
+  "group",
+  "natural",
+  "anthropic",
+  "practice",
+  "data",
+  "activity",
+  "knowledge",
+]);
+export type Nature = z.infer<typeof NatureEnum>;
+
+// Per-branch allowed sets (consumed by ComponentSchema.superRefine).
+const ANCHOR_NATURES = ["personae", "generic", "group"] as const;
+const USERNEED_NATURES = ["natural", "anthropic"] as const;
+const FUNCTIONAL_NATURES = ["practice", "data", "activity", "knowledge"] as const;
+const COMPONENT_SUBTYPES = [
+  "userNeed",
+  "market",
+  "ecosystem",
+  "solution",
+  "functional",
+  "supplier",
+] as const;
+const PIPELINE_SUBTYPES = ["functional", "userNeed", "solution"] as const;
 
 // ── Label (nested: name + optional position offset) ─────────
 export const LabelPositionSchema = z.object({
@@ -150,31 +179,72 @@ export const PipelineGeometrySchema = z.object({
   handleEvolution: EvolutionSchema.optional(),
 });
 
-// ── Method (Build / Buy / Outsource) ──────────────────────
+// ── Method decorator (generic category + recommendation) ───────────────────
+// Generic named category (e.g. "buying-policy"); `recommendation` is a per-component
+// label (e.g. an evolution-zone descriptor). Per-category styling lives in the
+// RenderConfig under style.decorators.method (keyed by category).
 export const MethodSchema = z.object({
-  type: z.string(),
-  preconisation: z.string(),
+  category: z.string(),
+  recommendation: z.string(),
 });
-/** @deprecated Use MethodSchema instead. */
-export const MethodEnum = MethodSchema;
 
-// ── Component ──────────────────────────────────────────────
-export const ComponentSchema = z.object({
-  id: z.string(),
-  label: LabelSchema,
-  type: ComponentTypeEnum,
-  nature: NatureEnum,
-  position: PositionSchema,
-  description: z.string().optional(),
-  // Evolution movement targets
-  evolvesTo: z.array(EvolvesToSchema).optional(),
-  // Pipeline geometry (only for type === "pipeline")
-  pipelineGeometry: PipelineGeometrySchema.optional(),
-  // Optional color override (Tailwind-style name, e.g. "red-600")
+// ── Step decorator (numbered sticker on a component) ───────────────────────
+export const StepDecoratorSchema = z.object({
+  number: z.number().int().min(1),
   color: z.string().optional(),
-  // Optional method annotation (Build / Buy / Outsource)
-  method: MethodSchema.optional(),
 });
+
+// ── Component (node) ───────────────────────────────────────────────────────
+// Single object + superRefine (rather than a discriminated union) so the inferred
+// type stays a flat object for the many consumers that read fields generically.
+export const ComponentSchema = z
+  .object({
+    id: z.string(),
+    label: LabelSchema,
+    type: ComponentTypeEnum,
+    // Refines a component; informational label on a pipeline. Validity per type.
+    subtype: SubtypeEnum.optional(),
+    // Metadata only — NO visual effect. Validity depends on type/subtype.
+    nature: NatureEnum.optional(),
+    position: PositionSchema,
+    description: z.string().optional(),
+    // Evolution movement targets
+    evolvesTo: z.array(EvolvesToSchema).optional(),
+    // Pipeline geometry (only for type === "pipeline")
+    pipelineGeometry: PipelineGeometrySchema.optional(),
+    // Optional color override (Tailwind-style name, e.g. "red-600")
+    color: z.string().optional(),
+    // ── Gameplay decorators (component-level annotations) ──
+    method: MethodSchema.optional(),
+    inertia: z.boolean().optional(),
+    accelerator: z.boolean().optional(),
+    deaccelerator: z.boolean().optional(),
+    step: StepDecoratorSchema.optional(),
+  })
+  .superRefine((c, ctx) => {
+    if (c.type === "anchor") {
+      if (c.subtype !== undefined)
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["subtype"], message: "anchor must not have a subtype" });
+      if (c.nature !== undefined && !ANCHOR_NATURES.includes(c.nature as (typeof ANCHOR_NATURES)[number]))
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["nature"], message: `anchor nature must be one of: ${ANCHOR_NATURES.join(", ")}` });
+    } else if (c.type === "component") {
+      if (c.subtype !== undefined && !COMPONENT_SUBTYPES.includes(c.subtype as (typeof COMPONENT_SUBTYPES)[number]))
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["subtype"], message: `component subtype must be one of: ${COMPONENT_SUBTYPES.join(", ")}` });
+      if (c.nature !== undefined) {
+        const allowed: readonly string[] =
+          c.subtype === "userNeed" ? USERNEED_NATURES :
+          c.subtype === "functional" ? FUNCTIONAL_NATURES :
+          [];
+        if (!allowed.includes(c.nature))
+          ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["nature"], message: `nature for component/${c.subtype ?? "(no subtype)"} must be one of: ${allowed.join(", ") || "(none — only userNeed|functional carry a nature)"}` });
+      }
+    } else if (c.type === "pipeline") {
+      if (c.subtype !== undefined && !PIPELINE_SUBTYPES.includes(c.subtype as (typeof PIPELINE_SUBTYPES)[number]))
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["subtype"], message: `pipeline subtype must be one of: ${PIPELINE_SUBTYPES.join(", ")}` });
+      if (c.nature !== undefined)
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["nature"], message: "pipeline must not have a nature" });
+    }
+  });
 
 // ── Relation (edge) ────────────────────────────────────────
 // Breaking change: source/target replaces from/to, DependsOn type
@@ -1617,32 +1687,9 @@ export const RenderConfigSchema = z.object({
   }
 });
 
-// ── Accelerator / Deaccelerator (gameplay layer) ──────────
-export const AcceleratorTypeEnum = z.enum(["accelerator", "deaccelerator"]);
-
-export const AcceleratorSchema = z.object({
-  id: z.string(),
-  label: z.string(),
-  position: PositionSchema,
-  type: AcceleratorTypeEnum,
-});
-
-// ── Steps (stage stickers) ─────────────────────────────────
-/**
- * A step sticker placed on the map. Steps are numbered markers with a position
- * and an optional colour override. The descriptive text associated with each
- * step number lives outside the JSON (managed client-side).
- */
-export const StepSchema = z.object({
-  /** Unique identifier for the step (used by diff-ops for targeting). */
-  id: z.string(),
-  /** Step number displayed inside the sticker (e.g. 1, 2, 3…). */
-  number: z.number().int().min(1),
-  /** Position on the map (evolution × visibility). */
-  position: PositionSchema,
-  /** Optional fill colour override (any valid CSS colour string). */
-  color: z.string().optional(),
-});
+// Gameplay (accelerator / deaccelerator / step) and method are now COMPONENT
+// DECORATORS (see ComponentSchema). The former top-level AcceleratorSchema,
+// StepSchema and WardleyMapSchema.accelerators/steps have been removed.
 
 // ── Wardley Map ────────────────────────────────────────────
 export const WardleyMapSchema = z.object({
@@ -1653,10 +1700,6 @@ export const WardleyMapSchema = z.object({
   // Optional render config — single source of truth for all visual overrides
   // Canvas dimensions: renderConfig.width (default 1600), renderConfig.height (default 800)
   renderConfig: RenderConfigSchema.optional(),
-  // Gameplay layer: accelerators and deaccelerators
-  accelerators: z.array(AcceleratorSchema).optional(),
-  // Steps: numbered stage stickers on the map
-  steps: z.array(StepSchema).optional(),
 });
 
 // ── TypeScript types derived from Zod ──────────────────────
@@ -1746,9 +1789,8 @@ export const DEFAULT_RENDER_CONFIG: RenderConfig = {
 };
 export type EvolveStyle = z.infer<typeof EvolveStyleSchema>;
 export type EvolveStylesMap = z.infer<typeof EvolveStylesMapSchema>;
-export type AcceleratorType = z.infer<typeof AcceleratorTypeEnum>;
-export type Accelerator = z.infer<typeof AcceleratorSchema>;
-export type Step = z.infer<typeof StepSchema>;
+/** Step decorator (number + optional color), attached to a component. */
+export type StepDecorator = z.infer<typeof StepDecoratorSchema>;
 export type WardleyMap = z.infer<typeof WardleyMapSchema>;
 
 // TypeStyleMap<V> is defined earlier alongside makeTypeStyleMapSchema and TypeColorsSchema.
@@ -1911,7 +1953,7 @@ export function validateMap(map: WardleyMap): string[] {
 
   // Must have at least one anchor or user-need
   const hasAnchorOrNeed = map.components.some(
-    (c) => c.type === "anchor" || c.type === "user-need"
+    (c) => c.type === "anchor" || c.subtype === "userNeed"
   );
   if (!hasAnchorOrNeed) {
     errors.push(
@@ -1935,18 +1977,25 @@ export function validateMap(map: WardleyMap): string[] {
   return errors;
 }
 
-// ── Legacy type mapping for LLM backward compat ─────────────
-const LEGACY_TYPE_MAP: Record<string, Component["type"]> = {
-  capacity: "component",
-  need: "user-need",
-  "user_need": "user-need",
-  anchor: "anchor",
-  component: "component",
-  "user-need": "user-need",
-  pipeline: "pipeline",
-  note: "note",
-  market: "market",
-  ecosystem: "ecosystem",
+// ── Legacy type mapping for LLM / old-data backward compat ──────────────────
+// Maps legacy flat type strings to the new {type, subtype} taxonomy.
+// `note` is removed → mapped to a plain component. Old standalone types
+// (market, ecosystem, user-need) become component subtypes.
+const LEGACY_TYPE_MAP: Record<string, { type: Component["type"]; subtype?: Subtype }> = {
+  capacity: { type: "component" },
+  component: { type: "component" },
+  need: { type: "component", subtype: "userNeed" },
+  user_need: { type: "component", subtype: "userNeed" },
+  "user-need": { type: "component", subtype: "userNeed" },
+  userNeed: { type: "component", subtype: "userNeed" },
+  anchor: { type: "anchor" },
+  pipeline: { type: "pipeline" },
+  market: { type: "component", subtype: "market" },
+  ecosystem: { type: "component", subtype: "ecosystem" },
+  solution: { type: "component", subtype: "solution" },
+  functional: { type: "component", subtype: "functional" },
+  supplier: { type: "component", subtype: "supplier" },
+  note: { type: "component" },
 };
 
 const LEGACY_RELATION_TYPE_MAP: Record<string, string> = {
@@ -1983,11 +2032,15 @@ export function sanitizeMap(raw: WardleyMap): WardleyMap {
   const map = structuredClone(raw);
 
   for (const c of map.components) {
-    // Migrate legacy type names (LLM might still produce old types)
+    // Migrate legacy type names (LLM / old data might still produce old types)
     const rawType = (c as any).type as string;
-    const mappedType = LEGACY_TYPE_MAP[rawType];
-    if (mappedType) {
-      c.type = mappedType;
+    const mapped = LEGACY_TYPE_MAP[rawType];
+    if (mapped) {
+      c.type = mapped.type;
+      // Apply legacy-derived subtype only when the data didn't already set one.
+      if (mapped.subtype !== undefined && c.subtype === undefined) {
+        c.subtype = mapped.subtype;
+      }
     } else {
       // Unknown type: default to "component"
       c.type = "component";
@@ -2116,7 +2169,6 @@ export function toOWM(map: WardleyMap): string {
 
   // Components: "component Name [visibility, evolution]"
   for (const c of map.components) {
-    if (c.type === "note") continue; // Notes not supported in OWM
     // OWM convention: 0=top, 1=bottom — same as our internal format, no conversion needed
     const v = vis(c).toFixed(2);
     const e = evo(c).toFixed(2);
@@ -2146,20 +2198,33 @@ export function toOWM(map: WardleyMap): string {
  */
 export function fromMapKeep(raw: any): WardleyMap {
   const components = (raw.components ?? []).map((c: any) => {
+    // Map the legacy MapKeep type string to the new {type, subtype} taxonomy.
+    const mappedNode = LEGACY_TYPE_MAP[c.type] ?? { type: "component" as Component["type"] };
     const base: any = {
       id: c.id,
       label: {
         name: c.label,
         ...(c.labelPosition ? { position: c.labelPosition } : {}),
       },
-      type: c.type,
+      type: mappedNode.type,
+      ...(mappedNode.subtype ? { subtype: mappedNode.subtype } : {}),
       position: {
         evolution: { scalar: c.evolution },
         visibility: { scalar: c.visibility },
       },
     };
 
-    if (c.nature) base.nature = c.nature;
+    // Carry a nature only when it is valid in the new model: the functional
+    // natures (practice/data/activity/knowledge) imply subtype "functional".
+    // Other/legacy natures are dropped (no clean mapping; no visual effect).
+    if (
+      c.nature &&
+      (["practice", "data", "activity", "knowledge"] as const).includes(c.nature) &&
+      (base.subtype === undefined || base.subtype === "functional")
+    ) {
+      base.nature = c.nature;
+      base.subtype = "functional";
+    }
     if (c.color) base.color = c.color;
     if (c.description) base.description = c.description;
 

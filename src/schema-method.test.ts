@@ -1,28 +1,28 @@
 import { describe, it, expect } from "vitest";
-import { ComponentSchema, MethodSchema, MethodEnum } from "./schema.js";
+import { ComponentSchema, MethodSchema } from "./schema.js";
 
 describe("MethodSchema", () => {
-  it("accepts a valid method object with type and preconisation", () => {
-    const result = MethodSchema.parse({ type: "build", preconisation: "recommended" });
-    expect(result).toEqual({ type: "build", preconisation: "recommended" });
+  it("accepts a valid method object with category and recommendation", () => {
+    const result = MethodSchema.parse({ category: "buying-policy", recommendation: "Uncharted" });
+    expect(result).toEqual({ category: "buying-policy", recommendation: "Uncharted" });
   });
 
-  it("accepts any free string for type", () => {
-    const result = MethodSchema.parse({ type: "custom-method", preconisation: "none" });
-    expect(result.type).toBe("custom-method");
+  it("accepts any free string for category", () => {
+    const result = MethodSchema.parse({ category: "custom-method", recommendation: "none" });
+    expect(result.category).toBe("custom-method");
   });
 
-  it("accepts any free string for preconisation", () => {
-    const result = MethodSchema.parse({ type: "build", preconisation: "strongly advised" });
-    expect(result.preconisation).toBe("strongly advised");
+  it("accepts any free string for recommendation", () => {
+    const result = MethodSchema.parse({ category: "buying-policy", recommendation: "strongly advised" });
+    expect(result.recommendation).toBe("strongly advised");
   });
 
-  it("rejects missing type", () => {
-    expect(() => MethodSchema.parse({ preconisation: "ok" })).toThrow();
+  it("rejects missing category", () => {
+    expect(() => MethodSchema.parse({ recommendation: "ok" })).toThrow();
   });
 
-  it("rejects missing preconisation", () => {
-    expect(() => MethodSchema.parse({ type: "build" })).toThrow();
+  it("rejects missing recommendation", () => {
+    expect(() => MethodSchema.parse({ category: "buying-policy" })).toThrow();
   });
 
   it("rejects a plain string (old enum format)", () => {
@@ -32,17 +32,15 @@ describe("MethodSchema", () => {
   it("rejects empty object", () => {
     expect(() => MethodSchema.parse({})).toThrow();
   });
-
-  it("MethodEnum is an alias for MethodSchema (backward compat)", () => {
-    expect(MethodEnum).toBe(MethodSchema);
-  });
 });
 
 describe("ComponentSchema.method", () => {
+  // component/functional carries a nature; method decorates it.
   const baseComponent = {
     id: "c1",
     label: { name: "CRM" },
     type: "component",
+    subtype: "functional",
     nature: "activity",
     position: {
       evolution: { scalar: 0.7 },
@@ -55,36 +53,20 @@ describe("ComponentSchema.method", () => {
     expect(result.method).toBeUndefined();
   });
 
-  it("accepts component with method object: build", () => {
+  it("accepts component with a method decorator", () => {
     const result = ComponentSchema.parse({
       ...baseComponent,
-      method: { type: "build", preconisation: "recommended" },
+      method: { category: "buying-policy", recommendation: "Uncharted" },
     });
-    expect(result.method).toEqual({ type: "build", preconisation: "recommended" });
+    expect(result.method).toEqual({ category: "buying-policy", recommendation: "Uncharted" });
   });
 
-  it("accepts component with method object: buy", () => {
+  it("accepts component with a custom method category", () => {
     const result = ComponentSchema.parse({
       ...baseComponent,
-      method: { type: "buy", preconisation: "default" },
+      method: { category: "lease-policy", recommendation: "experimental" },
     });
-    expect(result.method?.type).toBe("buy");
-  });
-
-  it("accepts component with method object: outsource", () => {
-    const result = ComponentSchema.parse({
-      ...baseComponent,
-      method: { type: "outsource", preconisation: "cost-driven" },
-    });
-    expect(result.method?.type).toBe("outsource");
-  });
-
-  it("accepts component with custom free-string method type", () => {
-    const result = ComponentSchema.parse({
-      ...baseComponent,
-      method: { type: "lease", preconisation: "experimental" },
-    });
-    expect(result.method?.type).toBe("lease");
+    expect(result.method?.category).toBe("lease-policy");
   });
 
   it("rejects old-style string method value", () => {
@@ -96,7 +78,7 @@ describe("ComponentSchema.method", () => {
   it("coexists with other optional fields (color, evolvesTo)", () => {
     const result = ComponentSchema.parse({
       ...baseComponent,
-      method: { type: "buy", preconisation: "preferred" },
+      method: { category: "buying-policy", recommendation: "preferred" },
       color: "blue-500",
       evolvesTo: [
         {
@@ -108,7 +90,7 @@ describe("ComponentSchema.method", () => {
         },
       ],
     });
-    expect(result.method?.type).toBe("buy");
+    expect(result.method?.category).toBe("buying-policy");
     expect(result.color).toBe("blue-500");
     expect(result.evolvesTo).toHaveLength(1);
   });

@@ -19,6 +19,7 @@
     "prebuild": "tsx scripts/bundle-interactive.ts",
     "build": "tsc",
     "typecheck": "tsc --noEmit",
+    "gen:schema": "tsx scripts/generate-json-schema.ts",
     "test": "vitest run"
   },
   "keywords": [

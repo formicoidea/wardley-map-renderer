@@ -96,7 +96,7 @@ describe("WardleyMapSchema with evolutionRange", () => {
         {
           id: "user",
           label: { name: "User" },
-          type: "user-need",
+          type: "component", subtype: "userNeed",
           position: {
             evolution: { scalar: 0.9 },
             visibility: { scalar: 0.95 },
@@ -198,7 +198,7 @@ describe("sanitizeMap with evolutionRange", () => {
       {
         id: "user",
         label: { name: "User" },
-        type: "user-need",
+        type: "component", subtype: "userNeed",
         position: {
           evolution: { scalar: 0.9 },
           visibility: { scalar: 0.95 },

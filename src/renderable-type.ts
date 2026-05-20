@@ -197,6 +197,38 @@ const KNOWN_DATA_COMPONENT_TYPES: ReadonlySet<string> = new Set<string>([
  *   mapComponentType("")           // → "_default"   (BrandedRenderableType)
  *   mapComponentType("COMPONENT")  // → "_default"   (case-sensitive)
  */
+/**
+ * Map a node's (type, subtype) to its effective `RenderableType` — the appearance
+ * vocabulary the symbol renderers understand.
+ *
+ * Bridges the new node taxonomy (type ∈ anchor|component|pipeline, plus a component
+ * `subtype`) onto the legacy renderable vocabulary so visual output is preserved:
+ *   - anchor   → "anchor"
+ *   - pipeline → "pipeline"
+ *   - component + market    → "market"
+ *   - component + ecosystem → "ecosystem"
+ *   - component + userNeed  → "user-need"
+ *   - component + (functional | solution | supplier | none) → "component"
+ *     (no dedicated symbol yet — fall back to the generic component glyph)
+ *
+ * @param type    - node type ("anchor" | "component" | "pipeline")
+ * @param subtype - optional component subtype
+ */
+export function componentRenderableType(type: string, subtype?: string): RenderableType {
+  if (type === "anchor") return "anchor";
+  if (type === "pipeline") return "pipeline";
+  switch (subtype) {
+    case "market":
+      return "market";
+    case "ecosystem":
+      return "ecosystem";
+    case "userNeed":
+      return "user-need";
+    default:
+      return "component";
+  }
+}
+
 export function mapComponentType(dataType: string): RenderableType {
   if (KNOWN_DATA_COMPONENT_TYPES.has(dataType)) {
     // Known data type — return as KnownRenderableType (no branding needed,

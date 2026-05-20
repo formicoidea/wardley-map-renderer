@@ -29,7 +29,7 @@ function componentWithMethod(
       evolution: { scalar: 0.5 },
       visibility: { scalar: 0.5 },
     },
-    method: { type: methodType, preconisation },
+    method: { category: methodType, recommendation: preconisation },
   } as Component;
 }
 

@@ -1,12 +1,10 @@
 /**
- * Integration tests for renderToSVG with accelerators.
+ * Integration tests for renderToSVG with accelerator/deaccelerator DECORATORS.
  *
- * Unlike the unit tests in accelerators-layer.test.ts (which test the layer
- * function in isolation), these tests exercise the full rendering pipeline:
- *   sanitizeMap → buildRenderContext → composeSVG (all 11 layers)
- *
- * Validates that accelerator/deaccelerator arrows and labels appear correctly
- * in the final SVG document produced by renderToSVG().
+ * Exercises the full pipeline (buildRenderContext → composeSVG) and validates
+ * that the gameplay arrows appear in the final SVG. Accelerator/deaccelerator
+ * are now component decorators (boolean flags) — the arrow has no own label
+ * (the decorated component carries its own node label).
  *
  * @module render/accelerators-integration.test
  */
@@ -18,177 +16,69 @@ import type { WardleyMap } from "../schema.js";
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
-/** Build a map with components and accelerators for integration testing */
-function mapWithAccelerators(
-  accelerators: WardleyMap["accelerators"]
+/** Build a map with two components, optionally decorated with gameplay arrows. */
+function mapWith(
+  decorators: { platform?: "accelerator" | "deaccelerator"; hosting?: "accelerator" | "deaccelerator" } = {}
 ): WardleyMap {
   return makeMap({
     title: "Accelerator Integration Test",
     components: [
-      makeComponent({ id: "platform", name: "Platform", evolution: 0.6, visibility: 0.3 }),
-      makeComponent({ id: "hosting", name: "Hosting", evolution: 0.8, visibility: 0.7, type: "component" }),
+      makeComponent({
+        id: "platform", name: "Platform", evolution: 0.6, visibility: 0.3,
+        ...(decorators.platform ? { [decorators.platform]: true } : {}),
+      }),
+      makeComponent({
+        id: "hosting", name: "Hosting", evolution: 0.8, visibility: 0.7,
+        ...(decorators.hosting ? { [decorators.hosting]: true } : {}),
+      }),
     ],
     relations: [{ id: "rel-platform-hosting", source: "platform", target: "hosting", type: "DependsOn" as const }],
-    accelerators,
   });
 }
 
 // ── Full-pipeline integration tests ─────────────────────────────────
 
 describe("renderToSVG with accelerators (integration)", () => {
-  it("produces valid SVG containing accelerator arrow and label", () => {
-    const map = mapWithAccelerators([
-      {
-        id: "acc-oss",
-        label: "Open Source",
-        type: "accelerator",
-        position: {
-          evolution: { scalar: 0.65 },
-          visibility: { scalar: 0.5 },
-        },
-      },
-    ]);
-
-    const svg = renderToSVG(map);
-
-    // Valid SVG document
+  it("produces valid SVG containing an accelerator arrow", () => {
+    const svg = renderToSVG(mapWith({ platform: "accelerator" }));
     expect(svg).toContain("<svg");
     expect(svg).toContain("</svg>");
-
-    // Accelerators layer group present
     expect(svg).toContain('data-layer="accelerators"');
-
-    // Arrow path rendered (no rotation for accelerator)
     expect(svg).toMatch(/<path[^>]+d="M /);
     expect(svg).toContain('fill="#000000"');
-
-    // Label text rendered
-    expect(svg).toContain("Open Source");
   });
 
-  it("produces valid SVG containing deaccelerator arrow with rotation", () => {
-    const map = mapWithAccelerators([
-      {
-        id: "deacc-legacy",
-        label: "Legacy Lock-in",
-        type: "deaccelerator",
-        position: {
-          evolution: { scalar: 0.3 },
-          visibility: { scalar: 0.4 },
-        },
-      },
-    ]);
-
-    const svg = renderToSVG(map);
-
-    // Deaccelerator has rotate(180)
+  it("produces valid SVG containing a deaccelerator arrow with rotation", () => {
+    const svg = renderToSVG(mapWith({ platform: "deaccelerator" }));
     expect(svg).toContain("rotate(180)");
-
-    // Label with end anchor (deaccelerator label goes left)
-    expect(svg).toContain("Legacy Lock-in");
-    expect(svg).toContain('text-anchor="end"');
   });
 
-  it("renders both accelerator and deaccelerator in the same map", () => {
-    const map = mapWithAccelerators([
-      {
-        id: "acc-cloud",
-        label: "Cloud Adoption",
-        type: "accelerator",
-        position: {
-          evolution: { scalar: 0.7 },
-          visibility: { scalar: 0.5 },
-        },
-      },
-      {
-        id: "deacc-reg",
-        label: "Regulation",
-        type: "deaccelerator",
-        position: {
-          evolution: { scalar: 0.4 },
-          visibility: { scalar: 0.6 },
-        },
-      },
-    ]);
-
-    const svg = renderToSVG(map);
-
-    // Both labels present
-    expect(svg).toContain("Cloud Adoption");
-    expect(svg).toContain("Regulation");
-
-    // Both arrows rendered (2 <path elements within accelerators layer)
-    const acceleratorsLayerMatch = svg.match(
-      /data-layer="accelerators"[\s\S]*?<\/g>/
-    );
-    expect(acceleratorsLayerMatch).not.toBeNull();
-    const layerContent = acceleratorsLayerMatch![0];
-
-    // Count path elements — one per accelerator
+  it("renders both an accelerator and a deaccelerator in the same map", () => {
+    const svg = renderToSVG(mapWith({ platform: "accelerator", hosting: "deaccelerator" }));
+    const layerMatch = svg.match(/data-layer="accelerators"[\s\S]*?<\/g>/);
+    expect(layerMatch).not.toBeNull();
+    const layerContent = layerMatch![0];
     const pathCount = (layerContent.match(/<path /g) || []).length;
     expect(pathCount).toBe(2);
-
-    // Count text elements — one label per accelerator
-    const textCount = (layerContent.match(/<text /g) || []).length;
-    expect(textCount).toBe(2);
-
-    // One has rotation (deaccelerator), one does not
     expect(layerContent).toContain("rotate(180)");
   });
 
-  it("produces SVG without accelerators layer content when no accelerators", () => {
-    const map = makeMap({
-      title: "No Accelerators",
-      components: [
-        makeComponent({ id: "comp-1", name: "Service", evolution: 0.5, visibility: 0.5 }),
-      ],
-      relations: [],
-    });
-
-    const svg = renderToSVG(map);
-
-    // SVG is valid
+  it("produces SVG without accelerators layer content when none are decorated", () => {
+    const svg = renderToSVG(mapWith());
     expect(svg).toContain("<svg");
-
-    // Accelerators layer group should be empty (no path/text inside)
-    const acceleratorsLayerMatch = svg.match(
-      /data-layer="accelerators"[\s\S]*?<\/g>/
-    );
-    if (acceleratorsLayerMatch) {
-      const layerContent = acceleratorsLayerMatch[0];
-      expect(layerContent).not.toContain("<path");
-      expect(layerContent).not.toContain("<text");
+    const layerMatch = svg.match(/data-layer="accelerators"[\s\S]*?<\/g>/);
+    if (layerMatch) {
+      expect(layerMatch[0]).not.toContain("<path");
     }
   });
 
   it("accelerator arrows coexist with other map elements (components, edges)", () => {
-    const map = mapWithAccelerators([
-      {
-        id: "acc-api",
-        label: "API Standards",
-        type: "accelerator",
-        position: {
-          evolution: { scalar: 0.55 },
-          visibility: { scalar: 0.45 },
-        },
-      },
-    ]);
-
-    const svg = renderToSVG(map);
-
-    // Components rendered in nodes layer
+    const svg = renderToSVG(mapWith({ platform: "accelerator" }));
     expect(svg).toContain('data-layer="nodes"');
     expect(svg).toContain("Platform");
     expect(svg).toContain("Hosting");
-
-    // Edges rendered
     expect(svg).toContain('data-layer="edges"');
-
-    // Accelerators rendered
     expect(svg).toContain('data-layer="accelerators"');
-    expect(svg).toContain("API Standards");
-
-    // Legend rendered
     expect(svg).toContain('data-layer="legend"');
   });
 });

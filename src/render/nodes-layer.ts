@@ -19,6 +19,7 @@
 import type { RenderContext, LayerRenderer } from "./types.js";
 import { resolveColor, resolveTypeStyle } from "../schema.js";
 import type { NodeRadii } from "../schema.js";
+import { componentRenderableType } from "../renderable-type.js";
 import {
   renderComponentNode,
   renderPipelineHandleSquare,
@@ -92,27 +93,30 @@ export const renderNodesLayer: LayerRenderer = (
     // Skip non-node types
     if (!NODE_TYPES.has(comp.type)) continue;
 
-    // Skip excluded component types
+    // Skip excluded component types (by node type)
     if (excluded.has(comp.type)) continue;
 
-    // Resolve per-type radius: nodeRadii[type] → nodeRadii._default
-    const r = resolveNodeRadius(comp.type, nodeRadii);
+    // Effective renderable type maps subtype → appearance vocabulary
+    const rt = componentRenderableType(comp.type, comp.subtype);
 
-    // Color precedence: component.color > typeColors[type] > typeColors._default > node default
-    const typeColor = typeColors[comp.type] ?? typeColors._default;
+    // Resolve per-type radius: nodeRadii[rt] → nodeRadii._default
+    const r = resolveNodeRadius(rt, nodeRadii);
+
+    // Color precedence: component.color > typeColors[rt] > typeColors._default > node default
+    const typeColor = typeColors[rt] ?? typeColors._default;
     const stroke = comp.color
       ? resolveColor(comp.color)
       : typeColor
         ? resolveColor(typeColor)
         : NODE_STROKE;
 
-    // Method indicator data: resolved from renderConfig.methods
+    // Method indicator data: resolved from renderConfig.methods (matched by category)
     let method: { color: string; position: number } | undefined;
     if (comp.method) {
-      const methodCfg = ctx.resolvedConfig.methods.find(m => m.type === comp.method!.type);
+      const methodCfg = ctx.resolvedConfig.methods.find(m => m.type === comp.method!.category);
       if (methodCfg) {
         const legendKeys = Object.keys(methodCfg.legend);
-        const position = legendKeys.indexOf(comp.method.preconisation);
+        const position = legendKeys.indexOf(comp.method.recommendation);
         if (position >= 0) {
           method = { color: methodCfg.color, position };
         }
@@ -122,7 +126,7 @@ export const renderNodesLayer: LayerRenderer = (
     // Delegate to shared svg-primitives.ts for zero renderer drift
     parts.push(renderComponentNode({
       id: comp.id,
-      type: comp.type,
+      type: rt,
       cx: node.cx,
       cy: node.cy,
       radius: r,

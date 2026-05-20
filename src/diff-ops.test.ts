@@ -1964,7 +1964,7 @@ describe("expandChangeTypeCascade", () => {
     expect(ids).not.toContain("outside-1");
   });
 
-  it("excludes nested pipelines and notes from ejection", () => {
+  it("excludes nested pipelines from ejection", () => {
     const map = makePipelineMap();
     map.components.push({
       id: "nested-pipe",
@@ -1973,16 +1973,9 @@ describe("expandChangeTypeCascade", () => {
       position: { evolution: { scalar: 0.5 }, visibility: { scalar: 0.4 } },
       pipelineGeometry: { evoStart: 0.4, evoEnd: 0.6, visStart: 0.35, visEnd: 0.45 },
     } as any);
-    map.components.push({
-      id: "note-inside",
-      label: { name: "Note" },
-      type: "note",
-      position: { evolution: { scalar: 0.5 }, visibility: { scalar: 0.4 } },
-    } as any);
     const ops = expandChangeTypeCascade(map, "pipe-1");
     const ids = ops.map((op) => (op as any).payload.id);
     expect(ids).not.toContain("nested-pipe");
-    expect(ids).not.toContain("note-inside");
   });
 
   it("respects epsilon 0.015 for boundary containment", () => {
@@ -2277,30 +2270,28 @@ describe("MoveStepPayload schema", () => {
 
 // ── applyMoveStep mutation tests ─────────────────────────────────────
 
+// Steps are component DECORATORS now: each step-bearing component has id == step id
+// (move_step targets the decorated component by id and moves it).
 function makeMapWithSteps(): WardleyMap {
   return {
     title: "Test Map",
     components: [
       {
-        id: "comp-1",
-        label: { name: "User" },
-        type: "component",
-        position: { evolution: { scalar: 0.8 }, visibility: { scalar: 0.1 } },
-      },
-    ],
-    relations: [],
-    steps: [
-      {
         id: "step-1",
-        number: 1,
+        label: { name: "S1" },
+        type: "component",
         position: { evolution: { scalar: 0.3 }, visibility: { scalar: 0.4 } },
+        step: { number: 1 },
       },
       {
         id: "step-2",
-        number: 2,
+        label: { name: "S2" },
+        type: "component",
         position: { evolution: { scalar: 0.6 }, visibility: { scalar: 0.7 } },
+        step: { number: 2 },
       },
     ],
+    relations: [],
   } as WardleyMap;
 }
 
@@ -2312,7 +2303,7 @@ describe("applyDiffOp — move_step", () => {
       payload: { id: "step-1", evolution: 0.9, visibility: 0.2 },
     });
     expect(ok).toBe(true);
-    const step = map.steps!.find((s: any) => s.id === "step-1")!;
+    const step = map.components.find((c: any) => c.id === "step-1")!;
     expect(step.position.evolution.scalar).toBe(0.9);
     expect(step.position.visibility.scalar).toBe(0.2);
   });
@@ -2341,7 +2332,7 @@ describe("applyDiffOp — move_step", () => {
       op: "move_step",
       payload: { id: "step-1", evolution: 0.1, visibility: 0.1 },
     });
-    const step2 = map.steps!.find((s: any) => s.id === "step-2")!;
+    const step2 = map.components.find((c: any) => c.id === "step-2")!;
     expect(step2.position.evolution.scalar).toBe(0.6);
     expect(step2.position.visibility.scalar).toBe(0.7);
   });
@@ -2356,7 +2347,7 @@ describe("applyDiffOp — move_step", () => {
       op: "move_step",
       payload: { id: "step-1", evolution: 0.8, visibility: 0.9 },
     });
-    const step = map.steps!.find((s: any) => s.id === "step-1")!;
+    const step = map.components.find((c: any) => c.id === "step-1")!;
     expect(step.position.evolution.scalar).toBe(0.8);
     expect(step.position.visibility.scalar).toBe(0.9);
   });

@@ -523,15 +523,15 @@ describe("svg-primitives server render parity", () => {
           position: { evolution: { scalar: 0.2 }, visibility: { scalar: 0.1 } },
         },
         {
-          id: "u1", label: { name: "User Need" }, type: "user-need",
+          id: "u1", label: { name: "User Need" }, type: "component", subtype: "userNeed",
           position: { evolution: { scalar: 0.3 }, visibility: { scalar: 0.2 } },
         },
         {
-          id: "m1", label: { name: "Market" }, type: "market",
+          id: "m1", label: { name: "Market" }, type: "component", subtype: "market",
           position: { evolution: { scalar: 0.7 }, visibility: { scalar: 0.5 } },
         },
         {
-          id: "e1", label: { name: "Eco" }, type: "ecosystem",
+          id: "e1", label: { name: "Eco" }, type: "component", subtype: "ecosystem",
           position: { evolution: { scalar: 0.8 }, visibility: { scalar: 0.6 } },
         },
       ],

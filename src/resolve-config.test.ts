@@ -292,9 +292,9 @@ describe("resolveConfig — tier 2 (layout-structural): authorConfig wins", () =
   it("filters from authorConfig wins", () => {
     const { config: result } = cfg(
       { filters: { excludeComponentTypes: ["anchor" as const] } },
-      { filters: { excludeComponentTypes: ["note" as const] } },
+      { filters: { excludeComponentTypes: ["pipeline" as const] } },
     );
-    expect(result.filters?.excludeComponentTypes).toEqual(["note"]);
+    expect(result.filters?.excludeComponentTypes).toEqual(["pipeline"]);
   });
 });
 
