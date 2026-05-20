@@ -184,6 +184,7 @@ export const StyleSchema = z.object({
     constraint: LineElement.optional(),
   }).optional(),
   movement: z.object({
+    default: LineElement.optional(),
     natural: LineElement.optional(),
     ecosystem: LineElement.optional(),
     forced: LineElement.optional(),
@@ -310,6 +311,16 @@ export function renderConfigV3ToLegacy(v3: RenderConfigV3 | undefined): RenderCo
 
   // ── movement → evolveStyles ──
   const evolveStyles: Record<string, any> = {};
+  const mvDefault = (style?.movement as any)?.default;
+  if (mvDefault) {
+    const m = mergeFacet(mvDefault.default, mvDefault.override);
+    if (m.line) {
+      evolveStyles._default = {
+        ...(m.line.color !== undefined ? { stroke: m.line.color } : {}),
+        ...(m.line.dash !== undefined ? { strokeDasharray: m.line.dash } : {}),
+      };
+    }
+  }
   if (style?.movement) for (const e of EVOLVE_TYPES) {
     const el = (style.movement as any)[e];
     if (!el) continue;
