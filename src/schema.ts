@@ -2472,6 +2472,13 @@ export interface ResolvedRenderConfig {
    */
   /** Method rendering configuration — array of method configs with type, color, and i18n legend labels */
   methods: MethodConfig[];
+  /**
+   * Resolved content-layer visibility toggles (title/pipelines/edges/evolvesTo/nodes/labels/notes).
+   * Populated from `filters.layers`; absent toggles default to visible. Read by the
+   * orchestrator's `applyLayerToggles` so all layer-visibility input flows through resolution
+   * (no consumer reads `renderConfig.filters.layers` directly).
+   */
+  layerToggles: LayerToggles;
   configIntent: ConfigIntent;
 }
 
@@ -2515,6 +2522,7 @@ const THEME_BASELINE_DEFAULT: Omit<ResolvedRenderConfig, "theme"> = {
       legend: { Uncharted: "pioneers", Transitional: "settlers", Industrialized: "town-planners" },
     },
   ],
+  layerToggles: {},
   configIntent: DEFAULT_CONFIG_INTENT,
 };
 
@@ -2618,8 +2626,12 @@ export function resolveTheme(renderConfig?: RenderConfigInput): ResolvedRenderCo
   return {
     theme: themeName,
     locale: renderConfig?.axes?.locale ?? "en",
-    width: spatial?.width ?? baseline.width,
-    height: spatial?.height ?? baseline.height,
+    // Canvas dims: single source of truth. An explicit coordinateSpace.{width,height}
+    // wins (it's the coordinate-system declaration); else spatial.{width,height};
+    // else baseline. resolved.width and coordinateSpace.width (below) are derived
+    // identically so they can never diverge (was: A1 duplication bug).
+    width: spatial?.coordinateSpace?.width ?? spatial?.width ?? baseline.width,
+    height: spatial?.coordinateSpace?.height ?? spatial?.height ?? baseline.height,
     background: { color: bg?.color ?? baseline.background.color },
     showEvolutionXAxis: bg?.evolutionXAxis?.show ?? baseline.showEvolutionXAxis,
     showValueChainYAxis: bg?.valueChainYAxis?.show ?? baseline.showValueChainYAxis,
@@ -2648,12 +2660,23 @@ export function resolveTheme(renderConfig?: RenderConfigInput): ResolvedRenderCo
       legendOverflow: renderConfig?.legend?.legendOverflow ?? baseline.legend.legendOverflow,
     },
     strokeWidth: spatial?.strokeWidth ?? baseline.strokeWidth,
-    // coordinateSpace: use provided value (already validated by CanvasCoordinateSpaceSchema) or fall back to DEFAULT_COORDINATE_SPACE
-    coordinateSpace: spatial?.coordinateSpace != null
-      ? { ...DEFAULT_COORDINATE_SPACE, ...spatial.coordinateSpace }
-      : baseline.coordinateSpace,
+    // coordinateSpace: provided value (validated by CanvasCoordinateSpaceSchema) or
+    // fall back to DEFAULT_COORDINATE_SPACE. A1 fix: canvas width/height are a SINGLE
+    // source of truth — coordinateSpace.width/height always mirror the resolved canvas
+    // width/height so computeScaleFactor() and rcWidth()/build-context can never diverge.
+    // (The output/view dimension is a separate concern via coordinateSpace.outputHint.)
+    coordinateSpace: {
+      ...(spatial?.coordinateSpace != null
+        ? { ...DEFAULT_COORDINATE_SPACE, ...spatial.coordinateSpace }
+        : baseline.coordinateSpace),
+      width: spatial?.coordinateSpace?.width ?? spatial?.width ?? baseline.width,
+      height: spatial?.coordinateSpace?.height ?? spatial?.height ?? baseline.height,
+    },
     // methods: use provided array or fall back to baseline (empty array)
     methods: renderConfig?.methods ?? baseline.methods,
+    // layerToggles: resolved from filters.layers (absent toggles default to visible).
+    // Routes all layer-visibility input through resolution.
+    layerToggles: renderConfig?.filters?.layers ?? baseline.layerToggles,
     // configIntent: merge explicit partial overrides over DEFAULT_CONFIG_INTENT
     configIntent: resolveConfigIntent(renderConfig?.configIntent ?? undefined),
   };

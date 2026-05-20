@@ -134,7 +134,7 @@ export async function render(
   const ctx = buildRenderContext(map, renderOptions);
 
   // Step 3: Phase 2 — SVG generation via layers (filtered by filters.layers)
-  const activeLayers = applyLayerToggles(LAYERS, map.renderConfig?.filters?.layers);
+  const activeLayers = applyLayerToggles(LAYERS, ctx.resolvedConfig.layerToggles);
   const svg = composeSVG(ctx, activeLayers);
 
   // Step 4: Optional PNG rasterisation
@@ -167,7 +167,7 @@ export function renderToSVG(
 ): string {
   const map = sanitizeMap(inputMap);
   const ctx = buildRenderContext(map, renderOptions);
-  const activeLayers = applyLayerToggles(LAYERS, map.renderConfig?.filters?.layers);
+  const activeLayers = applyLayerToggles(LAYERS, ctx.resolvedConfig.layerToggles);
   return composeSVG(ctx, activeLayers);
 }
 
@@ -180,7 +180,7 @@ export async function renderToPNG(
 ): Promise<Buffer> {
   const map = sanitizeMap(inputMap);
   const ctx = buildRenderContext(map, renderOptions);
-  const activeLayers = applyLayerToggles(LAYERS, map.renderConfig?.filters?.layers);
+  const activeLayers = applyLayerToggles(LAYERS, ctx.resolvedConfig.layerToggles);
   const svg = composeSVG(ctx, activeLayers);
   return rasterizeSVG(svg, ctx.canvasWidth, ctx.resolvedConfig.background.color);
 }

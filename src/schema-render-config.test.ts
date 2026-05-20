@@ -4168,20 +4168,17 @@ describe("Cross-category conflict resolution (resolveConflict precedence rules)"
     expect(resolved.axisLabels.phases[0]).toBe(AXIS_LABELS_FR.phases[0]); // "Genèse"
   });
 
-  // ── Conflict 4: custom coordinateSpace.width (layout) vs top-level width (canvas) — independent categories ──
-  it("coordinateSpace.width and resolved.width are independent — setting coordinateSpace does not change resolved.width", () => {
-    // coordinateSpace (layout math) is a separate category from the top-level width.
-    // Providing coordinateSpace: { width: 1200 } must NOT bleed into resolved.width —
-    // they are resolved independently from different config paths.
+  // ── Canvas dimensions are a SINGLE source of truth (A1 fix) ──
+  it("coordinateSpace.width and resolved.width are unified — coordinateSpace.width drives both", () => {
+    // A1 fix: the former duplication (resolved.width vs coordinateSpace.width resolved
+    // from different paths) is gone. An explicit coordinateSpace.width now propagates to
+    // resolved.width so computeScaleFactor() and the rendered canvas can never diverge.
     const resolved = resolveTheme({
       spatial: { coordinateSpace: { width: 1200 } },
     });
-    // resolved.width uses baseline (1600) — no explicit top-level width given
-    expect(resolved.width).toBe(1600);
-    // coordinateSpace.width reflects the explicit value
     expect(resolved.coordinateSpace.width).toBe(1200);
-    // The two are genuinely independent — no cross-contamination
-    expect(resolved.width).not.toBe(resolved.coordinateSpace.width);
+    expect(resolved.width).toBe(1200);
+    expect(resolved.width).toBe(resolved.coordinateSpace.width);
   });
 
   // ── Conflict 5: highContrast theme nodeRadii baseline vs explicit partial nodeRadii override ──
