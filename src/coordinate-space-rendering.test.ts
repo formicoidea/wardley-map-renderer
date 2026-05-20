@@ -95,13 +95,13 @@ describe("CoordinateSpace rendering invariant 1 — explicit defaults = no coord
 
     // Map B: explicit coordinateSpace with all default values
     const mapWithDefaultCs = makeTestMap({
-      spatial: { coordinateSpace: {
+      style: { background: { canvas: { default: {
         width: 1600,
         height: 800,
         evolutionRange: [0, 1],
         visibilityRange: [0, 1],
         unit: "canvas-px",
-      } },
+      } } } },
     });
 
     const svgNoCs = renderToSVG(mapNoCs);
@@ -114,13 +114,13 @@ describe("CoordinateSpace rendering invariant 1 — explicit defaults = no coord
   it("explicit default coordinateSpace produces identical RenderContext geometry to no coordinateSpace", () => {
     const mapNoCs = makeTestMap({});
     const mapWithDefaultCs = makeTestMap({
-      spatial: { coordinateSpace: {
+      style: { background: { canvas: { default: {
         width: 1600,
         height: 800,
         evolutionRange: [0, 1],
         visibilityRange: [0, 1],
         unit: "canvas-px",
-      } },
+      } } } },
     });
 
     const ctxNoCs = buildRenderContext(mapNoCs);
@@ -162,10 +162,10 @@ describe("CoordinateSpace rendering invariant 2 — evolutionRange affects x pos
     // Zoom into the left half of the evolution axis: [0, 0.5]
     // Now evo=0.5 maps to plotRight (the boundary of the zoomed range)
     const map = makeTestMap({
-      spatial: { coordinateSpace: {
+      style: { background: { canvas: { default: {
         evolutionRange: [0, 0.5],
         visibilityRange: [0, 1],
-      } },
+      } } } },
     });
     const ctx = buildRenderContext(map);
 
@@ -178,9 +178,9 @@ describe("CoordinateSpace rendering invariant 2 — evolutionRange affects x pos
   });
 
   it("zoomed-in evolutionRange moves component x further right than full range", () => {
-    const mapFull = makeTestMap({ spatial: { coordinateSpace: { evolutionRange: [0, 1] } } });
+    const mapFull = makeTestMap({ style: { background: { canvas: { default: { evolutionRange: [0, 1] } } } } });
     const mapZoomed = makeTestMap({
-      spatial: { coordinateSpace: { evolutionRange: [0, 0.5] } },
+      style: { background: { canvas: { default: { evolutionRange: [0, 0.5] } } } },
     });
 
     const ctxFull = buildRenderContext(mapFull);
@@ -215,10 +215,10 @@ describe("CoordinateSpace rendering invariant 2 — evolutionRange affects x pos
         ],
         relations: [],
         renderConfig: {
-          spatial: { coordinateSpace: {
+          style: { background: { canvas: { default: {
             evolutionRange: [0.25, 0.75],
             visibilityRange: [0, 1],
-          } },
+          } } } },
         },
       })
     );
@@ -333,10 +333,10 @@ describe("CoordinateSpace rendering invariant 4 — visibilityRange affects y po
     // Zoom into the top half of the visibility axis: [0, 0.5]
     // Now vis=0.5 maps to plot bottom (the boundary of the zoomed range)
     const map = makeTestMap({
-      spatial: { coordinateSpace: {
+      style: { background: { canvas: { default: {
         evolutionRange: [0, 1],
         visibilityRange: [0, 0.5],
-      } },
+      } } } },
     });
     const ctx = buildRenderContext(map);
 
@@ -349,9 +349,9 @@ describe("CoordinateSpace rendering invariant 4 — visibilityRange affects y po
   });
 
   it("zoomed-in visibilityRange moves component y further down than full range", () => {
-    const mapFull = makeTestMap({ spatial: { coordinateSpace: { visibilityRange: [0, 1] } } });
+    const mapFull = makeTestMap({ style: { background: { canvas: { default: { visibilityRange: [0, 1] } } } } });
     const mapZoomed = makeTestMap({
-      spatial: { coordinateSpace: { visibilityRange: [0, 0.5] } },
+      style: { background: { canvas: { default: { visibilityRange: [0, 0.5] } } } },
     });
 
     const ctxFull = buildRenderContext(mapFull);
@@ -419,13 +419,13 @@ describe("CoordinateSpace rendering invariant 6 — structural classification", 
   it("coordinateSpace evolutionRange affects node positions; background.evolutionXAxis.show does not", () => {
     // Two maps with same coordinateSpace but different axis chrome
     const mapShowAxes = makeTestMap({
-      spatial: { coordinateSpace: { evolutionRange: [0.1, 0.9] } },
-      styling: { background: { evolutionXAxis: { show: true } } },
+      style: { background: { canvas: { default: { evolutionRange: [0.1, 0.9] } } } },
+      display: { axisEvolution: true },
     });
 
     const mapHideAxes = makeTestMap({
-      spatial: { coordinateSpace: { evolutionRange: [0.1, 0.9] } },
-      styling: { background: { evolutionXAxis: { show: false } } },
+      style: { background: { canvas: { default: { evolutionRange: [0.1, 0.9] } } } },
+      display: { axisEvolution: false },
     });
 
     const ctxShow = buildRenderContext(mapShowAxes);
@@ -442,7 +442,7 @@ describe("CoordinateSpace rendering invariant 6 — structural classification", 
   it("different coordinateSpace configs produce different SVG outputs (not accidentally identical)", () => {
     const mapDefault = makeTestMap({});
     const mapZoomed = makeTestMap({
-      spatial: { coordinateSpace: { evolutionRange: [0.2, 0.8] } },
+      style: { background: { canvas: { default: { evolutionRange: [0.2, 0.8] } } } },
     });
 
     const svgDefault = renderToSVG(mapDefault);
