@@ -286,8 +286,8 @@ describe("resolveTheme — configIntent integration", () => {
 
   it("configIntent survives alongside other resolved fields (non-destructive)", () => {
     const resolved = resolveTheme({
-      styling: { theme: "dark" },
-      spatial: { width: 1920 },
+      rendering: { theme: "dark" },
+      style: { background: { canvas: { default: { width: 1920 } } } },
       configIntent: { noInteraction: false },
     });
     // configIntent resolution must not disturb other resolved fields

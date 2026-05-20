@@ -67,6 +67,7 @@ export const LineFacetSchema = z.object({
 
 export const BoxFacetSchema = z.object({
   position: z.union([z.enum(LEGEND_POSITIONS), z.object({ x: z.number(), y: z.number() })]).optional(),
+  overflow: z.enum(["clip", "allow", "warn"]).optional(),
   fill: z.string().optional(),
   stroke: z.string().optional(),
 });
@@ -202,10 +203,18 @@ export const StyleSchema = z.object({
   }).strict().optional(),
 }).strict();
 
+export const ConfigIntentV3Schema = z.object({
+  staticExport: z.boolean().optional(),
+  noTemporalDiff: z.boolean().optional(),
+  noInteraction: z.boolean().optional(),
+}).strict();
+
 export const RenderConfigV3Schema = z.object({
   display: DisplaySchema.optional(),
   rendering: RenderingSchema.optional(),
   style: StyleSchema.optional(),
+  // Platform-constraint flags — orthogonal metadata, shape-stable vs legacy.
+  configIntent: ConfigIntentV3Schema.optional(),
 }).strict();
 
 // ── Transformer: v3 → legacy RenderConfigInput ───────────────────────────────
@@ -371,7 +380,11 @@ export function renderConfigV3ToLegacy(v3: RenderConfigV3 | undefined): RenderCo
   if (display?.legend !== undefined) legend.show = display.legend;
   const legendBox = mergeFacet((style?.legend as any)?.default, (style?.legend as any)?.override)?.box;
   if (legendBox?.position !== undefined) legend.position = legendBox.position;
+  if (legendBox?.overflow !== undefined) legend.legendOverflow = legendBox.overflow;
   if (Object.keys(legend).length > 0) out.legend = legend;
+
+  // ── configIntent (passthrough — shape-stable platform flags) ──
+  if (v3.configIntent !== undefined) out.configIntent = v3.configIntent;
 
   // ── decorators.method → legacy renderConfig.methods[] (per category) ──
   const methodStyles = (style as any)?.decorators?.method as

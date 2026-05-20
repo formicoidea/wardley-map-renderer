@@ -89,7 +89,7 @@ describe("LabelsLayer", () => {
           { id: "a1", label: { name: "Visible Anchor" }, type: "anchor", position: { evolution: { scalar: 0.6 }, visibility: { scalar: 0.4 } } },
         ],
         relations: [],
-        renderConfig: { filters: { excludeComponentTypes: ["component"] } },
+        renderConfig: { display: { component: false } },
       })
     );
     const ctx = buildRenderContext(map);
