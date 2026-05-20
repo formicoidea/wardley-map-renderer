@@ -106,6 +106,24 @@ describe("renderConfigV3ToLegacy — field mapping", () => {
     expect(legacy.filters.excludeComponentTypes).toContain("anchor");
   });
 
+  it("maps decorators.method → legacy renderConfig.methods[] by category", () => {
+    const legacy = renderConfigV3ToLegacy(v3({
+      style: {
+        decorators: {
+          method: {
+            "buying-policy": {
+              default: { color: "#2563eb", legend: { Uncharted: "build", Transitional: "buy", Industrialized: "outsource" } },
+            },
+          },
+        },
+      },
+    })) as any;
+    expect(legacy.methods).toHaveLength(1);
+    expect(legacy.methods[0].type).toBe("buying-policy");
+    expect(legacy.methods[0].color).toBe("#2563eb");
+    expect(Object.keys(legacy.methods[0].legend)).toHaveLength(3);
+  });
+
   it("maps legend show + position", () => {
     const legacy = renderConfigV3ToLegacy(v3({
       display: { legend: false },

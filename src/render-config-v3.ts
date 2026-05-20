@@ -188,6 +188,18 @@ export const StyleSchema = z.object({
     forced: LineElement.optional(),
     late: LineElement.optional(),
   }).optional(),
+  // Decorators — per-category method styling (color + i18n legend). Other
+  // decorators (accelerator/deaccelerator/step/inertia) use renderer-hardcoded
+  // styles for now (no resolved-config knob), so they are not modelled here yet.
+  decorators: z.object({
+    method: z.record(
+      z.string(),
+      elementStyle(z.object({
+        color: z.string().optional(),
+        legend: z.record(z.string(), z.string()).optional(),
+      })),
+    ).optional(),
+  }).strict().optional(),
 }).strict();
 
 export const RenderConfigV3Schema = z.object({
@@ -360,6 +372,23 @@ export function renderConfigV3ToLegacy(v3: RenderConfigV3 | undefined): RenderCo
   const legendBox = mergeFacet((style?.legend as any)?.default, (style?.legend as any)?.override)?.box;
   if (legendBox?.position !== undefined) legend.position = legendBox.position;
   if (Object.keys(legend).length > 0) out.legend = legend;
+
+  // ── decorators.method → legacy renderConfig.methods[] (per category) ──
+  const methodStyles = (style as any)?.decorators?.method as
+    | Record<string, { default?: any; override?: any }>
+    | undefined;
+  if (methodStyles) {
+    const methods: any[] = [];
+    for (const category of Object.keys(methodStyles)) {
+      const m = mergeElement(methodStyles[category]);
+      methods.push({
+        type: category,
+        ...(m.color !== undefined ? { color: m.color } : {}),
+        ...(m.legend !== undefined ? { legend: m.legend } : {}),
+      });
+    }
+    if (methods.length > 0) out.methods = methods;
+  }
 
   if (Object.keys(spatial).length > 0) out.spatial = spatial;
 
