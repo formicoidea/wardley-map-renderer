@@ -22,17 +22,20 @@
  */
 
 import { z } from "zod";
-import {
-  LocaleEnum,
-  ThemeEnum,
-  EvolveTypeEnum,
-  LegendPositionEnum,
-  LegendPositionXYSchema,
-  ComponentTypeEnum,
-  SubtypeEnum,
-  type RenderConfigInput,
-} from "./schema.js";
 import { componentRenderableType } from "./renderable-type.js";
+// Type-only import from schema.ts (erased at runtime → no import cycle when
+// schema.ts imports this module to wire v3 into WardleyMapSchema).
+import type { RenderConfigInput } from "./schema.js";
+
+// Closed sets are inlined (not imported from schema.ts) to keep this module free
+// of any runtime dependency on schema.ts at evaluation time. They mirror the
+// canonical enums in schema.ts (stable, closed vocabularies).
+const LOCALES = ["en", "fr"] as const;
+const THEMES = ["default", "dark", "highContrast"] as const;
+const LEGEND_POSITIONS = ["top-left", "top-right", "bottom-left", "bottom-right", "auto"] as const;
+const NODE_TYPES = ["anchor", "component", "pipeline"] as const;
+const SUBTYPES = ["userNeed", "market", "ecosystem", "solution", "functional", "supplier"] as const;
+const EVOLVE_TYPES = ["natural", "ecosystem", "forced", "late"] as const;
 
 // ── Facets ───────────────────────────────────────────────────────────────────
 // All facet fields are optional: `default` supplies the standard, `override` a
@@ -63,7 +66,7 @@ export const LineFacetSchema = z.object({
 });
 
 export const BoxFacetSchema = z.object({
-  position: z.union([LegendPositionEnum, LegendPositionXYSchema]).optional(),
+  position: z.union([z.enum(LEGEND_POSITIONS), z.object({ x: z.number(), y: z.number() })]).optional(),
   fill: z.string().optional(),
   stroke: z.string().optional(),
 });
@@ -115,9 +118,9 @@ export const DisplaySchema = z.object({
 // ── rendering (non-visual params) ────────────────────────────────────────────
 
 export const RenderingSchema = z.object({
-  locale: LocaleEnum.optional(),
+  locale: z.enum(LOCALES).optional(),
   avoidCollisions: z.boolean().optional(),
-  theme: ThemeEnum.optional(),
+  theme: z.enum(THEMES).optional(),
 }).strict();
 
 // ── style ────────────────────────────────────────────────────────────────────
@@ -277,7 +280,7 @@ export function renderConfigV3ToLegacy(v3: RenderConfigV3 | undefined): RenderCo
     if (bt[t]) applyNode(componentRenderableType(t, undefined), bt[t]);
   }
   const bs = style?.nodes?.bySubtype;
-  if (bs) for (const s of SubtypeEnum.options) {
+  if (bs) for (const s of SUBTYPES) {
     if ((bs as any)[s]) applyNode(componentRenderableType("component", s), (bs as any)[s]);
   }
   if (Object.keys(nodeRadii).length > 0) {
@@ -286,7 +289,7 @@ export function renderConfigV3ToLegacy(v3: RenderConfigV3 | undefined): RenderCo
 
   // ── movement → evolveStyles ──
   const evolveStyles: Record<string, any> = {};
-  if (style?.movement) for (const e of EvolveTypeEnum.options) {
+  if (style?.movement) for (const e of EVOLVE_TYPES) {
     const el = (style.movement as any)[e];
     if (!el) continue;
     const m = mergeFacet(el.default, el.override);
@@ -343,7 +346,7 @@ export function renderConfigV3ToLegacy(v3: RenderConfigV3 | undefined): RenderCo
   }
   if (display?.evolveArrows !== undefined) layers.evolvesTo = display.evolveArrows;
   const excludeComponentTypes: string[] = [];
-  for (const t of ComponentTypeEnum.options) {
+  for (const t of NODE_TYPES) {
     if (display?.[t] === false) excludeComponentTypes.push(t);
   }
   const filters: any = {};

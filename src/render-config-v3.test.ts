@@ -4,7 +4,7 @@ import {
   renderConfigV3ToLegacy,
   type RenderConfigV3Input,
 } from "./render-config-v3.js";
-import { resolveTheme } from "./schema.js";
+import { resolveTheme, WardleyMapSchema } from "./schema.js";
 import { renderToSVG } from "./render-orchestrator.js";
 import { makeComponent, makeMap } from "./test-helpers.js";
 
@@ -125,6 +125,31 @@ describe("renderConfigV3ToLegacy — end-to-end via resolveTheme + render", () =
     expect(resolved.width).toBe(800);
     expect(resolved.coordinateSpace.width).toBe(800);
     expect(resolved.locale).toBe("fr");
+  });
+
+  it("WardleyMapSchema accepts a v3 renderConfig natively (preprocess → legacy)", () => {
+    const map = WardleyMapSchema.parse({
+      title: "Native v3",
+      components: [],
+      relations: [],
+      renderConfig: {
+        rendering: { locale: "fr" },
+        style: { background: { canvas: { default: { width: 800, height: 400 } } } },
+      },
+    });
+    // Stored as the nested legacy shape after the preprocess transform.
+    expect((map.renderConfig as any)?.spatial?.width).toBe(800);
+    expect((map.renderConfig as any)?.axes?.locale).toBe("fr");
+  });
+
+  it("WardleyMapSchema still accepts the legacy renderConfig shape", () => {
+    const map = WardleyMapSchema.parse({
+      title: "Legacy",
+      components: [],
+      relations: [],
+      renderConfig: { spatial: { width: 1200 }, axes: { locale: "en" } },
+    });
+    expect((map.renderConfig as any)?.spatial?.width).toBe(1200);
   });
 
   it("renders a valid SVG honoring a v3 palette override", () => {

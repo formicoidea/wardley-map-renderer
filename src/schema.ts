@@ -12,6 +12,13 @@ import {
   DEFAULT_COORDINATE_SPACE,
   type CoordinateSpace,
 } from "./coordinate-space.js";
+// New RenderConfig input shape (display/rendering/style) + adapter to the nested
+// legacy shape. render-config-v3 has NO runtime dependency on this module (only a
+// type-only import), so this import is cycle-safe.
+import {
+  RenderConfigV3Schema,
+  renderConfigV3ToLegacy,
+} from "./render-config-v3.js";
 // TypographyConfigSchema is defined locally below to avoid circular dependency
 // with render-config-v2.ts (which imports from schema.ts).
 // The render-config-v2.ts TypographyConfigSchema is the canonical definition;
@@ -1697,9 +1704,23 @@ export const WardleyMapSchema = z.object({
   components: z.array(ComponentSchema),
   relations: z.array(RelationSchema),
   context: z.string().optional(),
-  // Optional render config — single source of truth for all visual overrides
-  // Canvas dimensions: renderConfig.width (default 1600), renderConfig.height (default 800)
-  renderConfig: RenderConfigSchema.optional(),
+  // Optional render config. Accepts EITHER the new v3 input shape
+  // (display/rendering/style) — transformed to the nested legacy shape via
+  // renderConfigV3ToLegacy — OR the legacy nested shape directly. Both resolve
+  // through the unchanged resolveTheme()/flat ResolvedRenderConfig pipeline.
+  renderConfig: z
+    .preprocess((val) => {
+      if (
+        val != null &&
+        typeof val === "object" &&
+        !Array.isArray(val) &&
+        ("display" in val || "rendering" in val || "style" in val)
+      ) {
+        return renderConfigV3ToLegacy(RenderConfigV3Schema.parse(val));
+      }
+      return val;
+    }, RenderConfigSchema)
+    .optional(),
 });
 
 // ── TypeScript types derived from Zod ──────────────────────
