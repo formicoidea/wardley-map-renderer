@@ -1,5 +1,5 @@
 {
-  "name": "wardley-render",
+  "name": "wardley-map-renderer",
   "version": "1.0.0-beta.0",
   "description": "Pure-function Wardley Map renderer — SVG/PNG/HTML generation from JSON",
   "type": "module",
@@ -31,7 +31,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/formicoidea/WardleyAPI.git"
+    "url": "git+https://github.com/formicoidea/wardley-map-renderer.git"
   },
   "license": "ISC",
   "dependencies": {

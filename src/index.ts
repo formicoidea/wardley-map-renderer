@@ -1,5 +1,5 @@
 /**
- * wardley-render — public package entry point.
+ * wardley-map-renderer — public package entry point.
  *
  * Re-exports the render orchestrator, schema utilities, and types.
  * Pure render module — no HTTP, no LLM, no transport layer.

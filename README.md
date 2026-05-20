@@ -1,4 +1,4 @@
-# wardley-render
+# wardley-map-renderer
 
 Pure-function Wardley Map renderer. JSON in → SVG / PNG / interactive HTML out.
 
@@ -7,7 +7,7 @@ No HTTP server, no LLM, no transport layer. Drop this module into any Node-based
 ## Install
 
 ```bash
-pnpm add wardley-render
+pnpm add wardley-map-renderer
 ```
 
 Peer requirement: Node.js ≥ 18 (the PNG path uses `@resvg/resvg-js`, a native binary).
@@ -15,7 +15,7 @@ Peer requirement: Node.js ≥ 18 (the PNG path uses `@resvg/resvg-js`, a native 
 ## Quick start
 
 ```typescript
-import { render, WardleyMapSchema, type WardleyMap } from "wardley-render";
+import { render, WardleyMapSchema, type WardleyMap } from "wardley-map-renderer";
 
 const map: WardleyMap = WardleyMapSchema.parse({
   title: "Tea shop",
@@ -40,7 +40,7 @@ const result = await render(map, { format: "png" });
 ### Shorthand helpers
 
 ```typescript
-import { renderToSVG, renderToPNG } from "wardley-render";
+import { renderToSVG, renderToPNG } from "wardley-map-renderer";
 
 const svgString: string = await renderToSVG(map);
 const pngBuffer: Buffer = await renderToPNG(map);
@@ -49,7 +49,7 @@ const pngBuffer: Buffer = await renderToPNG(map);
 ### Interactive HTML artifact
 
 ```typescript
-import { renderInteractiveHTML } from "wardley-render";
+import { renderInteractiveHTML } from "wardley-map-renderer";
 // Returns a self-contained HTML document with embedded SVG + drag-drop editor
 const html: string = await renderInteractiveHTML(map);
 ```
