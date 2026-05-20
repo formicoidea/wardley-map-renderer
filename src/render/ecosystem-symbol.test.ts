@@ -12,7 +12,7 @@
 
 import { describe, it, expect } from "vitest";
 import { renderToSVG } from "../render-orchestrator.js";
-import type { WardleyMap, Legend, RenderConfig } from "../schema.js";
+import type { WardleyMap, RenderConfigInput } from "../schema.js";
 import { sanitizeMap } from "../schema.js";
 
 /** Minimal valid map with a single ecosystem component */
@@ -154,7 +154,7 @@ describe("EcosystemSymbol SVG rendering", () => {
         },
       ],
       relations: [],
-      renderConfig: { legend: { show: true } as Legend } as RenderConfig,
+      renderConfig: { legend: { show: true } } satisfies RenderConfigInput,
     });
     const svg = renderToSVG(map);
 

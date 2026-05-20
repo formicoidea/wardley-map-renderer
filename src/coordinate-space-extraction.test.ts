@@ -32,7 +32,6 @@ import {
   resolveTheme,
   WardleyMapSchema,
   sanitizeMap,
-  MapChromeSchema,
 } from "./schema.js";
 import {
   DEFAULT_COORDINATE_SPACE,
@@ -365,12 +364,6 @@ describe("CoordinateSpace extraction — integration: coordinateSpace in RenderC
 // ── 10. Structural: coordinateSpace placement ─────────────────────────────────
 
 describe("CoordinateSpace extraction — structural: field must be in RenderConfig, not MapChrome", () => {
-  it("MapChromeSchema does NOT have a coordinateSpace field", () => {
-    expect(
-      Object.prototype.hasOwnProperty.call(MapChromeSchema.shape, "coordinateSpace")
-    ).toBe(false);
-  });
-
   it("resolveTheme() always returns a coordinateSpace field (never undefined)", () => {
     const resolved = resolveTheme({});
     // The coordinateSpace field must always be present after resolution

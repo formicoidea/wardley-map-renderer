@@ -48,15 +48,6 @@ export {
   vis,
   evoTarget,
   visTarget,
-  // RenderConfig accessor helpers
-  rcWidth,
-  rcHeight,
-  rcStrokeWidth,
-  rcFontFamily,
-  rcLabelScale,
-  rcTheme,
-  rcLocale,
-  resolveRenderConfigDefaults,
   ComponentSchema,
   RelationSchema,
   EvolutionSchema,
@@ -80,21 +71,10 @@ export {
   LegendSchema,
   LegendPositionEnum,
   LegendPositionXYSchema,
-  RenderConfigSchema,
-  // Sub-schema exports
-  SpatialConfigSchema,
+  // RenderConfig — kept value/leaf schemas (the public INPUT shape is
+  // RenderConfigV3Schema; the legacy RenderConfigSchema + sub-schemas + DEFAULT_*
+  // were removed in the v3-only cutover).
   TypographyConfigSchema,
-  StylingConfigSchema,
-  AxesConfigSchema,
-  FiltersSchema,
-  // Default config exports
-  DEFAULT_RENDER_CONFIG,
-  DEFAULT_SPATIAL_CONFIG,
-  DEFAULT_TYPOGRAPHY_CONFIG,
-  DEFAULT_STYLING_CONFIG,
-  DEFAULT_AXES_CONFIG,
-  DEFAULT_LEGEND_CONFIG,
-  DEFAULT_FILTERS_CONFIG,
   ConfigIntentSchema,
   DEFAULT_CONFIG_INTENT,
   resolveConfigIntent,
@@ -119,20 +99,11 @@ export {
   type Legend,
   type LegendPosition,
   type LegendPositionXY,
-  type RenderConfig,
+  // Internal nested (legacy-shaped) intermediate produced by renderConfigV3ToLegacy.
   type RenderConfigInput,
   type ResolvedRenderConfig,
-  // Sub-schema types (output — after Zod defaults applied)
-  type SpatialConfig,
-  type SpatialConfigInput,
+  // Kept value/leaf config types
   type TypographyConfig,
-  type TypographyConfigInput,
-  type StylingConfig,
-  type StylingConfigInput,
-  type AxesConfig,
-  type AxesConfigInput,
-  type Filters,
-  type FiltersInput,
   type ConfigIntent,
   type ConfigIntentInput,
   type LegendInput,
@@ -152,33 +123,13 @@ export {
   type ScaleFactor,
 } from "./coordinate-space.js";
 
-// ── RenderConfig v2 — theme baselines, v2 schema, phase mapping ──
+// ── RenderConfig v3 — the public input schema + adapter ──────────
 export {
-  // Theme baseline system
-  resolveThemeBaseline,
-  DEFAULT_THEME_BASELINE,
-  DARK_THEME_BASELINE,
-  HIGH_CONTRAST_THEME_BASELINE,
-  THEME_BASELINES,
-  type ThemeBaseline,
-  // V2 structured render config (with backward-compat flat-key preprocess)
-  RenderConfigV2BaseSchema,
-  RenderConfigV2Schema,
-  type RenderConfigV2,
-  type RenderConfigV2Input,
-  // Flat-to-nested backward-compat layer toggles/filters
-  DEFAULT_LAYER_TOGGLES,
-  DEFAULT_FILTERS,
-  type DefaultLayerToggles,
-  // Phase mapping (object-keyed, complementary to phase-mapping.ts array-based)
-  PHASE_KEYS,
-  PhaseRangeSchema,
-  PhaseMappingSchema as V2PhaseMappingSchema,
-  DEFAULT_PHASE_MAPPING as V2_DEFAULT_PHASE_MAPPING,
-  type PhaseKey,
-  type PhaseRange,
-  type PhaseMapping as V2PhaseMapping,
-} from "./render-config-v2.js";
+  RenderConfigV3Schema,
+  renderConfigV3ToLegacy,
+  type RenderConfigV3,
+  type RenderConfigV3Input,
+} from "./render-config-v3.js";
 
 // ── Rendering-local type vocabulary ──────────────────────────────
 export {

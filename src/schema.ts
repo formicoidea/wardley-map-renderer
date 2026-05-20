@@ -20,18 +20,15 @@ import {
   renderConfigV3ToLegacy,
   type RenderConfigV3Input,
 } from "./render-config-v3.js";
-// TypographyConfigSchema is defined locally below to avoid circular dependency
-// with render-config-v2.ts (which imports from schema.ts).
-// The render-config-v2.ts TypographyConfigSchema is the canonical definition;
-// this local copy MUST stay in sync.
 
 // Re-export coordinate space types and defaults for convenience
 export { DEFAULT_COORDINATE_SPACE } from "./coordinate-space.js";
 export type { CoordinateSpace } from "./coordinate-space.js";
 
-// ── Typography sub-schema ────────────────────────────────────────────────────
-// Defined here (not imported from render-config-v2.ts) to avoid circular deps.
-// render-config-v2.ts imports from schema.ts, so schema.ts cannot import back.
+// ── Typography sub-schema (kept VALUE schema) ────────────────────────────────
+// TypographyConfig (the type) is consumed by ResolvedRenderConfig.typography.
+// Kept after the v3-only cutover; the v3 input maps style.global.{fontFamily,
+// labelScale} → this shape via renderConfigV3ToLegacy.
 
 /**
  * TypographyConfigSchema — groups font and text-scale concerns.
@@ -53,12 +50,6 @@ export const TypographyConfigSchema = z.object({
 
 /** TypeScript type for TypographyConfig (output after Zod defaults applied) */
 export type TypographyConfig = z.infer<typeof TypographyConfigSchema>;
-
-/** TypeScript input type for TypographyConfig (accepts partial input before defaults) */
-export type TypographyConfigInput = z.input<typeof TypographyConfigSchema>;
-
-/** Default TypographyConfig values (Inter font, 1.0× label scale) */
-export const DEFAULT_TYPOGRAPHY_CONFIG: TypographyConfig = TypographyConfigSchema.parse({});
 
 // ── 3-decimal precision helper ──────────────────────────────
 /** Round a number to 3 decimal places (API boundary normalization). */
@@ -314,29 +305,13 @@ export const AxisLabelsSchema = z.object({
   visibilityLow: z.string().optional(),
 });
 
-// ── Axes config (groups axisLabels + locale) ──────────────
-/**
- * Axes configuration sub-schema — groups all axis-related settings:
- *   - `locale`     — language preset for axis labels ("en" | "fr")
- *   - `axisLabels` — i18n label overrides for axes and phase labels
- *
- * Each leaf field has its own Zod `.default()` or `.optional()` — omit partially or entirely.
- *
- * @see AxisLabelsSchema for the full label override fields
- * @see LocaleEnum for supported locales
- */
-export const AxesConfigSchema = z.object({
-  /** Locale preset for axis labels (default: "en"). */
-  locale: LocaleEnum.default("en"),
-  /** i18n axis label overrides — locale preset used as base, individual fields override. */
-  axisLabels: AxisLabelsSchema.optional(),
-});
-
-export type AxesConfig = z.infer<typeof AxesConfigSchema>;
-export type AxesConfigInput = z.input<typeof AxesConfigSchema>;
-
-/** Default axes config — English locale, no label overrides. */
-export const DEFAULT_AXES_CONFIG: AxesConfig = AxesConfigSchema.parse({});
+// ── Axes config ───────────────────────────────────────────
+// The legacy `AxesConfigSchema` (wrapping locale + axisLabels) was an INPUT
+// wrapper, removed in the v3-only cutover. The locale lives in `rendering.locale`
+// (v3) and axis label text in `style.background.{axisEvolution,axisValueChain,
+// phases}.label.text`. The internal bridge output exposes them as
+// RenderConfigInput.axes.{locale,axisLabels} (a plain shape). `AxisLabelsSchema`
+// (above) is kept — it is the leaf value schema consumed by resolveTheme.
 
 // ── Legend config ──────────────────────────────────────────
 export const LegendPositionEnum = z.enum([
@@ -1133,161 +1108,14 @@ export const LAYER_DEPENDENCY_CONSTRAINTS = Object.fromEntries(
   LAYER_TOGGLE_DAG.map((e) => [e.dependent, e.requires])
 ) as { readonly evolvesTo: "nodes"; readonly labels: "nodes" };
 
-// ── Unified visibility filters ────────────────────────────────────────────────
-// Consolidates two previously separate top-level fields into one semantic group:
-//   - layers                (visual layer toggles, post-render)  ← was `layerToggles`
-//   - excludeComponentTypes (data filter, pre-render)            ← renamed from `excludeTypes`
-//
-// ## Rename: excludeTypes → excludeComponentTypes
-// The old top-level `excludeTypes` field has been renamed to `filters.excludeComponentTypes`
-// to (a) clarify it filters by component TYPE (not arbitrary criteria), and (b) nest it
-// alongside the related `layers` toggle inside the `filters` object.
-//
-// ## Two-level filtering model
-// The two mechanisms operate at different levels but serve the same intent:
-// controlling what is shown in the rendered output.
-//
-//   filters.layers: {boolean per layer} — skip entire SVG layer renderers (post-render)
-//     → toggling a layer off skips its SVG fragment; all map data remains in render context
-//   filters.excludeComponentTypes: [type[]] — remove component types from data (pre-render)
-//     → removed before geometry is computed; affects ALL layers simultaneously
-export const FiltersSchema = z.object({
-  /**
-   * **Visual layer toggles (post-render):** Enable or disable entire SVG rendering
-   * layers independently. When a layer toggle is `false`, that layer's renderer is
-   * skipped and contributes no SVG fragments — but all map data remains loaded in the
-   * render context.
-   *
-   * @distinction Contrast with `excludeComponentTypes` (data filter, pre-render):
-   *   - `layers` operates at the **visual layer level**: only the SVG output of
-   *     the toggled layer is omitted. Other layers may still reference the same data.
-   *     For example, setting `nodes: false` hides node circles but labels and edges
-   *     for those components are still rendered by their respective layers.
-   *   - `excludeComponentTypes` operates at the **data level**: filtered components are
-   *     removed before geometry is computed, affecting ALL layers simultaneously.
-   *
-   * Layers NOT included here (they have dedicated controls):
-   *   - `axes`   → background.evolutionXAxis / valueChainYAxis / evolutionPhases
-   *   - `legend` → legend.show
-   *
-   * All layer toggles default to `true` (visible) when absent.
-   *
-   * @category viewer-preference
-   */
-  layers: LayerTogglesSchema.optional(),
-  /**
-   * **Data filter (pre-render):** Component types to completely remove from the data
-   * before any layer processes it. Components matching these types are excluded from
-   * ALL layers — nodes, labels, edges, pipelines, notes — as if they did not exist
-   * in the map data at all.
-   *
-   * **Renamed from `excludeTypes`** (old v1 top-level field) — now nested inside
-   * `filters` alongside `layers` to clarify that this is a data-level filter, not
-   * a visual-layer toggle. The field name `excludeComponentTypes` also makes explicit
-   * that the filter discriminates by component **type** (as defined by `ComponentTypeEnum`).
-   *
-   * Valid type values: `"component"` | `"user-need"` | `"pipeline"` | `"note"` | `"anchor"` | `"market"` | `"ecosystem"`
-   *
-   * @distinction Contrast with `layers` (visual-layer toggles, post-render):
-   *   - `excludeComponentTypes` operates at the **data level** (pre-render): filtered
-   *     components are removed before geometry is computed. Edges referencing excluded
-   *     components may also be suppressed. Use this to permanently remove a component
-   *     type from the rendered output regardless of which layer would draw it.
-   *   - `layers` operates at the **visual layer level** (post-render): a layer's
-   *     renderer is simply skipped (returns no SVG fragments). Data is still loaded
-   *     into the render context — only the SVG output of that specific layer is omitted.
-   *
-   * @example Hide all notes and anchors from the rendered map:
-   *   `filters: { excludeComponentTypes: ["note", "anchor"] }`
-   *
-   * @category author-intent
-   */
-  excludeComponentTypes: z.array(ComponentTypeEnum).optional(),
-});
-
-// ── SpatialConfig sub-schema ──────────────────────────────────────────────────
-/**
- * SpatialConfigSchema — groups all canvas dimension, coordinate space, and
- * geometry concerns for a Wardley Map render.
- *
- * Fields:
- *   - `width`           — canvas width in pixels (default: 1600)
- *   - `height`          — canvas height in pixels (default: 800)
- *   - `coordinateSpace` — explicit coordinate space declaration (units + origin)
- *   - `strokeWidth`     — edge/outline stroke width in canvas px-space (default: 1)
- *   - `nodeRadii`       — per-type node circle radii in canvas px-space (default: { _default: 5 })
- *
- * Each leaf field has its own Zod `.default()` — omit partially or entirely.
- *
- * @see CoordinateSpaceSchema in coordinate-space.ts — full Zod definition
- * @see NodeRadiiSchema — TypeStyleMap<number> schema with required _default
- */
-export const SpatialConfigSchema = z.object({
-  /** Canvas width in pixels. Default: 1600 px. Valid range: 1–10000 px. */
-  width: z
-    .number()
-    .positive()
-    .max(10000, "Canvas width must not exceed 10000 px")
-    .default(1600),
-  /** Canvas height in pixels. Default: 800 px. Valid range: 1–10000 px. */
-  height: z
-    .number()
-    .positive()
-    .max(10000, "Canvas height must not exceed 10000 px")
-    .default(800),
-  /** Explicit coordinate space declaration (units, origin, ranges). */
-  coordinateSpace: CanvasCoordinateSpaceSchema.optional(),
-  /** Stroke width in canvas px-space for edges and node outlines. Default: 1 px. */
-  strokeWidth: z.number().min(0.25).max(8).default(1),
-  /** Per-type node circle radii in canvas px-space. _default is required. */
-  nodeRadii: NodeRadiiSchema.default({ _default: 5 }),
-});
-
-/** TypeScript type for SpatialConfig (output after Zod defaults applied) */
-export type SpatialConfig = z.infer<typeof SpatialConfigSchema>;
-
-/** TypeScript input type for SpatialConfig (accepts partial input before defaults) */
-export type SpatialConfigInput = z.input<typeof SpatialConfigSchema>;
-
-/** Default SpatialConfig — canvas 1600×800 px, strokeWidth 1, nodeRadii._default 5 */
-export const DEFAULT_SPATIAL_CONFIG: SpatialConfig = SpatialConfigSchema.parse({});
-
-// ── StylingConfig sub-schema ──────────────────────────────────────────────────
-/**
- * StylingConfigSchema — groups all visual styling concerns:
- *   - `theme`        — named visual theme preset (default: "default")
- *   - `palette`      — per-component-type color overrides
- *   - `evolveStyles` — per-evolve-type arrow stroke style overrides
- *   - `background`   — canvas background color and axis/phase display controls
- *
- * Design rule: themes handle only colors and font — strokeWidth and nodeRadii belong to spatial.
- *
- * Each leaf field has its own Zod `.default()` or `.optional()` — omit partially or entirely.
- *
- * @see ThemeEnum — Zod enum definition for theme names
- * @see TypeColorsSchema — palette shape (KNOWN_RENDERABLE_TYPES keys)
- * @see EvolveStylesMapSchema — evolveStyles key constraints (EvolveTypeEnum)
- * @see BackgroundSchema — background canvas color and axis/phase controls
- */
-export const StylingConfigSchema = z.object({
-  /** Named visual theme preset. Default: "default". */
-  theme: ThemeEnum.default("default"),
-  /** Per-renderable-type color overrides (any CSS color string). */
-  palette: TypeColorsSchema.optional(),
-  /** Per-evolve-type arrow stroke style overrides. */
-  evolveStyles: EvolveStylesMapSchema.optional(),
-  /** Background canvas color and axis/phase display controls. */
-  background: BackgroundSchema.optional(),
-});
-
-/** TypeScript type for StylingConfig (output after Zod defaults applied) */
-export type StylingConfig = z.infer<typeof StylingConfigSchema>;
-
-/** TypeScript input type for StylingConfig (accepts partial input before defaults) */
-export type StylingConfigInput = z.input<typeof StylingConfigSchema>;
-
-/** Default StylingConfig — "default" theme, no palette/evolveStyles/background overrides */
-export const DEFAULT_STYLING_CONFIG: StylingConfig = StylingConfigSchema.parse({});
+// ── Legacy RenderConfig INPUT sub-schemas (REMOVED in v3-only cutover) ─────────
+// FiltersSchema, SpatialConfigSchema, StylingConfigSchema (and their DEFAULT_*
+// constants + input/output types) were INPUT wrapper schemas for the deleted
+// legacy RenderConfigSchema. The public input shape is now RenderConfigV3Schema;
+// the internal nested intermediate is the plain `RenderConfigInput` interface
+// (above). The leaf VALUE schemas they referenced — NodeRadiiSchema,
+// TypeColorsSchema, EvolveStylesMapSchema, BackgroundSchema, LayerTogglesSchema —
+// are KEPT (consumed by the bridge output + resolveTheme).
 
 // ── ConfigIntent (scope-boundary intent flags as first-class booleans) ──
 //
@@ -1474,157 +1302,59 @@ export const MethodConfigSchema = z.object({
 
 export type MethodConfig = z.infer<typeof MethodConfigSchema>;
 
-export const RenderConfigSchema = z.object({
-  /**
-   * Spatial — canvas dimensions, coordinate space, stroke width, and node radii.
-   *
-   * Groups all canvas dimension, coordinate space, and geometry concerns:
-   *   - `width`           — canvas width in pixels (default: 1600)
-   *   - `height`          — canvas height in pixels (default: 800)
-   *   - `coordinateSpace` — explicit coordinate space declaration (units + origin)
-   *   - `strokeWidth`     — edge/outline stroke width in canvas px-space (default: 1)
-   *   - `nodeRadii`       — per-type node circle radii in canvas px-space (default: { _default: 5 })
-   *
-   * Each leaf field has its own Zod `.default()` — omit partially or entirely.
-   *
-   * @see SpatialConfigSchema for the full sub-schema
-   * @category layout-structural
-   */
-  spatial: SpatialConfigSchema.optional(),
+// ── RenderConfigInput — internal nested (legacy-shaped) intermediate ──────────
+//
+// The PUBLIC render-config input shape is RenderConfigV3Schema (display/rendering/
+// style), validated at the WardleyMapSchema boundary. `renderConfigV3ToLegacy`
+// transforms a parsed v3 object into this nested shape, which is what the renderer
+// pipeline (resolveTheme + a few direct call-sites) consumes. It is an internal
+// implementation detail — authors never write it directly anymore.
+//
+// Defined as a plain TS interface (no Zod) because the former legacy
+// RenderConfigSchema and its sub-schemas have been deleted; only the kept VALUE
+// schemas (NodeRadii, TypeColors, EvolveStylesMap, AxisLabels, Legend, CoordinateSpace,
+// MethodConfig, ConfigIntent, LayerToggles) are reused for the leaf types.
+export interface RenderConfigInput {
+  /** Canvas dimensions, coordinate space, stroke width, per-type node radii. */
+  spatial?: {
+    width?: number;
+    height?: number;
+    coordinateSpace?: z.input<typeof CanvasCoordinateSpaceSchema>;
+    strokeWidth?: number;
+    nodeRadii?: z.input<typeof NodeRadiiSchema>;
+  };
+  /** Font family + label scale multiplier. */
+  typography?: {
+    fontFamily?: string;
+    labelScale?: number;
+  };
+  /** Theme, per-type palette, evolve styles, background chrome. */
+  styling?: {
+    theme?: Theme;
+    palette?: z.input<typeof TypeColorsSchema>;
+    evolveStyles?: z.input<typeof EvolveStylesMapSchema>;
+    background?: MapChrome;
+  };
+  /** Layer toggles + per-component-type data exclusion. */
+  filters?: {
+    layers?: z.input<typeof LayerTogglesSchema>;
+    excludeComponentTypes?: ComponentType[];
+  };
+  /** Legend visibility, position, overflow. */
+  legend?: z.input<typeof LegendSchema>;
+  /** Axis locale preset + i18n axis label overrides. */
+  axes?: {
+    locale?: Locale;
+    axisLabels?: z.input<typeof AxisLabelsSchema>;
+  };
+  /** Label collision avoidance toggle. */
+  avoidCollisions?: boolean;
+  /** Per-method rendering configuration (color + i18n legend labels). */
+  methods?: MethodConfig[];
+  /** Scope-boundary intent flags (partial — merged over defaults). */
+  configIntent?: Partial<ConfigIntent>;
+}
 
-  /**
-   * Typography — font family and label scale multiplier.
-   *
-   * Groups all font and text-scale concerns:
-   *   - `fontFamily`  — CSS font-family stack applied to all map text elements
-   *   - `labelScale`  — unitless multiplier for component label font size (1.0 = 12 px base)
-   *
-   * Each leaf field has its own Zod `.default()` — omit partially or entirely.
-   *
-   * @see TypographyConfigSchema for the Zod sub-schema
-   * @see DEFAULT_TYPOGRAPHY_CONFIG for the default values
-   * @category viewer-preference
-   */
-  typography: TypographyConfigSchema.optional(),
-
-  /**
-   * Styling — theme, palette (colors), evolve styles, background.
-   *
-   * Groups all visual styling concerns:
-   *   - `theme`        — named visual theme preset (default: "default")
-   *   - `palette`      — per-component-type color overrides
-   *   - `evolveStyles` — per-evolve-type arrow stroke style overrides
-   *   - `background`   — canvas background color and axis/phase display controls
-   *
-   * Design rule: themes handle only colors and font — strokeWidth and nodeRadii belong to spatial.
-   *
-   * Each leaf field has its own Zod `.default()` or `.optional()` — omit partially or entirely.
-   *
-   * @see StylingConfigSchema for the full sub-schema
-   * @category author-intent
-   */
-  styling: StylingConfigSchema.optional(),
-
-  /**
-   * Unified visibility filters — consolidates two distinct mechanisms for controlling
-   * what is shown in the rendered output.
-   *
-   * ### `filters.layers` — Visual layer toggles (post-render)
-   * Enables or disables individual SVG rendering layers.
-   *
-   * ### `filters.excludeComponentTypes` — Data filter (pre-render)
-   * Removes component types from the map data before any layer processes them.
-   *
-   * @see FiltersSchema for full Zod field definitions and per-field JSDoc
-   * @category viewer-preference
-   */
-  filters: FiltersSchema.optional(),
-
-  /**
-   * Legend visibility and position.
-   *
-   * Groups all legend-related settings:
-   *   - `show`           — show/hide the legend box (default: true)
-   *   - `position`       — named anchor or explicit {x, y} coordinates (default: "bottom-right")
-   *   - `legendOverflow` — overflow handling for explicit position (default: "allow")
-   *
-   * @see LegendSchema for the full sub-schema
-   * @category viewer-preference
-   */
-  legend: LegendSchema.optional(),
-
-  /**
-   * Axes configuration — locale preset and i18n axis label overrides.
-   *
-   * Groups all axis-related settings:
-   *   - `axes.locale`     — language preset for axis labels ("en" | "fr"), default "en"
-   *   - `axes.axisLabels`  — per-field label overrides (xAxis, yAxis, phases, etc.)
-   *
-   * Each leaf field has its own Zod default — omit partially or entirely.
-   *
-   * @see AxesConfigSchema for the full sub-schema
-   * @category viewer-preference
-   */
-  axes: AxesConfigSchema.optional(),
-
-  /**
-   * Enable/disable label collision avoidance.
-   * @category layout-structural
-   */
-  avoidCollisions: z.boolean().optional(),
-
-  /**
-   * Method rendering configuration — maps method type strings to colors and i18n legend labels.
-   *
-   * Each entry defines how a specific method type (e.g. "build", "buy", "outsource") is
-   * rendered: its indicator color and its legend labels (exactly 3 keys per entry).
-   *
-   * @category author-intent
-   */
-  methods: z.array(MethodConfigSchema).optional(),
-
-  /**
-   * Configurable scope-boundary intent flags.
-   *
-   * Declares what this renderer does (`staticExport`) and does NOT do
-   * (`noTemporalDiff`, `noInteraction`) as first-class boolean metadata.
-   *
-   * @see ConfigIntentSchema — the full field schema
-   * @see DEFAULT_CONFIG_INTENT — the default values
-   * @category platform-constraint
-   */
-  configIntent: ConfigIntentSchema.partial().optional(),
-})
-  .superRefine((data, ctx) => {
-  // ── Legend {x,y} bounds validation ───────────────────────────────────────
-  // When legend.position is an explicit {x, y} coordinate object, enforce that
-  // the position lies within the canvas: 0 ≤ x ≤ width and 0 ≤ y ≤ height.
-  // Canvas dimensions read from spatial sub-object (default 1600 × 800 px).
-  const pos = data.legend?.position;
-  if (pos !== undefined && typeof pos === "object" && "x" in pos && "y" in pos) {
-    const canvasWidth = data.spatial?.width ?? 1600;
-    const canvasHeight = data.spatial?.height ?? 800;
-    const { x, y } = pos as { x: number; y: number };
-
-    if (x < 0 || x > canvasWidth) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["legend", "position", "x"],
-        message:
-          `legend.position.x (${x}) is out of canvas bounds — must be between 0 and ${canvasWidth} (canvas width).`,
-      });
-    }
-
-    if (y < 0 || y > canvasHeight) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["legend", "position", "y"],
-        message:
-          `legend.position.y (${y}) is out of canvas bounds — must be between 0 and ${canvasHeight} (canvas height).`,
-      });
-    }
-  }
-});
 
 // Gameplay (accelerator / deaccelerator / step) and method are now COMPONENT
 // DECORATORS (see ComponentSchema). The former top-level AcceleratorSchema,
@@ -1636,23 +1366,15 @@ export const WardleyMapSchema = z.object({
   components: z.array(ComponentSchema),
   relations: z.array(RelationSchema),
   context: z.string().optional(),
-  // Optional render config. Accepts EITHER the new v3 input shape
-  // (display/rendering/style) — transformed to the nested legacy shape via
-  // renderConfigV3ToLegacy — OR the legacy nested shape directly. Both resolve
-  // through the unchanged resolveTheme()/flat ResolvedRenderConfig pipeline.
-  renderConfig: z
-    .preprocess((val) => {
-      if (
-        val != null &&
-        typeof val === "object" &&
-        !Array.isArray(val) &&
-        ("display" in val || "rendering" in val || "style" in val)
-      ) {
-        return renderConfigV3ToLegacy(RenderConfigV3Schema.parse(val));
-      }
-      return val;
-    }, RenderConfigSchema)
-    .optional(),
+  // Optional render config. The PUBLIC input shape is the v3 schema
+  // (display/rendering/style). It is validated by RenderConfigV3Schema and then
+  // transformed — at parse time — into the internal nested legacy-shaped object
+  // (RenderConfigInput) consumed by resolveTheme()/the flat ResolvedRenderConfig
+  // pipeline and by the few call-sites that read map.renderConfig.spatial/legend
+  // directly. The stored value is therefore the bridge output, NOT the v3 input.
+  renderConfig: RenderConfigV3Schema.transform(
+    (v3): RenderConfigInput => renderConfigV3ToLegacy(v3),
+  ).optional(),
 });
 
 // ── TypeScript types derived from Zod ──────────────────────
@@ -1706,40 +1428,11 @@ export type MapChrome = z.infer<typeof BackgroundSchema>;
  */
 export type Background = MapChrome;
 export type LayerToggles = z.infer<typeof LayerTogglesSchema>;
-export type Filters = z.infer<typeof FiltersSchema>;
-/** Input type for Filters — accepts partial input before defaults */
-export type FiltersInput = z.input<typeof FiltersSchema>;
-export type RenderConfig = z.infer<typeof RenderConfigSchema>;
-/** Input type for RenderConfig — all nested sub-schemas accept partial input before defaults */
-export type RenderConfigInput = z.input<typeof RenderConfigSchema>;
-
-/**
- * Default render configuration — concrete baseline values for the nested RenderConfig.
- *
- * Represents the standard "out-of-box" canvas configuration before any caller
- * overrides or theme resolution. All sub-schemas are resolved with their defaults.
- *
- * @see SpatialConfigSchema — spatial defaults (1600×800 canvas, strokeWidth 1, nodeRadii._default 5)
- * @see TypographyConfigSchema — typography defaults (Inter font, 1.0× label scale)
- * @see StylingConfigSchema — styling defaults ("default" theme, no overrides)
- * @see AxesConfigSchema — axes defaults (English locale, no label overrides)
- * @see LegendSchema — legend defaults (show=true, position="bottom-right")
- */
-/** Default legend config — show=true, position="bottom-right", overflow="allow". */
-export const DEFAULT_LEGEND_CONFIG = LegendSchema.parse({});
-
-/** Default filters config — all layers visible, no component types excluded. */
-export const DEFAULT_FILTERS_CONFIG = FiltersSchema.parse({});
-
-export const DEFAULT_RENDER_CONFIG: RenderConfig = {
-  spatial: DEFAULT_SPATIAL_CONFIG,
-  typography: DEFAULT_TYPOGRAPHY_CONFIG,
-  styling: DEFAULT_STYLING_CONFIG,
-  filters: DEFAULT_FILTERS_CONFIG,
-  legend: DEFAULT_LEGEND_CONFIG,
-  axes: DEFAULT_AXES_CONFIG,
-  configIntent: DEFAULT_CONFIG_INTENT,
-};
+// RenderConfigInput is the internal nested (legacy-shaped) intermediate — defined
+// as a plain TS interface above (no Zod). The PUBLIC render-config input shape is
+// RenderConfigV3Schema. The former legacy RenderConfig / Filters / DEFAULT_*_CONFIG
+// / DEFAULT_RENDER_CONFIG / resolveRenderConfigDefaults / rc* accessors have been
+// removed in the v3-only cutover.
 export type EvolveStyle = z.infer<typeof EvolveStyleSchema>;
 export type EvolveStylesMap = z.infer<typeof EvolveStylesMapSchema>;
 /** Step decorator (number + optional color), attached to a component. */
@@ -1764,77 +1457,10 @@ export function evoTarget(e: EvolvesTo): number { return e.position.evolution.sc
 /** Get visibility scalar from an evolvesTo target */
 export function visTarget(e: EvolvesTo): number { return e.position.visibility.scalar; }
 
-// ── RenderConfig accessor helpers ───────────────────────────
-// Reduce verbosity when accessing nested RenderConfig sub-schema fields.
-// Each accessor reads from the nested group with a fallback to the default.
-
-// Cached resolved defaults for accessors (avoids repeated optional chaining)
-const _defaultSpatial = DEFAULT_SPATIAL_CONFIG;
-const _defaultTypography = DEFAULT_TYPOGRAPHY_CONFIG;
-const _defaultStyling = DEFAULT_STYLING_CONFIG;
-const _defaultAxes = DEFAULT_AXES_CONFIG;
-
-/** Get canvas width from a RenderConfig (spatial.width, default 1600) */
-export function rcWidth(rc?: RenderConfigInput): number {
-  return rc?.spatial?.width ?? _defaultSpatial.width;
-}
-
-/** Get canvas height from a RenderConfig (spatial.height, default 800) */
-export function rcHeight(rc?: RenderConfigInput): number {
-  return rc?.spatial?.height ?? _defaultSpatial.height;
-}
-
-/** Get stroke width from a RenderConfig (spatial.strokeWidth, default 1) */
-export function rcStrokeWidth(rc?: RenderConfigInput): number {
-  return rc?.spatial?.strokeWidth ?? _defaultSpatial.strokeWidth;
-}
-
-/** Get font family from a RenderConfig (typography.fontFamily, default "Inter, sans-serif") */
-export function rcFontFamily(rc?: RenderConfigInput): string {
-  return rc?.typography?.fontFamily ?? _defaultTypography.fontFamily;
-}
-
-/** Get label scale from a RenderConfig (typography.labelScale, default 1.0) */
-export function rcLabelScale(rc?: RenderConfigInput): number {
-  return rc?.typography?.labelScale ?? _defaultTypography.labelScale;
-}
-
-/** Get theme from a RenderConfig (styling.theme, default "default") */
-export function rcTheme(rc?: RenderConfigInput): Theme {
-  return (rc?.styling?.theme ?? _defaultStyling.theme) as Theme;
-}
-
-/** Get locale from a RenderConfig (axes.locale, default "en") */
-export function rcLocale(rc?: RenderConfigInput): Locale {
-  return (rc?.axes?.locale ?? _defaultAxes.locale) as Locale;
-}
-
-/**
- * Merge a partial RenderConfigInput with defaults to produce a fully resolved RenderConfig.
- *
- * Parses the input through RenderConfigSchema (applying Zod defaults) then
- * deep-merges with DEFAULT_RENDER_CONFIG to guarantee every leaf field is present.
- *
- * @param input - Partial nested config input (any sub-schema can be omitted)
- * @returns Fully resolved RenderConfig with all defaults applied
- */
-export function resolveRenderConfigDefaults(input?: RenderConfigInput): RenderConfig {
-  if (!input) return { ...DEFAULT_RENDER_CONFIG };
-  const parsed = RenderConfigSchema.parse(input);
-  return {
-    spatial: parsed.spatial ? { ..._defaultSpatial, ...parsed.spatial } : _defaultSpatial,
-    typography: parsed.typography ? { ..._defaultTypography, ...parsed.typography } : _defaultTypography,
-    styling: parsed.styling ? { ..._defaultStyling, ...parsed.styling } : _defaultStyling,
-    filters: parsed.filters ? { ...DEFAULT_FILTERS_CONFIG, ...parsed.filters } : DEFAULT_FILTERS_CONFIG,
-    legend: parsed.legend ? { ...DEFAULT_LEGEND_CONFIG, ...parsed.legend } : DEFAULT_LEGEND_CONFIG,
-    axes: parsed.axes ? { ..._defaultAxes, ...parsed.axes } : _defaultAxes,
-    avoidCollisions: parsed.avoidCollisions,
-    methods: parsed.methods,
-    configIntent: parsed.configIntent
-      ? { ...DEFAULT_CONFIG_INTENT, ...parsed.configIntent }
-      : DEFAULT_CONFIG_INTENT,
-  };
-}
+// The legacy `rc*` accessors (rcWidth/rcHeight/rcStrokeWidth/rcFontFamily/
+// rcLabelScale/rcTheme/rcLocale) and `resolveRenderConfigDefaults` have been
+// removed in the v3-only cutover. Consumers read fully-resolved values from
+// `resolveTheme(...)` (ResolvedRenderConfig) instead of the raw input config.
 
 // ── Color mapping ──────────────────────────────────────────
 // Minimal Tailwind-to-hex mapping with black fallback
@@ -2252,11 +1878,19 @@ export function fromMapKeep(raw: any): WardleyMap {
     components,
     relations,
     context: raw.context,
-    // Map gridSize → renderConfig dimensions
+    // Map gridSize → renderConfig canvas dimensions (v3 input shape).
     ...(raw.gridSize ? {
       renderConfig: {
-        width: raw.gridSize.width ?? 1600,
-        height: raw.gridSize.height ?? 800,
+        style: {
+          background: {
+            canvas: {
+              default: {
+                width: raw.gridSize.width ?? 1600,
+                height: raw.gridSize.height ?? 800,
+              },
+            },
+          },
+        },
       },
     } : {}),
   });

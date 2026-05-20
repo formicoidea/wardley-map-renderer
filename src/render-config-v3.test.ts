@@ -156,7 +156,7 @@ describe("renderConfigV3ToLegacy — end-to-end via resolveTheme + render", () =
     expect(resolved.locale).toBe("fr");
   });
 
-  it("WardleyMapSchema accepts a v3 renderConfig natively (preprocess → legacy)", () => {
+  it("WardleyMapSchema accepts a v3 renderConfig natively (transform → legacy)", () => {
     const map = WardleyMapSchema.parse({
       title: "Native v3",
       components: [],
@@ -166,19 +166,23 @@ describe("renderConfigV3ToLegacy — end-to-end via resolveTheme + render", () =
         style: { background: { canvas: { default: { width: 800, height: 400 } } } },
       },
     });
-    // Stored as the nested legacy shape after the preprocess transform.
+    // Stored as the nested legacy shape after the v3 transform.
     expect((map.renderConfig as any)?.spatial?.width).toBe(800);
     expect((map.renderConfig as any)?.axes?.locale).toBe("fr");
   });
 
-  it("WardleyMapSchema still accepts the legacy renderConfig shape", () => {
-    const map = WardleyMapSchema.parse({
-      title: "Legacy",
-      components: [],
-      relations: [],
-      renderConfig: { spatial: { width: 1200 }, axes: { locale: "en" } },
-    });
-    expect((map.renderConfig as any)?.spatial?.width).toBe(1200);
+  it("WardleyMapSchema REJECTS the legacy renderConfig shape (v3-only input)", () => {
+    // After the v3-only cutover, the public input shape is v3 (display/rendering/
+    // style). Legacy nested keys (spatial/axes/styling/...) are unknown → rejected
+    // by the strict RenderConfigV3Schema.
+    expect(() =>
+      WardleyMapSchema.parse({
+        title: "Legacy",
+        components: [],
+        relations: [],
+        renderConfig: { spatial: { width: 1200 }, axes: { locale: "en" } },
+      }),
+    ).toThrow();
   });
 
   it("renders a valid SVG honoring a v3 palette override", () => {
