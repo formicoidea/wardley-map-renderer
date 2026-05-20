@@ -18,6 +18,7 @@ import {
 import {
   RenderConfigV3Schema,
   renderConfigV3ToLegacy,
+  type RenderConfigV3Input,
 } from "./render-config-v3.js";
 // TypographyConfigSchema is defined locally below to avoid circular dependency
 // with render-config-v2.ts (which imports from schema.ts).
@@ -2635,7 +2636,24 @@ const THEME_BASELINES: Record<"default" | "dark" | "highContrast", Omit<Resolved
  * @param renderConfig - Optional RenderConfig from the map payload (all fields optional)
  * @returns Flat ResolvedRenderConfig with all values resolved to concrete values
  */
-export function resolveTheme(renderConfig?: RenderConfigInput): ResolvedRenderConfig {
+/** True when an input is the new v3 RenderConfig shape (display/rendering/style). */
+function isV3RenderConfig(input: unknown): input is RenderConfigV3Input {
+  return (
+    input != null &&
+    typeof input === "object" &&
+    !Array.isArray(input) &&
+    ("display" in input || "rendering" in input || "style" in input)
+  );
+}
+
+export function resolveTheme(
+  input?: RenderConfigInput | RenderConfigV3Input,
+): ResolvedRenderConfig {
+  // Accept the new v3 input shape directly by bridging it to the nested legacy
+  // shape this resolver consumes. Legacy input passes through unchanged.
+  const renderConfig: RenderConfigInput | undefined = isV3RenderConfig(input)
+    ? renderConfigV3ToLegacy(RenderConfigV3Schema.parse(input))
+    : (input as RenderConfigInput | undefined);
   const themeName = renderConfig?.styling?.theme ?? "default";
   const baseline = THEME_BASELINES[themeName];
 

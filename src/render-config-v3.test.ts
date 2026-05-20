@@ -117,6 +117,17 @@ describe("renderConfigV3ToLegacy — field mapping", () => {
 });
 
 describe("renderConfigV3ToLegacy — end-to-end via resolveTheme + render", () => {
+  it("resolveTheme accepts a v3 config DIRECTLY (internal bridge)", () => {
+    const resolved = resolveTheme({
+      rendering: { locale: "fr", theme: "dark" },
+      style: { background: { canvas: { default: { width: 640 } } } },
+    } as any);
+    expect(resolved.width).toBe(640);
+    expect(resolved.coordinateSpace.width).toBe(640);
+    expect(resolved.locale).toBe("fr");
+    expect(resolved.theme).toBe("dark");
+  });
+
   it("resolves through the existing pipeline to the flat ResolvedRenderConfig", () => {
     const resolved = resolveTheme(renderConfigV3ToLegacy(v3({
       rendering: { locale: "fr" },
