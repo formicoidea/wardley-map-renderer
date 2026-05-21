@@ -36,7 +36,7 @@ function makeMap(): WardleyMap {
       },
     ],
     relations: [
-      { id: "r1", source: "c1", target: "c2", type: "DependsOn" },
+      { id: "r1", consumer: "c1", supplier: "c2", type: "DependsOn" },
     ],
   };
 }
@@ -125,7 +125,7 @@ describe("Buffer logic (simulated)", () => {
     const buf = createBuffer();
     buf.addDiff({ op: "move_component", payload: { id: "c1", evolution: 0.5, visibility: 0.2 } });
     buf.addDiff({ op: "rename_component", payload: { id: "c2", name: "API" } });
-    buf.addDiff({ op: "add_edge", payload: { id: "r2", source: "c1", target: "c2", type: "Flow" } });
+    buf.addDiff({ op: "add_edge", payload: { id: "r2", consumer: "c1", supplier: "c2", type: "Flow" } });
 
     expect(buf.getDiffCount()).toBe(3);
     expect(buf.diffBuffer[0].op).toBe("move_component");
@@ -166,7 +166,7 @@ describe("Buffer logic (simulated)", () => {
   it("flushDiffs returns complete array and clears buffer", () => {
     const buf = createBuffer();
     buf.addDiff({ op: "add_component", payload: { id: "c3", name: "DB", type: "component", nature: "visible", evolution: 0.4, visibility: 0.5 } });
-    buf.addDiff({ op: "add_edge", payload: { id: "r2", source: "c1", target: "c3", type: "DependsOn" } });
+    buf.addDiff({ op: "add_edge", payload: { id: "r2", consumer: "c1", supplier: "c3", type: "DependsOn" } });
 
     const flushed = buf.flushDiffs();
     expect(flushed).toHaveLength(2);

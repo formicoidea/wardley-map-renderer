@@ -330,7 +330,7 @@ describe("allEdgeSegments", () => {
           },
         },
       ],
-      relations: [{ id: "rel-a-b", source: "a", target: "b", type: "DependsOn" }],
+      relations: [{ id: "rel-a-b", consumer: "a", supplier: "b", type: "DependsOn" }],
     });
     const ctx = createRenderContext(map);
     const positions = allComponentPositions(map, ctx);
@@ -356,7 +356,7 @@ describe("allEdgeSegments", () => {
           },
         },
       ],
-      relations: [{ id: "rel-a-missing", source: "a", target: "missing", type: "DependsOn" }],
+      relations: [{ id: "rel-a-missing", consumer: "a", supplier: "missing", type: "DependsOn" }],
     });
     const ctx = createRenderContext(map);
     const positions = allComponentPositions(map, ctx);

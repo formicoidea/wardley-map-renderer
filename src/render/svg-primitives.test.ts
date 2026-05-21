@@ -575,7 +575,7 @@ describe("svg-primitives server render parity", () => {
         },
       ],
       relations: [
-        { id: "r1", source: "c1", target: "c2", type: "DependsOn" },
+        { id: "r1", consumer: "c1", supplier: "c2", type: "DependsOn" },
       ],
     });
 
@@ -606,7 +606,7 @@ describe("svg-primitives server render parity", () => {
         },
       ],
       relations: [
-        { id: "r1", source: "c1", target: "c2", type: "DependsOn" },
+        { id: "r1", consumer: "c1", supplier: "c2", type: "DependsOn" },
       ],
     });
 

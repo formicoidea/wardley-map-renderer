@@ -32,7 +32,7 @@ function mapWith(
         ...(decorators.hosting ? { [decorators.hosting]: true } : {}),
       }),
     ],
-    relations: [{ id: "rel-platform-hosting", source: "platform", target: "hosting", type: "DependsOn" as const }],
+    relations: [{ id: "rel-platform-hosting", consumer: "platform", supplier: "hosting", type: "DependsOn" as const }],
   });
 }
 

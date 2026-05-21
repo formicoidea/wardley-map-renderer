@@ -52,8 +52,8 @@ const FULL_MAP: WardleyMap = WardleyMapSchema.parse({
     },
   ],
   relations: [
-    { id: "rel-1", source: "user", target: "platform" },
-    { id: "rel-2", source: "platform", target: "infra" },
+    { id: "rel-1", consumer: "user", supplier: "platform" },
+    { id: "rel-2", consumer: "platform", supplier: "infra" },
   ],
 });
 

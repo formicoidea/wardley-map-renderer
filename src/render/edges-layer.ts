@@ -52,8 +52,8 @@ export const renderEdgesLayer: LayerRenderer = (
 
     // Skip edges where source or target component type is excluded
     if (excluded.size > 0) {
-      const srcComp = ctx.componentById.get(relation.source);
-      const tgtComp = ctx.componentById.get(relation.target);
+      const srcComp = ctx.componentById.get(relation.consumer);
+      const tgtComp = ctx.componentById.get(relation.supplier);
       if (srcComp && excluded.has(srcComp.type)) continue;
       if (tgtComp && excluded.has(tgtComp.type)) continue;
     }

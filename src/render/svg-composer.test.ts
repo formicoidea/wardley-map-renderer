@@ -37,7 +37,7 @@ const MINIMAL_MAP: WardleyMap = WardleyMapSchema.parse({
       position: { evolution: { scalar: 0.7 }, visibility: { scalar: 0.6 } },
     },
   ],
-  relations: [{ id: "rel-c1-c2", source: "c1", target: "c2" }],
+  relations: [{ id: "rel-c1-c2", consumer: "c1", supplier: "c2" }],
 });
 
 // ── esc() helper ─────────────────────────────────────────────────────
@@ -312,8 +312,8 @@ describe("buildRenderContext()", () => {
   it("computes edge segments for relations", () => {
     const ctx = buildRenderContext(MINIMAL_MAP);
     expect(ctx.edges).toHaveLength(1);
-    expect(ctx.edges[0].relation.source).toBe("c1");
-    expect(ctx.edges[0].relation.target).toBe("c2");
+    expect(ctx.edges[0].relation.consumer).toBe("c1");
+    expect(ctx.edges[0].relation.supplier).toBe("c2");
   });
 
   it("preserves the original map reference", () => {

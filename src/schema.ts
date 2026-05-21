@@ -246,7 +246,7 @@ export const ComponentSchema = z
   });
 
 // ── Relation (edge) ────────────────────────────────────────
-// Breaking change: source/target replaces from/to, DependsOn type
+// Breaking change: consumer/supplier replaces source/target (which had replaced from/to)
 // flow: optional semantic annotation for the nature of the dependency
 // Relation types:
 //   - DependsOn: standard dependency (A depends on B)
@@ -263,8 +263,8 @@ export const FlowSchema = z.object({
 
 export const RelationSchema = z.object({
   id: z.string(), // unique relation identifier (required)
-  source: z.string(), // component id (dependency origin — the depender)
-  target: z.string(), // component id (dependency destination — the depended-upon)
+  consumer: z.string(), // component id (dependency origin — the depender, consumes the supplier)
+  supplier: z.string(), // component id (dependency destination — the depended-upon, supplies the consumer)
   type: RelationTypeEnum.default("DependsOn"),
   /** Optional flow annotation describing what passes along this edge */
   flow: FlowSchema.optional(),
@@ -1547,10 +1547,10 @@ export function validateMap(map: WardleyMap): string[] {
 
   // Validate relations reference valid IDs
   for (const r of map.relations) {
-    if (!ids.has(r.source))
-      errors.push(`Relation references unknown component: ${r.source}`);
-    if (!ids.has(r.target))
-      errors.push(`Relation references unknown component: ${r.target}`);
+    if (!ids.has(r.consumer))
+      errors.push(`Relation references unknown component: ${r.consumer}`);
+    if (!ids.has(r.supplier))
+      errors.push(`Relation references unknown component: ${r.supplier}`);
   }
 
   return errors;
@@ -1697,18 +1697,14 @@ export function sanitizeMap(raw: WardleyMap): WardleyMap {
     }
   }
 
-  // Migrate legacy from/to → source/target and normalize relation types
+  // Normalize relation ids and types
   const componentIds = new Set(map.components.map((c) => c.id));
   for (let i = 0; i < map.relations.length; i++) {
     const r = map.relations[i];
-    const rawRel = r as any;
-    // Legacy from/to field migration (in case raw data sneaks through parse)
-    if (!r.source && rawRel.from) r.source = rawRel.from;
-    if (!r.target && rawRel.to) r.target = rawRel.to;
 
     // Auto-generate id if missing (legacy data)
     if (!r.id) {
-      r.id = `rel-${r.source}-${r.target}-${i}`;
+      r.id = `rel-${r.consumer}-${r.supplier}-${i}`;
     }
 
     // Normalize relation type
@@ -1718,13 +1714,13 @@ export function sanitizeMap(raw: WardleyMap): WardleyMap {
 
   // Remove orphan relations (referencing non-existent component IDs)
   map.relations = map.relations.filter(
-    (r) => componentIds.has(r.source) && componentIds.has(r.target)
+    (r) => componentIds.has(r.consumer) && componentIds.has(r.supplier)
   );
 
   // Deduplicate relations
   const seen = new Set<string>();
   map.relations = map.relations.filter((r) => {
-    const key = `${r.source}->${r.target}`;
+    const key = `${r.consumer}->${r.supplier}`;
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
@@ -1734,7 +1730,7 @@ export function sanitizeMap(raw: WardleyMap): WardleyMap {
 }
 
 /** Convert JSON pivot to OWM (Online Wardley Maps) text format
- *  NOTE: temporarily broken due to schema breaking changes (source/target, types).
+ *  NOTE: temporarily broken due to schema breaking changes (consumer/supplier, types).
  *  Will be updated in a future iteration.
  */
 export function toOWM(map: WardleyMap): string {
@@ -1759,8 +1755,8 @@ export function toOWM(map: WardleyMap): string {
   // Relations
   const byId = new Map(map.components.map((c) => [c.id, c]));
   for (const r of map.relations) {
-    const src = byId.get(r.source);
-    const tgt = byId.get(r.target);
+    const src = byId.get(r.consumer);
+    const tgt = byId.get(r.supplier);
     if (src && tgt) {
       lines.push(`${src.label.name}->${tgt.label.name}`);
     }
@@ -1865,8 +1861,8 @@ export function fromMapKeep(raw: any): WardleyMap {
       const target = e.target ?? e.to;
       const rel: any = {
         id: e.id ?? `rel-${source}-${target}-${i}`,
-        source,
-        target,
+        consumer: source,
+        supplier: target,
         type: e.type ?? "DependsOn",
       };
       if (e.flow) rel.flow = e.flow;

@@ -112,7 +112,7 @@ describe("WardleyMapSchema with evolutionRange", () => {
           },
         },
       ],
-      relations: [{ id: "rel-user-platform", source: "user", target: "platform" }],
+      relations: [{ id: "rel-user-platform", consumer: "user", supplier: "platform" }],
     };
     const result = WardleyMapSchema.safeParse(map);
     expect(result.success).toBe(true);

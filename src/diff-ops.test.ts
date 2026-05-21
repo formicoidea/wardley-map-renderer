@@ -49,8 +49,8 @@ function makeMap(overrides?: Partial<WardleyMap>): WardleyMap {
       },
     ],
     relations: [
-      { id: "rel-1", source: "comp-1", target: "comp-2", type: "DependsOn" },
-      { id: "rel-2", source: "comp-2", target: "comp-3", type: "DependsOn" },
+      { id: "rel-1", consumer: "comp-1", supplier: "comp-2", type: "DependsOn" },
+      { id: "rel-2", consumer: "comp-2", supplier: "comp-3", type: "DependsOn" },
     ],
     ...overrides,
   } as WardleyMap;
@@ -180,8 +180,8 @@ describe("AddEdgePayload schema", () => {
   it("accepts valid payload", () => {
     const result = AddEdgePayload.safeParse({
       id: "rel-new",
-      source: "comp-1",
-      target: "comp-2",
+      consumer: "comp-1",
+      supplier: "comp-2",
     });
     expect(result.success).toBe(true);
     if (result.success) {
@@ -192,8 +192,8 @@ describe("AddEdgePayload schema", () => {
   it("accepts explicit type", () => {
     const result = AddEdgePayload.safeParse({
       id: "rel-flow",
-      source: "comp-1",
-      target: "comp-2",
+      consumer: "comp-1",
+      supplier: "comp-2",
       type: "Flow",
     });
     expect(result.success).toBe(true);
@@ -205,7 +205,7 @@ describe("AddEdgePayload schema", () => {
   it("rejects missing source", () => {
     const result = AddEdgePayload.safeParse({
       id: "rel-x",
-      target: "comp-2",
+      supplier: "comp-2",
     });
     expect(result.success).toBe(false);
   });
@@ -213,7 +213,7 @@ describe("AddEdgePayload schema", () => {
   it("rejects missing target", () => {
     const result = AddEdgePayload.safeParse({
       id: "rel-x",
-      source: "comp-1",
+      consumer: "comp-1",
     });
     expect(result.success).toBe(false);
   });
@@ -221,8 +221,8 @@ describe("AddEdgePayload schema", () => {
   it("rejects empty id", () => {
     const result = AddEdgePayload.safeParse({
       id: "",
-      source: "comp-1",
-      target: "comp-2",
+      consumer: "comp-1",
+      supplier: "comp-2",
     });
     expect(result.success).toBe(false);
   });
@@ -230,8 +230,8 @@ describe("AddEdgePayload schema", () => {
   it("rejects invalid type", () => {
     const result = AddEdgePayload.safeParse({
       id: "rel-x",
-      source: "comp-1",
-      target: "comp-2",
+      consumer: "comp-1",
+      supplier: "comp-2",
       type: "InvalidType",
     });
     expect(result.success).toBe(false);
@@ -292,7 +292,7 @@ describe("DiffOp discriminated union", () => {
   it("parses add_edge", () => {
     const result = DiffOp.safeParse({
       op: "add_edge",
-      payload: { id: "rel-new", source: "comp-1", target: "comp-2" },
+      payload: { id: "rel-new", consumer: "comp-1", supplier: "comp-2" },
     });
     expect(result.success).toBe(true);
     if (result.success) expect(result.data.op).toBe("add_edge");
@@ -321,7 +321,7 @@ describe("ComponentDiffOp backward compatibility", () => {
   it("parses add_edge via ComponentDiffOp alias", () => {
     const result = ComponentDiffOp.safeParse({
       op: "add_edge",
-      payload: { id: "rel-new", source: "comp-1", target: "comp-2" },
+      payload: { id: "rel-new", consumer: "comp-1", supplier: "comp-2" },
     });
     expect(result.success).toBe(true);
   });
@@ -581,13 +581,13 @@ describe("applyDiffOp", () => {
       const map = makeMap();
       const ok = applyDiffOp(map, {
         op: "add_edge",
-        payload: { id: "rel-new", source: "comp-1", target: "comp-3", type: "DependsOn" },
+        payload: { id: "rel-new", consumer: "comp-1", supplier: "comp-3", type: "DependsOn" },
       });
       expect(ok).toBe(true);
       expect(map.relations).toHaveLength(3);
       const added = map.relations.find((r) => r.id === "rel-new")!;
-      expect(added.source).toBe("comp-1");
-      expect(added.target).toBe("comp-3");
+      expect(added.consumer).toBe("comp-1");
+      expect(added.supplier).toBe("comp-3");
       expect(added.type).toBe("DependsOn");
     });
 
@@ -595,7 +595,7 @@ describe("applyDiffOp", () => {
       const map = makeMap();
       const ok = applyDiffOp(map, {
         op: "add_edge",
-        payload: { id: "rel-flow", source: "comp-1", target: "comp-3", type: "Flow" },
+        payload: { id: "rel-flow", consumer: "comp-1", supplier: "comp-3", type: "Flow" },
       });
       expect(ok).toBe(true);
       const added = map.relations.find((r) => r.id === "rel-flow")!;
@@ -606,7 +606,7 @@ describe("applyDiffOp", () => {
       const map = makeMap();
       const ok = applyDiffOp(map, {
         op: "add_edge",
-        payload: { id: "rel-1", source: "comp-1", target: "comp-3", type: "DependsOn" },
+        payload: { id: "rel-1", consumer: "comp-1", supplier: "comp-3", type: "DependsOn" },
       });
       expect(ok).toBe(false);
       expect(map.relations).toHaveLength(2);
@@ -616,7 +616,7 @@ describe("applyDiffOp", () => {
       const map = makeMap();
       const ok = applyDiffOp(map, {
         op: "add_edge",
-        payload: { id: "rel-bad", source: "no-such", target: "comp-2", type: "DependsOn" },
+        payload: { id: "rel-bad", consumer: "no-such", supplier: "comp-2", type: "DependsOn" },
       });
       expect(ok).toBe(false);
       expect(map.relations).toHaveLength(2);
@@ -626,7 +626,7 @@ describe("applyDiffOp", () => {
       const map = makeMap();
       const ok = applyDiffOp(map, {
         op: "add_edge",
-        payload: { id: "rel-bad", source: "comp-1", target: "no-such", type: "DependsOn" },
+        payload: { id: "rel-bad", consumer: "comp-1", supplier: "no-such", type: "DependsOn" },
       });
       expect(ok).toBe(false);
       expect(map.relations).toHaveLength(2);
@@ -636,7 +636,7 @@ describe("applyDiffOp", () => {
       const map = makeMap();
       const ok = applyDiffOp(map, {
         op: "add_edge",
-        payload: { id: "rel-self", source: "comp-1", target: "comp-1", type: "DependsOn" },
+        payload: { id: "rel-self", consumer: "comp-1", supplier: "comp-1", type: "DependsOn" },
       });
       expect(ok).toBe(false);
       expect(map.relations).toHaveLength(2);
@@ -646,11 +646,11 @@ describe("applyDiffOp", () => {
       const map = makeMap();
       applyDiffOp(map, {
         op: "add_edge",
-        payload: { id: "rel-new", source: "comp-1", target: "comp-3", type: "DependsOn" },
+        payload: { id: "rel-new", consumer: "comp-1", supplier: "comp-3", type: "DependsOn" },
       });
       // Original relations unchanged
-      expect(map.relations.find((r) => r.id === "rel-1")!.source).toBe("comp-1");
-      expect(map.relations.find((r) => r.id === "rel-2")!.source).toBe("comp-2");
+      expect(map.relations.find((r) => r.id === "rel-1")!.consumer).toBe("comp-1");
+      expect(map.relations.find((r) => r.id === "rel-2")!.consumer).toBe("comp-2");
     });
   });
 
@@ -1161,7 +1161,7 @@ describe("applyDiffOps", () => {
   it("applies edge operations in batch", () => {
     const map = makeMap();
     const results = applyDiffOps(map, [
-      { op: "add_edge", payload: { id: "rel-new", source: "comp-1", target: "comp-3", type: "DependsOn" } },
+      { op: "add_edge", payload: { id: "rel-new", consumer: "comp-1", supplier: "comp-3", type: "DependsOn" } },
       { op: "delete_edge", payload: { id: "rel-1" } },
     ]);
     expect(results).toEqual([true, true]);
@@ -1174,7 +1174,7 @@ describe("applyDiffOps", () => {
     const map = makeMap();
     // Try to add edge to a component that doesn't exist yet, then add it
     const results = applyDiffOps(map, [
-      { op: "add_edge", payload: { id: "rel-bad", source: "comp-new", target: "comp-1", type: "DependsOn" } },
+      { op: "add_edge", payload: { id: "rel-bad", consumer: "comp-new", supplier: "comp-1", type: "DependsOn" } },
       { op: "add_component", payload: { id: "comp-new", name: "New", type: "component", evolution: 0.5, visibility: 0.5 } },
     ]);
     expect(results).toEqual([false, true]); // edge fails, component succeeds
@@ -1186,11 +1186,11 @@ describe("applyDiffOps", () => {
     const map = makeMap();
     const results = applyDiffOps(map, [
       { op: "add_component", payload: { id: "comp-new", name: "New", type: "component", evolution: 0.5, visibility: 0.5 } },
-      { op: "add_edge", payload: { id: "rel-new", source: "comp-1", target: "comp-new", type: "DependsOn" } },
+      { op: "add_edge", payload: { id: "rel-new", consumer: "comp-1", supplier: "comp-new", type: "DependsOn" } },
     ]);
     expect(results).toEqual([true, true]);
     expect(map.relations).toHaveLength(3);
-    expect(map.relations.find((r) => r.id === "rel-new")!.target).toBe("comp-new");
+    expect(map.relations.find((r) => r.id === "rel-new")!.supplier).toBe("comp-new");
   });
 });
 
@@ -1288,7 +1288,7 @@ function makePipelineMap(): WardleyMap {
       },
     ],
     relations: [
-      { id: "rel-1", source: "inside-1", target: "inside-2", type: "DependsOn" },
+      { id: "rel-1", consumer: "inside-1", supplier: "inside-2", type: "DependsOn" },
     ],
   } as WardleyMap;
 }
@@ -1496,7 +1496,7 @@ describe("integration: full workflow with all op types", () => {
     // 6. add_edge
     expect(applyDiffOp(map, {
       op: "add_edge",
-      payload: { id: "rel-new", source: "inside-1", target: "comp-new", type: "DependsOn" },
+      payload: { id: "rel-new", consumer: "inside-1", supplier: "comp-new", type: "DependsOn" },
     })).toBe(true);
     expect(map.relations).toHaveLength(2);
 
@@ -1545,7 +1545,7 @@ describe("integration: full workflow with all op types", () => {
       { op: "move_component", payload: { id: "c4", evolution: 0.6, visibility: 0.4 } },
       { op: "rename_component", payload: { id: "c4", name: "REST API" } },
       { op: "change_component_type", payload: { id: "c4", type: "anchor" } },
-      { op: "add_edge", payload: { id: "r3", source: "comp-1", target: "c4", type: "DependsOn" } },
+      { op: "add_edge", payload: { id: "r3", consumer: "comp-1", supplier: "c4", type: "DependsOn" } },
       { op: "change_edge_type", payload: { id: "r3", type: "Constraint" } },
       { op: "set_flow", payload: { id: "r3", flow: { label: "auth", style: "bold" } } },
       { op: "set_evolves_to", payload: { id: "comp-2", evolvesTo: "c4" } },
@@ -1576,7 +1576,7 @@ describe("round-trip consistency", () => {
     applyDiffOps(map, [
       { op: "rename_map", payload: { title: "Round Trip" } },
       { op: "add_component", payload: { id: "rt-1", name: "Service", type: "component", evolution: 0.333, visibility: 0.667 } },
-      { op: "add_edge", payload: { id: "rt-rel", source: "comp-1", target: "rt-1", type: "Flow" } },
+      { op: "add_edge", payload: { id: "rt-rel", consumer: "comp-1", supplier: "rt-1", type: "Flow" } },
       { op: "set_flow", payload: { id: "rt-rel", flow: { label: "events", style: "dashed" } } },
       { op: "move_component", payload: { id: "comp-2", evolution: 0.999, visibility: 0.001 } },
     ]);
@@ -1613,7 +1613,7 @@ describe("round-trip consistency", () => {
       { op: "rename_component", payload: { id: "comp-1", name: "Admin" } },
       { op: "move_component", payload: { id: "comp-2", evolution: 0.9, visibility: 0.2 } },
       { op: "add_component", payload: { id: "x", name: "X", type: "component", evolution: 0.5, visibility: 0.5 } },
-      { op: "add_edge", payload: { id: "rx", source: "comp-1", target: "x", type: "DependsOn" } },
+      { op: "add_edge", payload: { id: "rx", consumer: "comp-1", supplier: "x", type: "DependsOn" } },
       { op: "delete_edge", payload: { id: "rel-2" } },
     ];
 
@@ -1631,8 +1631,8 @@ describe("cascade integrity", () => {
     const map = makeMap();
     // Add extra edges involving comp-2
     applyDiffOps(map, [
-      { op: "add_edge", payload: { id: "r3", source: "comp-3", target: "comp-2", type: "DependsOn" } },
-      { op: "add_edge", payload: { id: "r4", source: "comp-2", target: "comp-1", type: "Flow" } },
+      { op: "add_edge", payload: { id: "r3", consumer: "comp-3", supplier: "comp-2", type: "DependsOn" } },
+      { op: "add_edge", payload: { id: "r4", consumer: "comp-2", supplier: "comp-1", type: "Flow" } },
     ]);
     expect(map.relations).toHaveLength(4);
 
@@ -1647,7 +1647,7 @@ describe("cascade integrity", () => {
     // Add edge between comp-1 and comp-3 (doesn't involve comp-2)
     applyDiffOp(map, {
       op: "add_edge",
-      payload: { id: "r-direct", source: "comp-1", target: "comp-3", type: "DependsOn" },
+      payload: { id: "r-direct", consumer: "comp-1", supplier: "comp-3", type: "DependsOn" },
     });
     expect(map.relations).toHaveLength(3);
 
@@ -1692,7 +1692,7 @@ describe("dispatcher exhaustiveness", () => {
       { op: "rename_component", payload: { id: "ex-1", name: "Exhaustive Component" } },
       { op: "change_component_type", payload: { id: "ex-1", type: "anchor" } },
       { op: "set_evolves_to", payload: { id: "inside-1", evolvesTo: "ex-1" } },
-      { op: "add_edge", payload: { id: "ex-rel", source: "inside-1", target: "ex-1", type: "DependsOn" } },
+      { op: "add_edge", payload: { id: "ex-rel", consumer: "inside-1", supplier: "ex-1", type: "DependsOn" } },
       { op: "change_edge_type", payload: { id: "ex-rel", type: "Flow" } },
       { op: "set_flow", payload: { id: "ex-rel", flow: { label: "signal", style: "bold" } } },
       { op: "resize_pipeline", payload: { id: "pipe-1", evoStart: 0.15, evoEnd: 0.85 } },
@@ -1715,7 +1715,7 @@ describe("dispatcher exhaustiveness", () => {
       { op: "add_component", payload: { id: "a", name: "A", evolution: 0.5, visibility: 0.5 } },
       { op: "delete_component", payload: { id: "a" } },
       { op: "rename_component", payload: { id: "a", name: "B" } },
-      { op: "add_edge", payload: { id: "e", source: "a", target: "b" } },
+      { op: "add_edge", payload: { id: "e", consumer: "a", supplier: "b" } },
       { op: "delete_edge", payload: { id: "e" } },
       { op: "change_component_type", payload: { id: "a", type: "anchor" } },
       { op: "set_evolves_to", payload: { id: "a", evolvesTo: "b" } },

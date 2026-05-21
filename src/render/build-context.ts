@@ -203,8 +203,8 @@ export function buildRenderContext(map: WardleyMap, options: RenderOptions = DEF
   // Edge geometry
   const edges: EdgeGeometry[] = [];
   for (const rel of adjustedMap.relations) {
-    const src = nodeById.get(rel.source);
-    const tgt = nodeById.get(rel.target);
+    const src = nodeById.get(rel.consumer);
+    const tgt = nodeById.get(rel.supplier);
     if (!src || !tgt) continue;
     edges.push({
       x1: src.cx,

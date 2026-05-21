@@ -23,7 +23,7 @@ function makeMap(overrides: Record<string, unknown> = {}): WardleyMap {
       { id: "a", label: { name: "User" }, type: "anchor", position: { evolution: { scalar: 0.5 }, visibility: { scalar: 0.1 } } },
       { id: "b", label: { name: "Service" }, type: "component", position: { evolution: { scalar: 0.6 }, visibility: { scalar: 0.5 } } },
     ],
-    relations: [{ id: "rel-a-b", source: "a", target: "b" }],
+    relations: [{ id: "rel-a-b", consumer: "a", supplier: "b" }],
     ...overrides,
   }));
 }
@@ -51,7 +51,7 @@ function makeAllTypesMap(): WardleyMap {
       { id: "f", label: { name: "Trading" }, type: "component", subtype: "market", position: { evolution: { scalar: 0.7 }, visibility: { scalar: 0.4 } } },
       { id: "g", label: { name: "Cloud" }, type: "component", subtype: "ecosystem", position: { evolution: { scalar: 0.8 }, visibility: { scalar: 0.6 } } },
     ],
-    relations: [{ id: "rel-a-b", source: "a", target: "b" }],
+    relations: [{ id: "rel-a-b", consumer: "a", supplier: "b" }],
   }));
 }
 
@@ -185,7 +185,7 @@ describe("LegendLayer — type+color", () => {
         { id: "f", label: { name: "Trading" }, type: "component", subtype: "market", position: { evolution: { scalar: 0.7 }, visibility: { scalar: 0.4 } } },
         { id: "g", label: { name: "Cloud" }, type: "component", subtype: "ecosystem", position: { evolution: { scalar: 0.8 }, visibility: { scalar: 0.6 } } },
       ],
-      relations: [{ id: "rel-a-b", source: "a", target: "b" }],
+      relations: [{ id: "rel-a-b", consumer: "a", supplier: "b" }],
     }));
     const ctx = buildRenderContext(allMap);
     const parts = renderLegendLayer(ctx);

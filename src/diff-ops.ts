@@ -105,8 +105,8 @@ const RelationType = z.enum(["DependsOn", "Flow", "Constraint"]).default("Depend
 
 export const AddEdgePayload = z.object({
   id: EdgeId,
-  source: ComponentId,
-  target: ComponentId,
+  consumer: ComponentId,
+  supplier: ComponentId,
   type: RelationType,
 });
 export type AddEdgePayload = z.infer<typeof AddEdgePayload>;
@@ -357,9 +357,9 @@ function applyDeleteComponent(map: WardleyMap, payload: DeleteComponentPayload):
   // Remove the component
   map.components.splice(idx, 1);
 
-  // Cascade-delete relations referencing this component (source or target)
+  // Cascade-delete relations referencing this component (consumer or supplier)
   map.relations = map.relations.filter(
-    (r) => r.source !== payload.id && r.target !== payload.id,
+    (r) => r.consumer !== payload.id && r.supplier !== payload.id,
   );
 
   // Cascade-delete evolvesTo references from other components that point to this id
@@ -385,9 +385,9 @@ function applyRenameComponent(map: WardleyMap, payload: RenameComponentPayload):
 /**
  * Add a new edge (relation) to the map. Validates that:
  * - No duplicate edge id exists
- * - Source component exists
- * - Target component exists
- * - Source and target are different components
+ * - Consumer component exists
+ * - Supplier component exists
+ * - Consumer and supplier are different components
  * Mutates the map in place.
  * @returns true if the edge was added, false otherwise.
  */
@@ -396,21 +396,21 @@ function applyAddEdge(map: WardleyMap, payload: AddEdgePayload): boolean {
   const exists = map.relations.some((r) => r.id === payload.id);
   if (exists) return false;
 
-  // Validate source component exists
-  const sourceExists = map.components.some((c) => c.id === payload.source);
-  if (!sourceExists) return false;
+  // Validate consumer component exists
+  const consumerExists = map.components.some((c) => c.id === payload.consumer);
+  if (!consumerExists) return false;
 
-  // Validate target component exists
-  const targetExists = map.components.some((c) => c.id === payload.target);
-  if (!targetExists) return false;
+  // Validate supplier component exists
+  const supplierExists = map.components.some((c) => c.id === payload.supplier);
+  if (!supplierExists) return false;
 
   // Reject self-links
-  if (payload.source === payload.target) return false;
+  if (payload.consumer === payload.supplier) return false;
 
   map.relations.push({
     id: payload.id,
-    source: payload.source,
-    target: payload.target,
+    consumer: payload.consumer,
+    supplier: payload.supplier,
     type: payload.type,
   });
   return true;
@@ -654,7 +654,7 @@ function applyRenameMap(map: WardleyMap, payload: RenameMapPayload): boolean {
  * buffer BEFORE the final `delete_component` op so that Claude sees every
  * state change with zero inference required:
  *
- *   1. `delete_edge` for every relation where source or target === componentId
+ *   1. `delete_edge` for every relation where consumer or supplier === componentId
  *   2. `set_evolves_to` { id, evolvesTo: null } for every component whose
  *      evolvesTo array references positions matching the deleted component
  *
@@ -670,7 +670,7 @@ export function expandDeleteCascade(map: WardleyMap, componentId: string): DiffO
 
   // 1. Explicit delete_edge for every relation referencing this component
   for (const r of map.relations) {
-    if (r.source === componentId || r.target === componentId) {
+    if (r.consumer === componentId || r.supplier === componentId) {
       ops.push({ op: "delete_edge", payload: { id: r.id } });
     }
   }

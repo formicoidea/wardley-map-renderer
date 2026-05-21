@@ -237,8 +237,8 @@ export function allEdgeSegments(
 ): EdgeSegment[] {
   const segments: EdgeSegment[] = [];
   for (const rel of map.relations) {
-    const src = positions.get(rel.source);
-    const tgt = positions.get(rel.target);
+    const src = positions.get(rel.consumer);
+    const tgt = positions.get(rel.supplier);
     if (!src || !tgt) continue;
     segments.push({
       x1: src.cx,

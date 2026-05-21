@@ -752,8 +752,8 @@ ${bundleScript}
     if (!rel) return;
     var gEl = edgeEls[relId];
     if (!gEl) return;
-    var srcComp = componentsById[rel.source];
-    var tgtComp = componentsById[rel.target];
+    var srcComp = componentsById[rel.consumer];
+    var tgtComp = componentsById[rel.supplier];
     if (!srcComp || !tgtComp) return;
     var srcPx = mapCoordsToPixel(srcComp.position.evolution.scalar, srcComp.position.visibility.scalar);
     var tgtPx = mapCoordsToPixel(tgtComp.position.evolution.scalar, tgtComp.position.visibility.scalar);
@@ -1616,15 +1616,15 @@ ${bundleScript}
       var newEdgeId = "rel_" + Date.now();
       applyOp("add_edge", {
         id: newEdgeId,
-        source: edgeSrcId,
-        target: edgeDstId,
+        consumer: edgeSrcId,
+        supplier: edgeDstId,
         type: "dependency"
       }, function(m) {
         if (!m.relations) m.relations = [];
         m.relations.push({
           id: newEdgeId,
-          source: edgeSrcId,
-          target: edgeDstId,
+          consumer: edgeSrcId,
+          supplier: edgeDstId,
           type: "dependency"
         });
       });
@@ -1850,8 +1850,8 @@ ${bundleScript}
       var rel = relationsById[selection.id];
       if (!rel) { hideContextZone(); return; }
       showContextPanel("edge");
-      var srcLabel = componentsById[rel.source] ? ((componentsById[rel.source].label && componentsById[rel.source].label.name) || rel.source) : rel.source;
-      var dstLabel = componentsById[rel.target] ? ((componentsById[rel.target].label && componentsById[rel.target].label.name) || rel.target) : rel.target;
+      var srcLabel = componentsById[rel.consumer] ? ((componentsById[rel.consumer].label && componentsById[rel.consumer].label.name) || rel.consumer) : rel.consumer;
+      var dstLabel = componentsById[rel.supplier] ? ((componentsById[rel.supplier].label && componentsById[rel.supplier].label.name) || rel.supplier) : rel.supplier;
       if (ctxEdgeLabel) ctxEdgeLabel.textContent = srcLabel + " → " + dstLabel;
       if (ctxEdgeType) ctxEdgeType.value = rel.type || "dependency";
     } else if (selection.type === "pipeline") {
@@ -1942,7 +1942,7 @@ ${bundleScript}
       var cascadeEvolvesFromIds = [];
       var deletedComp = null;
       (mapModel.relations || []).forEach(function(r) {
-        if (r.source === id || r.target === id) {
+        if (r.consumer === id || r.supplier === id) {
           cascadeEdgeIds.push(r.id);
         }
       });

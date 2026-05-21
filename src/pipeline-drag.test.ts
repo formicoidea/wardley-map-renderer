@@ -76,8 +76,8 @@ function makePipelineMap(overrides?: {
       ...(overrides?.extraComponents ?? []),
     ],
     relations: [
-      { id: "r1", source: "inside-1", target: "inside-2", type: "DependsOn" },
-      { id: "r2", source: "outside-1", target: "inside-1", type: "DependsOn" },
+      { id: "r1", consumer: "inside-1", supplier: "inside-2", type: "DependsOn" },
+      { id: "r2", consumer: "outside-1", supplier: "inside-1", type: "DependsOn" },
     ],
   } as WardleyMap;
 }

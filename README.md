@@ -26,7 +26,7 @@ const map: WardleyMap = WardleyMapSchema.parse({
       position: { evolution: { scalar: 0.85 }, visibility: { scalar: 0.25 } } }
   ],
   relations: [
-    { id: "r1", source: "customer", target: "cup-of-tea" }
+    { id: "r1", consumer: "customer", supplier: "cup-of-tea" }
   ]
 });
 

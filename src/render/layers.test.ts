@@ -41,7 +41,7 @@ function makeSimpleMap(overrides: Record<string, unknown> = {}): WardleyMap {
       { id: "a", label: { name: "User" }, type: "anchor", position: { evolution: { scalar: 0.5 }, visibility: { scalar: 0.1 } } },
       { id: "b", label: { name: "Service" }, type: "component", position: { evolution: { scalar: 0.6 }, visibility: { scalar: 0.5 } } },
     ],
-    relations: [{ id: "rel-a-b", source: "a", target: "b" }],
+    relations: [{ id: "rel-a-b", consumer: "a", supplier: "b" }],
     ...overrides,
   }));
 }
@@ -77,8 +77,8 @@ function makeMapWithFlowEdges(): WardleyMap {
       { id: "c", label: { name: "C" }, type: "component", position: { evolution: { scalar: 0.9 }, visibility: { scalar: 0.8 } } },
     ],
     relations: [
-      { id: "rel-a-b", source: "a", target: "b", type: "DependsOn" },
-      { id: "rel-b-c", source: "b", target: "c", type: "DependsOn", flow: { label: "data", style: "dashed" } },
+      { id: "rel-a-b", consumer: "a", supplier: "b", type: "DependsOn" },
+      { id: "rel-b-c", consumer: "b", supplier: "c", type: "DependsOn", flow: { label: "data", style: "dashed" } },
     ],
   }));
 }
@@ -362,7 +362,7 @@ describe("renderEdgesLayer", () => {
 
   it("skips edges referencing unknown components", () => {
     const map = makeSimpleMap({
-      relations: [{ id: "rel-a-nonexistent", source: "a", target: "nonexistent" }],
+      relations: [{ id: "rel-a-nonexistent", consumer: "a", supplier: "nonexistent" }],
     });
     const ctx = buildRenderContext(map);
     const parts = renderEdgesLayer(ctx);

@@ -91,8 +91,8 @@ interface PipelineGeometry {
 
 interface Relation {
   id: string;
-  source: string;
-  target: string;
+  consumer: string;
+  supplier: string;
   type?: string;
   flow?: { label: string; style?: string };
 }
@@ -288,8 +288,8 @@ function resolveColor(color: string | undefined): string {
     // 4. Edges
     const edges: EdgeGeo[] = [];
     for (const rel of map.relations) {
-      const src = nodeById.get(rel.source);
-      const tgt = nodeById.get(rel.target);
+      const src = nodeById.get(rel.consumer);
+      const tgt = nodeById.get(rel.supplier);
       if (!src || !tgt) continue;
       edges.push({
         x1: src.cx, y1: src.cy,
@@ -457,8 +457,8 @@ function resolveColor(color: string | undefined): string {
       const edgeFrags: string[] = [];
       const nodeById = new Map(nodes.map((n) => [n.id, n]));
       for (const edge of edges) {
-        const srcComp = nodeById.get(edge.relation.source)?.comp;
-        const tgtComp = nodeById.get(edge.relation.target)?.comp;
+        const srcComp = nodeById.get(edge.relation.consumer)?.comp;
+        const tgtComp = nodeById.get(edge.relation.supplier)?.comp;
         if (srcComp && excluded.has(srcComp.type)) continue;
         if (tgtComp && excluded.has(tgtComp.type)) continue;
         edgeFrags.push(renderEdge({
@@ -1086,14 +1086,14 @@ function resolveColor(color: string | undefined): string {
       pushSnapshot();
       applyOp("add_edge", {
         id: newEdgeId,
-        source: edgeSrcId,
-        target: edgeDstId,
+        consumer: edgeSrcId,
+        supplier: edgeDstId,
         type: "dependency",
       }, (m) => {
         m.relations.push({
           id: newEdgeId,
-          source: edgeSrcId!,
-          target: edgeDstId!,
+          consumer: edgeSrcId!,
+          supplier: edgeDstId!,
           type: "dependency",
         });
       });
