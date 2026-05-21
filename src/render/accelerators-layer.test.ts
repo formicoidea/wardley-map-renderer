@@ -99,12 +99,31 @@ describe("renderAcceleratorsLayer", () => {
     expect(result[1]).toContain("rotate(180)");
   });
 
-  it("positions arrows using evoToX/visToY coordinate conversion", () => {
+  it("positions the accelerator to the right of the node (y unchanged)", () => {
     const ctx = buildRenderContext(mapWithAccels([{ kind: "accelerator", evolution: 0.75, visibility: 0.25 }]));
     const result = renderAcceleratorsLayer(ctx);
     const expectedX = ctx.evoToX(0.75);
     const expectedY = ctx.visToY(0.25);
-    expect(result[0]).toContain(`translate(${expectedX}, ${expectedY})`);
+    const m = result[0].match(/translate\(([-\d.]+), ([-\d.]+)\)/);
+    expect(m).not.toBeNull();
+    const [, txStr, tyStr] = m!;
+    // The arrow sits beside the node at the same height
+    expect(Number(tyStr)).toBeCloseTo(expectedY, 6);
+    // Accelerator is offset to the right of the node center
+    expect(Number(txStr)).toBeGreaterThan(expectedX);
+  });
+
+  it("positions the deaccelerator to the left of the node (y unchanged)", () => {
+    const ctx = buildRenderContext(mapWithAccels([{ kind: "deaccelerator", evolution: 0.75, visibility: 0.25 }]));
+    const result = renderAcceleratorsLayer(ctx);
+    const expectedX = ctx.evoToX(0.75);
+    const expectedY = ctx.visToY(0.25);
+    const m = result[0].match(/translate\(([-\d.]+), ([-\d.]+)\)/);
+    expect(m).not.toBeNull();
+    const [, txStr, tyStr] = m!;
+    expect(Number(tyStr)).toBeCloseTo(expectedY, 6);
+    // Deaccelerator is offset to the left of the node center
+    expect(Number(txStr)).toBeLessThan(expectedX);
   });
 
   it("arrow path has fill and stroke attributes", () => {

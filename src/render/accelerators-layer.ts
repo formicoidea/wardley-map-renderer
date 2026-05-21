@@ -15,13 +15,34 @@
  */
 
 import type { RenderContext, LayerRenderer } from "./types.js";
+import type { Component } from "../schema.js";
+import { resolveTypeStyle } from "../schema.js";
+import { componentRenderableType } from "../renderable-type.js";
 import {
   renderAccelerator,
   buildArrowPath as buildArrowPathPrimitive,
+  MARKET_OUTER_R,
+  ECO_OUTER_R,
+  METHOD_AURA_R,
 } from "./svg-primitives.js";
 
 // Re-export buildArrowPath for backward compatibility with tests
 export const buildArrowPath = buildArrowPathPrimitive;
+
+/**
+ * Effective visual radius of a node, used to offset the accelerator arrow so it
+ * clears the node's actual footprint (not just its nominal nodeRadii value):
+ *   - ecosystem / market glyphs use fixed radii independent of nodeRadii
+ *   - a method aura (when present) extends the footprint to METHOD_AURA_R
+ */
+function effectiveVisualRadius(comp: Component, ctx: RenderContext): number {
+  const rt = componentRenderableType(comp.type, comp.subtype);
+  if (rt === "ecosystem") return ECO_OUTER_R;
+  if (rt === "market") return MARKET_OUTER_R;
+  let r = resolveTypeStyle<number>(ctx.resolvedConfig.nodeRadii, rt) as number;
+  if (comp.method) r = Math.max(r, METHOD_AURA_R);
+  return r;
+}
 
 // ── Layer renderer ───────────────────────────────────────────────────
 
@@ -57,6 +78,7 @@ export const renderAcceleratorsLayer: LayerRenderer = (
       label: "",
       type,
       fontFamily,
+      nodeRadius: effectiveVisualRadius(comp, ctx),
     }));
   }
 

@@ -728,6 +728,11 @@ const ARROW_STROKE = "#000000";
 const ARROW_FILL = "#000000";
 const ACC_LABEL_FONT_SIZE = 12;
 const ACC_LABEL_GAP = 6;
+// Gap between the node edge and the near edge of the arrow, so the arrow sits
+// beside the node instead of overlapping its center.
+const ACC_GAP = 6;
+// Fallback node radius when the caller does not provide one (matches the method aura).
+const ACC_DEFAULT_NODE_R = 16;
 
 export { ARROW_W, ARROW_HALF_H };
 
@@ -759,25 +764,38 @@ export interface AcceleratorRenderInput {
   readonly label: string;
   readonly type: "accelerator" | "deaccelerator";
   readonly fontFamily: string;
+  /** Radius of the node this arrow decorates, used to offset the arrow to its side */
+  readonly nodeRadius?: number;
 }
 
 /**
  * Render an accelerator/deaccelerator arrow with label.
+ *
+ * The arrow is offset horizontally so it sits beside the node instead of
+ * overlapping its center: to the right (pointing right) for an accelerator,
+ * to the left (pointing left) for a deaccelerator. The near edge of the arrow
+ * starts at `nodeRadius + ACC_GAP` from the node center.
  */
 export function renderAccelerator(input: AcceleratorRenderInput): string {
   const { cx, cy, label, type, fontFamily } = input;
+  const nodeRadius = input.nodeRadius ?? ACC_DEFAULT_NODE_R;
   const isDeaccelerator = type === "deaccelerator";
   const rotation = isDeaccelerator ? 180 : 0;
   const arrowD = buildArrowPath();
 
+  // Distance from the node center to the arrow center: clear the node radius +
+  // a gap, then half the arrow so the near edge lands exactly at that gap.
+  const offset = nodeRadius + ACC_GAP + ARROW_W / 2;
+  const arrowCx = isDeaccelerator ? cx - offset : cx + offset;
+
   const arrowSvg =
     `<path d="${arrowD}" ` +
-    `transform="translate(${cx}, ${cy})${rotation ? ` rotate(${rotation})` : ""}" ` +
+    `transform="translate(${arrowCx}, ${cy})${rotation ? ` rotate(${rotation})` : ""}" ` +
     `fill="${ARROW_FILL}" stroke="${ARROW_STROKE}" stroke-width="1" />`;
 
   const labelX = isDeaccelerator
-    ? cx - ARROW_W / 2 - ACC_LABEL_GAP
-    : cx + ARROW_W / 2 + ACC_LABEL_GAP;
+    ? arrowCx - ARROW_W / 2 - ACC_LABEL_GAP
+    : arrowCx + ARROW_W / 2 + ACC_LABEL_GAP;
   const textAnchor = isDeaccelerator ? "end" : "start";
 
   const labelSvg =
