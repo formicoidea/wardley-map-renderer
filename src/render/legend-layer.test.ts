@@ -557,7 +557,7 @@ describe("LegendLayer — i18n for new elements", () => {
 // ── Market & Ecosystem in legend ──────────────────────────────────────
 
 describe("LegendLayer — Market & Ecosystem entries", () => {
-  it("market type present → 'Market' entry with triangle-in-circle swatch", () => {
+  it("market type present → 'Market' entry with rings-and-triangle swatch", () => {
     const map = sanitizeMap(WardleyMapSchema.parse({
       title: "Market",
       components: [
@@ -569,8 +569,9 @@ describe("LegendLayer — Market & Ecosystem entries", () => {
     const parts = renderLegendLayer(ctx);
     const svg = parts.join("");
     expect(svg).toContain("Market");
-    // Triangle inscribed in circle: polygon for triangle + circle for outer ring
+    // Triangle connecting the nodes + ring circles, no center spokes
     expect(svg).toContain("<polygon");
+    expect(svg).not.toContain("<line");
     expect(svg).toContain("<circle");
   });
 

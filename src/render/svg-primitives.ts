@@ -50,8 +50,10 @@ const ECO_HATCH_SPACING = 4;
 
 // Market symbol constants
 const MARKET_OUTER_R = 16;
-const MARKET_VERTEX_R = 3;
-const MARKET_TRIANGLE_R = MARKET_OUTER_R - MARKET_VERTEX_R; // 13
+const MARKET_VERTEX_R = 5; // ring (hollow node) radius
+const MARKET_TRIANGLE_R = 9; // distance from center to each node
+const MARKET_RING_SW_MULT = 2.4; // ring stroke = strokeWidth × this (bold rings)
+const MARKET_TRI_SW_MULT = 1.6; // triangle edge stroke = strokeWidth × this
 const SIN60 = Math.sin(Math.PI / 3);
 const COS60 = Math.cos(Math.PI / 3);
 
@@ -146,8 +148,10 @@ export function renderEcosystemSymbol(
 }
 
 /**
- * Render the market symbol: outer circle with inscribed equilateral triangle
- * and 3 small vertex circles.
+ * Render the market symbol: outer circle containing 3 bold hollow rings
+ * (the nodes), connected to one another by a triangle. The rings have a white
+ * fill and sit on top of the triangle, so the triangle reads as edges between
+ * the nodes.
  */
 export function renderMarketSymbol(
   cx: number,
@@ -166,21 +170,19 @@ export function renderMarketSymbol(
   const brX = cx + MARKET_TRIANGLE_R * SIN60;
   const brY = cy + MARKET_TRIANGLE_R * COS60;
 
+  // Triangle connecting the three nodes (drawn behind the rings).
+  const triSW = strokeWidth * MARKET_TRI_SW_MULT;
   const triangle =
     `<polygon points="${topX},${topY} ${blX},${blY} ${brX},${brY}" ` +
-    `fill="none" stroke="${stroke}" stroke-width="${strokeWidth}" stroke-linejoin="round" />`;
+    `fill="none" stroke="${stroke}" stroke-width="${triSW}" stroke-linejoin="round" />`;
 
-  const c1 =
-    `<circle cx="${topX}" cy="${topY}" r="${MARKET_VERTEX_R}" ` +
-    `fill="${NODE_FILL}" stroke="${stroke}" stroke-width="${strokeWidth}" />`;
-  const c2 =
-    `<circle cx="${blX}" cy="${blY}" r="${MARKET_VERTEX_R}" ` +
-    `fill="${NODE_FILL}" stroke="${stroke}" stroke-width="${strokeWidth}" />`;
-  const c3 =
-    `<circle cx="${brX}" cy="${brY}" r="${MARKET_VERTEX_R}" ` +
-    `fill="${NODE_FILL}" stroke="${stroke}" stroke-width="${strokeWidth}" />`;
+  // Three bold hollow rings (white fill so the triangle is hidden behind them).
+  const ringSW = strokeWidth * MARKET_RING_SW_MULT;
+  const ring = (x: number, y: number) =>
+    `<circle cx="${x}" cy="${y}" r="${MARKET_VERTEX_R}" ` +
+    `fill="${NODE_FILL}" stroke="${stroke}" stroke-width="${ringSW}" />`;
 
-  return outerCircle + triangle + c1 + c2 + c3;
+  return outerCircle + triangle + ring(topX, topY) + ring(blX, blY) + ring(brX, brY);
 }
 
 /**

@@ -128,12 +128,15 @@ describe("renderEcosystemSymbol", () => {
 });
 
 describe("renderMarketSymbol", () => {
-  it("renders outer circle + triangle + 3 vertex circles", () => {
+  it("renders outer circle + triangle + 3 hollow rings", () => {
     const svg = renderMarketSymbol(100, 200, "#000", 1);
-    // 1 outer + 3 vertex = 4 circles
+    // 1 outer + 3 rings = 4 circles (no center dot)
     const circles = svg.match(/<circle/g) ?? [];
     expect(circles.length).toBe(4);
+    // triangle connecting the 3 nodes, no spokes
     expect(svg).toContain("<polygon");
+    const lines = svg.match(/<line/g) ?? [];
+    expect(lines.length).toBe(0);
   });
 });
 
@@ -181,7 +184,7 @@ describe("renderComponentNode", () => {
     expect(svg).toContain("<polyline");
   });
 
-  it("market: outer circle + triangle + vertex circles", () => {
+  it("market: outer circle + triangle + 3 hollow rings", () => {
     const svg = renderComponentNode({
       id: "m1", type: "market", cx: 100, cy: 200,
       radius: 5, stroke: "#000", strokeWidth: 1,
@@ -189,6 +192,8 @@ describe("renderComponentNode", () => {
     const circles = svg.match(/<circle/g) ?? [];
     expect(circles.length).toBe(4);
     expect(svg).toContain("<polygon");
+    const lines = svg.match(/<line/g) ?? [];
+    expect(lines.length).toBe(0);
   });
 
   it("ecosystem: 3 concentric circles with hatch pattern", () => {
@@ -551,7 +556,7 @@ describe("svg-primitives server render parity", () => {
     expect(joinedSvg).toContain("<circle");
     // Anchor: person silhouette
     expect(joinedSvg).toContain("<polyline");
-    // Market: polygon triangle
+    // Market: triangle connecting the nodes
     expect(joinedSvg).toContain("<polygon");
     // Ecosystem: hatch pattern
     expect(joinedSvg).toContain("<pattern");

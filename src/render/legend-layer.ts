@@ -183,30 +183,30 @@ function collectLegendItems(ctx: RenderContext): LegendItem[] {
         },
       });
     } else if (type === "market") {
-      // Market swatch: small circle + inscribed triangle + 3 vertex dots (scaled down for legend)
+      // Market swatch: outer circle + 3 bold hollow rings connected by a triangle (scaled down for legend)
       items.push({
         label,
         renderSwatch: (x, y) => {
           const cx = x + SWATCH_CX;
           const cy = y + SWATCH_CY;
           const r = MARKET_LEGEND_R;
+          const triR = r * 0.56; // ≈ MARKET_TRIANGLE_R / MARKET_OUTER_R
+          const ringR = r * 0.33; // ≈ MARKET_VERTEX_R / MARKET_OUTER_R
           const tTopX = cx;
-          const tTopY = cy - r;
-          const tBlX = cx - r * SIN60;
-          const tBlY = cy + r * COS60;
-          const tBrX = cx + r * SIN60;
-          const tBrY = cy + r * COS60;
+          const tTopY = cy - triR;
+          const tBlX = cx - triR * SIN60;
+          const tBlY = cy + triR * COS60;
+          const tBrX = cx + triR * SIN60;
+          const tBrY = cy + triR * COS60;
+          const ring = (rx: number, ry: number) =>
+            `<circle cx="${rx}" cy="${ry}" r="${ringR}" ` +
+            `fill="#ffffff" stroke="${color}" stroke-width="1.5" />`;
           return (
             `<circle cx="${cx}" cy="${cy}" r="${r}" ` +
             `fill="#ffffff" stroke="${color}" stroke-width="1" />` +
             `<polygon points="${tTopX},${tTopY} ${tBlX},${tBlY} ${tBrX},${tBrY}" ` +
             `fill="none" stroke="${color}" stroke-width="1" stroke-linejoin="round" />` +
-            `<circle cx="${tTopX}" cy="${tTopY}" r="2" ` +
-            `fill="#ffffff" stroke="${color}" stroke-width="1" />` +
-            `<circle cx="${tBlX}" cy="${tBlY}" r="2" ` +
-            `fill="#ffffff" stroke="${color}" stroke-width="1" />` +
-            `<circle cx="${tBrX}" cy="${tBrY}" r="2" ` +
-            `fill="#ffffff" stroke="${color}" stroke-width="1" />`
+            ring(tTopX, tTopY) + ring(tBlX, tBlY) + ring(tBrX, tBrY)
           );
         },
       });

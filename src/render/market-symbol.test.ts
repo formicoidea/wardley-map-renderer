@@ -1,8 +1,10 @@
 /**
  * Tests for the Market symbol rendering.
  *
- * Market symbol: outer circle (r=16, matching Method aura) with equilateral triangle
- * inscribed so vertex circles are fully contained inside the outer circle.
+ * Market symbol: outer circle (r=16, matching Method aura) containing 3 filled
+ * vertex dots connected to the center by spokes, plus a small filled center dot.
+ * The 3 vertices sit on an equilateral triangle inscribed so vertex circles are
+ * fully contained inside the outer circle.
  * MARKET_OUTER_R = 16, MARKET_TRIANGLE_R = 13 (= OUTER_R - VERTEX_R).
  * Rendered by nodes-layer when component type is "market".
  */
@@ -63,11 +65,12 @@ function makeMinimalContext(
 // ── Tests ───────────────────────────────────────────────────────────
 
 describe("MarketSymbol rendering", () => {
-  it("exports MARKET_OUTER_R = 16 (matches Method aura), MARKET_TRIANGLE_R = 13 (vertex circles inscribed), MARKET_VERTEX_R = 3", () => {
+  it("exports MARKET_OUTER_R = 16 (matches Method aura), MARKET_TRIANGLE_R = 9 (node ring distance), MARKET_VERTEX_R = 5 (ring radius)", () => {
     expect(MARKET_OUTER_R).toBe(16);
-    expect(MARKET_TRIANGLE_R).toBe(13); // OUTER_R - VERTEX_R so vertex circles stay inside
-    expect(MARKET_TRIANGLE_R).toBe(MARKET_OUTER_R - MARKET_VERTEX_R);
-    expect(MARKET_VERTEX_R).toBe(3);
+    expect(MARKET_TRIANGLE_R).toBe(9);
+    expect(MARKET_VERTEX_R).toBe(5);
+    // Rings stay inside the outer circle: triangle distance + ring radius ≤ outer
+    expect(MARKET_TRIANGLE_R + MARKET_VERTEX_R).toBeLessThanOrEqual(MARKET_OUTER_R);
   });
 
   it("outer circle R=16 matches Method aura, triangle vertices touch circle", () => {
@@ -85,13 +88,13 @@ describe("MarketSymbol rendering", () => {
     expect(svg).toContain('cx="400"');
     expect(svg).toContain('cy="200"');
 
-    // Triangle vertices at distance MARKET_TRIANGLE_R from center
-    // Top vertex at (cx, cy - 30): vertex touches outer circle edge
+    // Vertices at distance MARKET_TRIANGLE_R from center
+    // Top vertex dot at (cx, cy - MARKET_TRIANGLE_R): touches outer circle edge
     const topVertexY = cy - MARKET_TRIANGLE_R;
-    expect(svg).toContain(`${cx},${topVertexY}`);
+    expect(svg).toContain(`cx="${cx}" cy="${topVertexY}" r="${MARKET_VERTEX_R}"`);
   });
 
-  it("renders an inscribed equilateral triangle (polygon element)", () => {
+  it("renders a triangle connecting the 3 nodes (polygon element), no spokes", () => {
     const comp = makeMarketComponent();
     const node: NodeGeometry = { id: "mkt-1", cx: 400, cy: 200, component: comp };
     const ctx = makeMinimalContext([node]);
@@ -99,12 +102,14 @@ describe("MarketSymbol rendering", () => {
     const parts = renderNodesLayer(ctx);
     const svg = parts.join("");
 
-    // Should contain a polygon for the triangle
+    // Nodes are connected by a triangle, not spokes to the center
     expect(svg).toContain("<polygon");
-    expect(svg).toContain("stroke-linejoin=\"round\"");
+    expect(svg).toContain('stroke-linejoin="round"');
+    const lineCount = (svg.match(/<line /g) || []).length;
+    expect(lineCount).toBe(0);
   });
 
-  it("renders 3 vertex circles with r=3", () => {
+  it("renders 3 ring circles with r=5", () => {
     const comp = makeMarketComponent();
     const node: NodeGeometry = { id: "mkt-1", cx: 400, cy: 200, component: comp };
     const ctx = makeMinimalContext([node]);
@@ -112,13 +117,13 @@ describe("MarketSymbol rendering", () => {
     const parts = renderNodesLayer(ctx);
     const svg = parts.join("");
 
-    // Count circles with r="3" — should be exactly 3 vertex circles
-    const r3Matches = svg.match(/r="3"/g);
-    expect(r3Matches).not.toBeNull();
-    expect(r3Matches!.length).toBe(3);
+    // Count circles with r="5" — should be exactly 3 node rings
+    const r5Matches = svg.match(/r="5"/g);
+    expect(r5Matches).not.toBeNull();
+    expect(r5Matches!.length).toBe(3);
   });
 
-  it("total SVG has 5 elements: 1 outer circle + 1 polygon + 3 vertex circles", () => {
+  it("total SVG has 4 circles (outer + 3 rings) and 1 triangle, no center dot", () => {
     const comp = makeMarketComponent();
     const node: NodeGeometry = { id: "mkt-1", cx: 400, cy: 200, component: comp };
     const ctx = makeMinimalContext([node]);
@@ -128,16 +133,16 @@ describe("MarketSymbol rendering", () => {
     expect(parts.length).toBe(1);
     const svg = parts[0];
 
-    // Count circle elements (1 outer + 3 vertex = 4)
+    // Count circle elements (1 outer + 3 rings = 4, no center dot)
     const circleCount = (svg.match(/<circle /g) || []).length;
     expect(circleCount).toBe(4);
 
-    // Count polygon elements (1 triangle)
+    // Exactly one triangle
     const polygonCount = (svg.match(/<polygon /g) || []).length;
     expect(polygonCount).toBe(1);
   });
 
-  it("triangle top vertex is at (cx, cy - MARKET_TRIANGLE_R)", () => {
+  it("top vertex dot is at (cx, cy - MARKET_TRIANGLE_R)", () => {
     const comp = makeMarketComponent();
     const cx = 500;
     const cy = 300;
@@ -147,9 +152,9 @@ describe("MarketSymbol rendering", () => {
     const parts = renderNodesLayer(ctx);
     const svg = parts.join("");
 
-    // Top vertex of inscribed triangle: (cx, cy - MARKET_TRIANGLE_R) = (500, 270)
+    // Top vertex dot: (cx, cy - MARKET_TRIANGLE_R) = (500, 270)
     const topY = cy - MARKET_TRIANGLE_R;
-    expect(svg).toContain(`${cx},${topY}`);
+    expect(svg).toContain(`cx="${cx}" cy="${topY}" r="${MARKET_VERTEX_R}"`);
   });
 
   it("respects component.color override", () => {
@@ -195,14 +200,13 @@ describe("MarketSymbol rendering", () => {
     const parts = renderNodesLayer(ctx);
     const svg = parts.join("");
 
-    // Should NOT have a circle with the default radius (5) as main node
-    // It should have r="16" (outer) and r="3" (vertex circles)
-    // The key check: it should have a polygon (triangle), not just circles
+    // Should NOT have a circle with the default radius (5) as main node.
+    // The key check: it should have a connecting triangle + an outer r=16 circle.
     expect(svg).toContain("<polygon");
     expect(svg).toContain(`r="${MARKET_OUTER_R}"`);
   });
 
-  it("vertex circles are white-filled with stroke", () => {
+  it("the rings are hollow (white fill); the triangle has no fill", () => {
     const comp = makeMarketComponent();
     const node: NodeGeometry = { id: "mkt-1", cx: 400, cy: 200, component: comp };
     const ctx = makeMinimalContext([node]);
@@ -210,10 +214,16 @@ describe("MarketSymbol rendering", () => {
     const parts = renderNodesLayer(ctx);
     const svg = parts.join("");
 
-    // All circles should have white fill
-    const fillMatches = svg.match(/fill="#ffffff"/g);
-    expect(fillMatches).not.toBeNull();
-    // 4 circles (1 outer + 3 vertex) all with white fill
-    expect(fillMatches!.length).toBe(4);
+    // Outer circle + 3 rings are all white-filled → 4 white fills
+    const whiteFills = svg.match(/fill="#ffffff"/g);
+    expect(whiteFills).not.toBeNull();
+    expect(whiteFills!.length).toBe(4);
+
+    // The triangle is not filled
+    expect(svg).toContain('fill="none"');
+
+    // No element is filled with the stroke color (rings are hollow, no center dot)
+    const blackFills = svg.match(/fill="#000000"/g);
+    expect(blackFills).toBeNull();
   });
 });
