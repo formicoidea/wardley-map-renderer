@@ -35,10 +35,13 @@ export function esc(s: string): string {
 const NODE_FILL = "#ffffff";
 const NODE_STROKE = "#000000";
 
-// Person silhouette constants (relative to node center)
-const HEAD_OFFSET_Y = -2;
-const HEAD_RADIUS = 1.5;
-const BODY_STROKE_WIDTH = 1.2;
+// Person silhouette (anchor avatar) — ratios relative to the node radius
+const PERSON_HEAD_R = 0.30; // head radius
+const PERSON_HEAD_CY = 0.30; // head center offset above the node center
+const PERSON_SHOULDER_W = 0.55; // shoulders half-width
+const PERSON_SHOULDER_TOP = 0.10; // shoulders dome apex offset below center
+const PERSON_SHOULDER_BOTTOM = 1.05; // shoulders bottom offset (clipped by the circle)
+const PERSON_SW_MULT = 1.2; // silhouette stroke = strokeWidth × this
 
 // Ecosystem symbol constants
 const ECO_OUTER_R = 30;
@@ -88,29 +91,44 @@ export function renderNodeCircle(
 }
 
 /**
- * Render a person silhouette (head + body triangle) inside the anchor circle.
- * The silhouette is centered at (cx, cy) and fits within NODE_RADIUS=5.
+ * Render a "user in a circle" avatar inside the anchor circle: a head ring and
+ * a shoulders dome (thin outline), clipped to the node circle so the bust is cut
+ * cleanly at the edge. Scales with the node radius `r`. `id` makes the clipPath
+ * unique per node.
  */
-export function renderPersonSilhouette(cx: number, cy: number, stroke: string): string {
-  const hx = cx;
-  const hy = cy + HEAD_OFFSET_Y;
+export function renderPersonSilhouette(
+  cx: number,
+  cy: number,
+  r: number,
+  id: string,
+  stroke: string,
+  strokeWidth: number,
+): string {
+  const silSW = strokeWidth * PERSON_SW_MULT;
+  const hr = r * PERSON_HEAD_R;
+  const hcy = cy - r * PERSON_HEAD_CY;
+  const sw = r * PERSON_SHOULDER_W;
+  const sBottom = cy + r * PERSON_SHOULDER_BOTTOM;
+  const sTopY = cy + r * PERSON_SHOULDER_TOP;
+  const ry = sBottom - sTopY;
 
-  const topX = cx;
-  const topY = cy - 0.5;
-  const leftX = cx - 2.5;
-  const leftY = cy + 3.5;
-  const rightX = cx + 2.5;
-  const rightY = cy + 3.5;
+  const clipId = `anchor-clip-${id}`;
+  const clip =
+    `<defs><clipPath id="${clipId}">` +
+    `<circle cx="${cx}" cy="${cy}" r="${r - strokeWidth / 2}" />` +
+    `</clipPath></defs>`;
 
   const head =
-    `<circle cx="${hx}" cy="${hy}" r="${HEAD_RADIUS}" ` +
-    `fill="none" stroke="${stroke}" stroke-width="${BODY_STROKE_WIDTH}" />`;
+    `<circle cx="${cx}" cy="${hcy}" r="${hr}" ` +
+    `fill="none" stroke="${stroke}" stroke-width="${silSW}" />`;
 
-  const body =
-    `<polyline points="${topX},${topY} ${leftX},${leftY} ${rightX},${rightY} ${topX},${topY}" ` +
-    `fill="none" stroke="${stroke}" stroke-width="${BODY_STROKE_WIDTH}" stroke-linejoin="round" />`;
+  // Shoulders as an upward-bulging arc (dome); endpoints sit below the circle
+  // and are clipped, matching the reference avatar's clipped bust.
+  const shoulders =
+    `<path d="M ${cx - sw} ${sBottom} A ${sw} ${ry} 0 0 1 ${cx + sw} ${sBottom}" ` +
+    `fill="none" stroke="${stroke}" stroke-width="${silSW}" stroke-linecap="round" />`;
 
-  return head + body;
+  return `${clip}<g clip-path="url(#${clipId})">${head}${shoulders}</g>`;
 }
 
 /**
@@ -278,7 +296,7 @@ export function renderComponentNode(input: NodeRenderInput): string {
     nodeSvg = renderEcosystemSymbol(cx, cy, id, stroke, strokeWidth);
   } else if (type === "anchor") {
     nodeSvg = renderNodeCircle(cx, cy, radius, stroke, strokeWidth) +
-      renderPersonSilhouette(cx, cy, stroke);
+      renderPersonSilhouette(cx, cy, radius, id, stroke, strokeWidth);
   } else {
     nodeSvg = renderNodeCircle(cx, cy, radius, stroke, strokeWidth);
   }

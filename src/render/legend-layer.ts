@@ -153,13 +153,23 @@ function collectLegendItems(ctx: RenderContext): LegendItem[] {
         renderSwatch: (x, y) => {
           const cx = x + 12;
           const cy = y + 10;
+          const r = 5;
+          const hr = r * 0.3;
+          const hcy = cy - r * 0.3;
+          const sw = r * 0.55;
+          const sBottom = cy + r * 1.05;
+          const ry = sBottom - (cy + r * 0.1);
           return (
-            `<circle cx="${cx}" cy="${cy}" r="5" ` +
+            `<defs><clipPath id="anchor-legend-clip">` +
+            `<circle cx="${cx}" cy="${cy}" r="${r - 0.75}" /></clipPath></defs>` +
+            `<circle cx="${cx}" cy="${cy}" r="${r}" ` +
             `fill="#ffffff" stroke="${color}" stroke-width="1.5" />` +
-            `<circle cx="${cx}" cy="${cy - 2}" r="1.5" ` +
+            `<g clip-path="url(#anchor-legend-clip)">` +
+            `<circle cx="${cx}" cy="${hcy}" r="${hr}" ` +
             `fill="none" stroke="${color}" stroke-width="1" />` +
-            `<polyline points="${cx},${cy - 0.5} ${cx - 2.5},${cy + 3.5} ${cx + 2.5},${cy + 3.5} ${cx},${cy - 0.5}" ` +
-            `fill="none" stroke="${color}" stroke-width="1" stroke-linejoin="round" />`
+            `<path d="M ${cx - sw} ${sBottom} A ${sw} ${ry} 0 0 1 ${cx + sw} ${sBottom}" ` +
+            `fill="none" stroke="${color}" stroke-width="1" stroke-linecap="round" />` +
+            `</g>`
           );
         },
       });

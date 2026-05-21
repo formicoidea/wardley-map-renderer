@@ -484,7 +484,7 @@ describe("renderNodesLayer", () => {
 
     // anchor is excluded, component remains
     // person silhouette (from anchor) should not be present
-    expect(parts.some((p) => p.includes("polyline"))).toBe(false);
+    expect(parts.some((p) => p.includes("anchor-clip"))).toBe(false);
   });
 
   it("uses strokeWidth from renderConfig for node circles", () => {

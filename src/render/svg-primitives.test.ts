@@ -107,11 +107,13 @@ describe("renderNodeCircle", () => {
 });
 
 describe("renderPersonSilhouette", () => {
-  it("renders head circle and body polyline", () => {
-    const svg = renderPersonSilhouette(100, 200, "#000");
-    expect(svg).toContain("<circle");
-    expect(svg).toContain("<polyline");
-    expect(svg).toContain('stroke-linejoin="round"');
+  it("renders a clipped head ring and shoulders dome (no triangle body)", () => {
+    const svg = renderPersonSilhouette(100, 200, 5, "a1", "#000", 1);
+    expect(svg).toContain("<circle"); // head ring
+    expect(svg).toContain("<path"); // shoulders dome (arc)
+    expect(svg).toContain("<clipPath");
+    expect(svg).toContain('clip-path="url(#anchor-clip-a1)"');
+    expect(svg).not.toContain("<polyline");
   });
 });
 
@@ -175,13 +177,15 @@ describe("renderComponentNode", () => {
     expect(svg).not.toContain("<polygon");
   });
 
-  it("anchor: circle + person silhouette", () => {
+  it("anchor: circle + user avatar (head ring + shoulders dome, clipped)", () => {
     const svg = renderComponentNode({
       id: "a1", type: "anchor", cx: 100, cy: 200,
       radius: 5, stroke: "#000", strokeWidth: 1,
     });
     expect(svg).toContain("<circle");
-    expect(svg).toContain("<polyline");
+    expect(svg).toContain("<path"); // shoulders dome
+    expect(svg).toContain('clip-path="url(#anchor-clip-a1)"');
+    expect(svg).not.toContain("<polyline");
   });
 
   it("market: outer circle + triangle + 3 hollow rings", () => {
@@ -554,8 +558,8 @@ describe("svg-primitives server render parity", () => {
     const joinedSvg = serverSvg;
     // Standard component: simple circle
     expect(joinedSvg).toContain("<circle");
-    // Anchor: person silhouette
-    expect(joinedSvg).toContain("<polyline");
+    // Anchor: user avatar (shoulders dome path, clipped)
+    expect(joinedSvg).toContain("anchor-clip-");
     // Market: triangle connecting the nodes
     expect(joinedSvg).toContain("<polygon");
     // Ecosystem: hatch pattern
