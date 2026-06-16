@@ -26,7 +26,7 @@
     "typecheck": "tsc --noEmit",
     "gen:schema": "tsx scripts/generate-json-schema.ts",
     "test": "vitest run",
-    "prepublishOnly": "pnpm run build"
+    "prepublishOnly": "pnpm run gen:schema && pnpm run build"
   },
   "keywords": [
     "wardley",

@@ -57,3 +57,22 @@ evaluations/*.json
 
 # But keep summary reports
 !evaluations/summary-*.csv
+
+# ── Internal docs / agent instructions (non-public) ──
+/docs/
+CLAUDE.md
+
+# ── Generated schema (regenerated at publish, see prepublishOnly) ──
+/schema/
+
+# ── scripts/ : dev utilities ignored, keep only build-critical ones ──
+/scripts/**
+!/scripts/bundle-interactive.ts
+!/scripts/generate-json-schema.ts
+
+# ── data/ : ignore all except fixtures used by visual-regression.test.ts ──
+/data/**
+!/data/mapkeep/
+!/data/mapkeep/mapkeep-extracted-maps.json
+!/data/verified-exemples/
+!/data/verified-exemples/**
