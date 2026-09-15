@@ -12,7 +12,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { PNG } from "pngjs";
 import pixelmatch from "pixelmatch";
@@ -35,27 +35,15 @@ const PIXEL_THRESHOLD = 0.1;
 
 // ── Helpers ─────────────────────────────────────────────────────────
 
-/** Load Inter font data (cached) */
-let fontData: Uint8Array | null = null;
-function loadFont(): Uint8Array {
-  if (fontData) return fontData;
-  try {
-    fontData = new Uint8Array(readFileSync(FONT_PATH));
-  } catch {
-    fontData = new Uint8Array(0);
-  }
-  return fontData;
-}
-
 /** Render SVG to PNG at a specific width using resvg */
 function renderSvgToPng(svg: string, targetWidth: number): PNG {
-  const font = loadFont();
   const opts: any = {
     background: "#ffffff",
     fitTo: { mode: "width" as const, value: targetWidth },
   };
-  if (font.length > 0) {
-    opts.font = { fontFiles: [font], defaultFontFamily: "Inter" };
+  if (existsSync(FONT_PATH)) {
+    // resvg-js fontFiles takes paths (string[]), not buffers
+    opts.font = { fontFiles: [FONT_PATH], loadSystemFonts: false, defaultFontFamily: "Inter" };
   }
   const resvg = new Resvg(svg, opts);
   const rendered = resvg.render();

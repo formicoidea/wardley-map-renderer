@@ -198,10 +198,12 @@ export function computeMapGeometry(
 
 // ── PNG rasterisation (lazy font loading) ───────────────────────────
 
-let interFontData: Uint8Array | null = null;
+// resvg-js 2.6.2 `font.fontFiles` is `string[]` (file PATHS), not buffers:
+// passing a Uint8Array silently loads nothing and resvg falls back to a system font.
+let interFontPath: string | null | undefined;
 
-async function loadInterFont(): Promise<Uint8Array> {
-  if (interFontData) return interFontData;
+async function resolveInterFontPath(): Promise<string | null> {
+  if (interFontPath !== undefined) return interFontPath;
 
   const fs = await import("node:fs/promises");
   const path = await import("node:path");
@@ -213,28 +215,31 @@ async function loadInterFont(): Promise<Uint8Array> {
   );
 
   try {
-    interFontData = new Uint8Array(await fs.readFile(fontPath));
+    await fs.access(fontPath);
+    interFontPath = fontPath;
   } catch {
     console.warn(
       `[render] Inter font not found at ${fontPath}, using default sans-serif`
     );
-    interFontData = new Uint8Array(0);
+    interFontPath = null;
   }
-  return interFontData;
+  return interFontPath;
 }
 
 async function rasterizeSVG(svg: string, width: number, backgroundColor?: string): Promise<Buffer> {
   const { Resvg } = await import("@resvg/resvg-js");
-  const fontData = await loadInterFont();
+  const fontPath = await resolveInterFontPath();
 
   const opts: any = {
     background: backgroundColor ?? "#ffffff",
     fitTo: { mode: "width" as const, value: width },
   };
 
-  if (fontData.length > 0) {
+  if (fontPath) {
+    // System fonts off → deterministic output across machines.
     opts.font = {
-      fontFiles: [fontData],
+      fontFiles: [fontPath],
+      loadSystemFonts: false,
       defaultFontFamily: "Inter",
     };
   }
