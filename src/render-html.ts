@@ -155,6 +155,7 @@ export function extractEmbeddableRenderConfig(resolved: ResolvedRenderConfig): R
     typography: {
       fontFamily: resolved.typography.fontFamily,
       labelScale: resolved.typography.labelScale,
+      textScale: resolved.typography.textScale ?? 1,
     },
     nodeRadii: { ...resolved.nodeRadii },
     typeColors: { ...resolved.typeColors },

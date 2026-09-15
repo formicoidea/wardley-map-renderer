@@ -20,7 +20,7 @@ import {
   PHASE_LABEL_FONT_SIZE,
   DIRECTION_LABEL_FONT_SIZE,
 } from "../blocks/wardley-map/wardley-map-consts.js";
-import { esc } from "./svg-composer.js";
+import { esc, scaledFontSize } from "./svg-composer.js";
 
 // ── Layer renderer ──────────────────────────────────────────────────
 
@@ -38,6 +38,11 @@ export const renderAxesLayer: LayerRenderer = (
   // independently of whether the evolution axis itself is shown.
   const showPhaseDividerAndLabel = rc.showPhaseDividerAndLabel;
   const labels = rc.axisLabels;
+  const scales = rc.typography.elementScales;
+  const evoAxisSize = scaledFontSize(ctx, AXIS_LABEL_FONT_SIZE, scales?.axisEvolution);
+  const evoDirectionSize = scaledFontSize(ctx, DIRECTION_LABEL_FONT_SIZE, scales?.axisEvolution);
+  const vcAxisSize = scaledFontSize(ctx, AXIS_LABEL_FONT_SIZE, scales?.axisValueChain);
+  const vcDirectionSize = scaledFontSize(ctx, PHASE_LABEL_FONT_SIZE, scales?.axisValueChain);
 
   // Horizontal grid lines removed — cleaner visual per Wardley convention
 
@@ -85,7 +90,7 @@ export const renderAxesLayer: LayerRenderer = (
       const ly = plot.bottom + 16;
       parts.push(
         `<text x="${lx}" y="${ly}" text-anchor="start" ` +
-          `font-family="Inter, sans-serif" font-size="${PHASE_LABEL_FONT_SIZE}" ` +
+          `font-family="Inter, sans-serif" font-size="${scaledFontSize(ctx, PHASE_LABEL_FONT_SIZE, scales?.phases?.[i])}" ` +
           `fill="${LABEL_COLOR}">${esc(phaseLabel)}</text>`
       );
     }
@@ -95,7 +100,7 @@ export const renderAxesLayer: LayerRenderer = (
   if (showEvolution) {
     parts.push(
       `<text x="${plot.right-16}" y="${plot.bottom + 16}" text-anchor="end" ` +
-        `font-family="Inter, sans-serif" font-size="${AXIS_LABEL_FONT_SIZE}" ` +
+        `font-family="Inter, sans-serif" font-size="${evoAxisSize}" ` +
         `fill="${AXIS_LABEL_COLOR}">${esc(labels.xAxis)}</text>`
     );
   }
@@ -104,11 +109,11 @@ export const renderAxesLayer: LayerRenderer = (
   if (showEvolution) {
     parts.push(
       `<text x="${plot.left + 12}" y="${plot.top + 14}" ` +
-        `font-family="Inter, sans-serif" font-size="${DIRECTION_LABEL_FONT_SIZE}" fill="${LABEL_COLOR}">${esc(labels.evolutionStart)}</text>`
+        `font-family="Inter, sans-serif" font-size="${evoDirectionSize}" fill="${LABEL_COLOR}">${esc(labels.evolutionStart)}</text>`
     );
     parts.push(
       `<text x="${plot.right - 4}" y="${plot.top + 14}" text-anchor="end" ` +
-        `font-family="Inter, sans-serif" font-size="${DIRECTION_LABEL_FONT_SIZE}" fill="${LABEL_COLOR}">${esc(labels.evolutionEnd)}</text>`
+        `font-family="Inter, sans-serif" font-size="${evoDirectionSize}" fill="${LABEL_COLOR}">${esc(labels.evolutionEnd)}</text>`
     );
   }
 
@@ -118,7 +123,7 @@ export const renderAxesLayer: LayerRenderer = (
     const labelX = plot.left - 8;
     parts.push(
       `<text x="${labelX}" y="${yCenter}" text-anchor="middle" ` +
-        `font-family="Inter, sans-serif" font-size="${AXIS_LABEL_FONT_SIZE}" ` +
+        `font-family="Inter, sans-serif" font-size="${vcAxisSize}" ` +
         `fill="${AXIS_LABEL_COLOR}" ` +
         `transform="rotate(-90, ${labelX}, ${yCenter})">${esc(labels.yAxis)}</text>`
     );
@@ -131,14 +136,14 @@ export const renderAxesLayer: LayerRenderer = (
     const visTopY = plot.top + 40;
     parts.push(
       `<text x="${visX}" y="${visTopY}" text-anchor="middle" ` +
-        `font-family="Inter, sans-serif" font-size="${PHASE_LABEL_FONT_SIZE}" ` +
+        `font-family="Inter, sans-serif" font-size="${vcDirectionSize}" ` +
         `fill="${LABEL_COLOR}" transform="rotate(-90, ${visX}, ${visTopY})">${esc(labels.visibilityHigh)}</text>`
     );
     // "Invisible" near bottom of Y-axis, rotated -90°
     const visBotY = plot.bottom - 30;
     parts.push(
       `<text x="${visX}" y="${visBotY}" text-anchor="middle" ` +
-        `font-family="Inter, sans-serif" font-size="${PHASE_LABEL_FONT_SIZE}" ` +
+        `font-family="Inter, sans-serif" font-size="${vcDirectionSize}" ` +
         `fill="${LABEL_COLOR}" transform="rotate(-90, ${visX}, ${visBotY})">${esc(labels.visibilityLow)}</text>`
     );
   }

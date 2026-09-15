@@ -14,7 +14,7 @@
  */
 
 import type { RenderContext, LayerRenderer } from "./types.js";
-import { esc } from "./svg-composer.js";
+import { esc, scaledFontSize } from "./svg-composer.js";
 import { resolveTypeStyle } from "../schema.js";
 import { componentRenderableType } from "../renderable-type.js";
 import { SIN60, COS60 } from "./nodes-layer.js";
@@ -522,12 +522,18 @@ export const renderLegendLayer: LayerRenderer = (
   const items = collectLegendItems(ctx);
   if (items.length === 0) return [];
 
-  // Compute legend box dimensions
+  // Effective font size drives the box: text width scales with it, row/title
+  // heights grow with it (never below the 20px swatch row).
+  const fontSize = scaledFontSize(ctx, FONT_SIZE, ctx.resolvedConfig.typography.elementScales?.legend);
+  const k = fontSize / FONT_SIZE;
+  const lineHeight = LINE_HEIGHT * Math.max(1, k);
+  const titleHeight = TITLE_HEIGHT * Math.max(1, k);
+
   // Approximate text width: longest label × ~7px per char at 12px Inter
   const maxLabelLen = Math.max(...items.map((it) => it.label.length));
-  const textWidth = maxLabelLen * 7;
+  const textWidth = maxLabelLen * 7 * k;
   const legendW = Math.max(MIN_WIDTH, LEGEND_PADDING * 2 + SWATCH_WIDTH + SWATCH_GAP + textWidth);
-  const legendH = LEGEND_PADDING * 2 + TITLE_HEIGHT + items.length * LINE_HEIGHT;
+  const legendH = LEGEND_PADDING * 2 + titleHeight + items.length * lineHeight;
 
   // Determine position — read from resolvedConfig (baseline default: "bottom-right")
   const position = legend.position;
@@ -560,8 +566,8 @@ export const renderLegendLayer: LayerRenderer = (
   // Title (i18n)
   const titleText = TITLE_LABELS[ctx.resolvedConfig.locale] ?? TITLE_LABELS.en;
   parts.push(
-    `<text x="${cx + LEGEND_PADDING}" y="${cy + LEGEND_PADDING + 12}" ` +
-    `font-family="Inter, sans-serif" font-size="${FONT_SIZE}" font-weight="bold" ` +
+    `<text x="${cx + LEGEND_PADDING}" y="${cy + LEGEND_PADDING + fontSize}" ` +
+    `font-family="Inter, sans-serif" font-size="${fontSize}" font-weight="bold" ` +
     `fill="${FONT_COLOR}">${esc(titleText)}</text>`
   );
 
@@ -569,17 +575,17 @@ export const renderLegendLayer: LayerRenderer = (
   for (let i = 0; i < items.length; i++) {
     const item = items[i];
     const rowX = cx + LEGEND_PADDING;
-    const rowY = cy + LEGEND_PADDING + TITLE_HEIGHT + i * LINE_HEIGHT;
+    const rowY = cy + LEGEND_PADDING + titleHeight + i * lineHeight;
 
-    // Swatch
-    parts.push(item.renderSwatch(rowX, rowY));
+    // Swatch (fixed 20px, vertically centred in the row)
+    parts.push(item.renderSwatch(rowX, rowY + (lineHeight - LINE_HEIGHT) / 2));
 
-    // Label text
+    // Label text: baseline at row centre + ~1/3 font size (14 for 12px in a 20px row)
     const textX = rowX + SWATCH_WIDTH + SWATCH_GAP;
-    const textY = rowY + 14; // baseline offset for 12px font
+    const textY = rowY + lineHeight / 2 + fontSize / 3;
     parts.push(
       `<text x="${textX}" y="${textY}" ` +
-      `font-family="Inter, sans-serif" font-size="${FONT_SIZE}" ` +
+      `font-family="Inter, sans-serif" font-size="${fontSize}" ` +
       `fill="${FONT_COLOR}">${esc(item.label)}</text>`
     );
   }

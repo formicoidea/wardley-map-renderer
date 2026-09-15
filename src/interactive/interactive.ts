@@ -119,7 +119,7 @@ interface RenderConstants {
 interface EmbeddedRenderConfig {
   background: { color: string };
   strokeWidth: number;
-  typography: { fontFamily: string; labelScale: number };
+  typography: { fontFamily: string; labelScale: number; textScale?: number };
   nodeRadii: Record<string, number>;
   typeColors: Record<string, string | undefined>;
   evolveStyles: Record<string, { stroke?: string; strokeDasharray?: string } | undefined>;
@@ -342,7 +342,7 @@ function resolveColor(color: string | undefined): string {
     const strokeWidth = cfg?.strokeWidth ?? 1;
     const fontFamily = cfg?.typography?.fontFamily ?? "Inter, sans-serif";
     const labelScale = cfg?.typography?.labelScale ?? K.labelScale ?? 1;
-    const fontSize = Math.round(COMPONENT_LABEL_BASE_FONT_SIZE * labelScale);
+    const fontSize = Math.round(COMPONENT_LABEL_BASE_FONT_SIZE * labelScale * (cfg?.typography?.textScale ?? 1));
     const typeColors = cfg?.typeColors ?? {};
     const evolveStyles = cfg?.evolveStyles ?? {};
     const excluded = new Set(cfg?.excludeComponentTypes ?? []);
