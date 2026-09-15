@@ -25,7 +25,8 @@ import { renderToSVG } from "./render-orchestrator.js";
 const DATA_DIR = join(import.meta.dirname ?? ".", "..", "data");
 const MAPKEEP_JSON = join(DATA_DIR, "mapkeep", "mapkeep-extracted-maps.json");
 const VERIFIED_DIR = join(DATA_DIR, "verified-exemples");
-const FONT_PATH = join(import.meta.dirname ?? ".", "assets", "fonts", "Inter-Regular.ttf");
+const FONT_DIR = join(import.meta.dirname ?? ".", "assets", "fonts");
+const FONT_PATHS = ["Inter-Regular.ttf", "Inter-SemiBold.ttf", "Inter-Bold.ttf"].map((f) => join(FONT_DIR, f));
 
 /** Maximum percentage of differing pixels allowed (< 1%) */
 const MAX_DIFF_PERCENT = 5;
@@ -41,9 +42,9 @@ function renderSvgToPng(svg: string, targetWidth: number): PNG {
     background: "#ffffff",
     fitTo: { mode: "width" as const, value: targetWidth },
   };
-  if (existsSync(FONT_PATH)) {
+  if (existsSync(FONT_PATHS[0])) {
     // resvg-js fontFiles takes paths (string[]), not buffers
-    opts.font = { fontFiles: [FONT_PATH], loadSystemFonts: false, defaultFontFamily: "Inter" };
+    opts.font = { fontFiles: FONT_PATHS.filter((p) => existsSync(p)), loadSystemFonts: false, defaultFontFamily: "Inter" };
   }
   const resvg = new Resvg(svg, opts);
   const rendered = resvg.render();

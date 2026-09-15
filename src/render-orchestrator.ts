@@ -200,45 +200,48 @@ export function computeMapGeometry(
 
 // resvg-js 2.6.2 `font.fontFiles` is `string[]` (file PATHS), not buffers:
 // passing a Uint8Array silently loads nothing and resvg falls back to a system font.
-let interFontPath: string | null | undefined;
+// SemiBold (600, title) and Bold (700, legend title) are bundled because system
+// fonts are disabled: without them resvg renders those texts in Regular.
+const INTER_FONT_FILES = ["Inter-Regular.ttf", "Inter-SemiBold.ttf", "Inter-Bold.ttf"];
 
-async function resolveInterFontPath(): Promise<string | null> {
-  if (interFontPath !== undefined) return interFontPath;
+let interFontPaths: string[] | undefined;
+
+async function resolveInterFontPaths(): Promise<string[]> {
+  if (interFontPaths !== undefined) return interFontPaths;
 
   const fs = await import("node:fs/promises");
   const path = await import("node:path");
-  const fontPath = path.join(
-    import.meta.dirname ?? ".",
-    "assets",
-    "fonts",
-    "Inter-Regular.ttf"
-  );
+  const fontDir = path.join(import.meta.dirname ?? ".", "assets", "fonts");
 
-  try {
-    await fs.access(fontPath);
-    interFontPath = fontPath;
-  } catch {
-    console.warn(
-      `[render] Inter font not found at ${fontPath}, using default sans-serif`
-    );
-    interFontPath = null;
+  const found: string[] = [];
+  for (const file of INTER_FONT_FILES) {
+    const fontPath = path.join(fontDir, file);
+    try {
+      await fs.access(fontPath);
+      found.push(fontPath);
+    } catch {
+      console.warn(`[render] Inter font not found at ${fontPath}`);
+    }
   }
-  return interFontPath;
+  // Without Regular, fall back to resvg defaults (sans-serif) rather than a partial set.
+  interFontPaths = found[0]?.endsWith(INTER_FONT_FILES[0]) ? found : [];
+  if (interFontPaths.length === 0) console.warn("[render] Inter unavailable, using default sans-serif");
+  return interFontPaths;
 }
 
 async function rasterizeSVG(svg: string, width: number, backgroundColor?: string): Promise<Buffer> {
   const { Resvg } = await import("@resvg/resvg-js");
-  const fontPath = await resolveInterFontPath();
+  const fontPaths = await resolveInterFontPaths();
 
   const opts: any = {
     background: backgroundColor ?? "#ffffff",
     fitTo: { mode: "width" as const, value: width },
   };
 
-  if (fontPath) {
+  if (fontPaths.length > 0) {
     // System fonts off → deterministic output across machines.
     opts.font = {
-      fontFiles: [fontPath],
+      fontFiles: fontPaths,
       loadSystemFonts: false,
       defaultFontFamily: "Inter",
     };
