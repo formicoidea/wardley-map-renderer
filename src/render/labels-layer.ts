@@ -18,6 +18,9 @@
 import type { RenderContext, LayerRenderer } from "./types.js";
 import type { LabelPlacement, EdgeSegment } from "./label-placement.js";
 import { avoidLabelCollisions } from "./label-placement.js";
+import { scaledFontSize } from "./svg-composer.js";
+import { resolveTypeStyle } from "../schema.js";
+import { componentRenderableType } from "../renderable-type.js";
 
 // ── Visual constants ─────────────────────────────────────────────────
 
@@ -45,8 +48,9 @@ export const renderLabelsLayer: LayerRenderer = (
 ): string[] => {
   const labelPlacements: LabelPlacement[] = [];
   const excluded = new Set(ctx.resolvedConfig.excludeComponentTypes);
-  const fontFamily = ctx.resolvedConfig.typography.fontFamily;
-  const fontSize = Math.round(COMPONENT_LABEL_BASE_FONT_SIZE * ctx.resolvedConfig.typography.labelScale);
+  const { fontFamily, labelScale, elementScales } = ctx.resolvedConfig.typography;
+  const nodeScales = elementScales?.nodes ?? {};
+  const fontSizeById = new Map<string, number>();
 
   for (const node of ctx.nodes) {
     const comp = node.component;
@@ -59,6 +63,10 @@ export const renderLabelsLayer: LayerRenderer = (
 
     const cx = node.cx;
     const cy = node.cy;
+
+    // base × textScale × labelScale × style.nodes cascade label.scale
+    const nodeScale = resolveTypeStyle(nodeScales, componentRenderableType(comp.type, comp.subtype)) ?? 1;
+    fontSizeById.set(comp.id, Math.round(scaledFontSize(ctx, COMPONENT_LABEL_BASE_FONT_SIZE, labelScale * nodeScale)));
 
     // Label offset: to the right of node (pipelines: above handle center)
     const hasCustomPos = comp.label.position != null;
@@ -134,7 +142,7 @@ export const renderLabelsLayer: LayerRenderer = (
       text: lbl.text,
       anchor: lbl.anchor,
       fontFamily,
-      fontSize,
+      fontSize: fontSizeById.get(lbl.componentId!) ?? COMPONENT_LABEL_BASE_FONT_SIZE,
       componentId: lbl.componentId,
       interactive,
     }));

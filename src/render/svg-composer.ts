@@ -43,6 +43,15 @@ import { getOrderedLayers } from "./registry.js";
 import { esc } from "./svg-primitives.js";
 export { esc };
 
+/**
+ * Effective font size: `base × typography.textScale × elementScale`
+ * (absent scales → 1), rounded to 2 decimals.
+ */
+export function scaledFontSize(ctx: RenderContext, base: number, elementScale?: number): number {
+  const textScale = ctx.resolvedConfig.typography.textScale ?? 1;
+  return Math.round(base * textScale * (elementScale ?? 1) * 100) / 100;
+}
+
 // ── Background pseudo-layer ──────────────────────────────────────────
 
 /**

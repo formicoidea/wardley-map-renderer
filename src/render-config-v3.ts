@@ -15,8 +15,9 @@
  *
  * Global typography/strokeWidth: the flat resolved contract needs single global
  * values, while the new shape is per-element. `style.global` is the single
- * baseline source; per-element `label`/`line` facets are accepted but inert for
- * font/scale/strokeWidth until the resolved contract is expanded (audit C2).
+ * baseline source. Per-element `label.scale` (title, legend, axes, phases,
+ * nodes) is honoured and multiplied by `style.global.textScale`; per-element
+ * font/color/strokeWidth facets are still inert (audit C2).
  *
  * @module render-config-v3
  */
@@ -129,6 +130,8 @@ export const RenderingSchema = z.object({
 export const GlobalStyleSchema = z.object({
   fontFamily: z.string().optional(),
   labelScale: z.number().positive().max(5).optional(),
+  /** Comfort multiplier applied to all texts, on top of per-element label.scale. Default 1. */
+  textScale: z.number().positive().max(5).optional(),
   strokeWidth: z.number().min(0.25).max(8).optional(),
   color: z.string().optional(),
 }).strict();
@@ -230,7 +233,8 @@ function mergeElement(el: { default?: AnyFacets; override?: AnyFacets } | undefi
 function mergeFacet(a: any, b: any): any {
   const out: any = { ...(a ?? {}) };
   for (const k of Object.keys(b ?? {})) {
-    out[k] = { ...(a?.[k] ?? {}), ...(b[k] ?? {}) };
+    // arrays (e.g. phases.labels) are replaced, not spread into an object
+    out[k] = Array.isArray(b[k]) ? b[k] : { ...(a?.[k] ?? {}), ...(b[k] ?? {}) };
   }
   return out;
 }
@@ -257,11 +261,28 @@ export function renderConfigV3ToLegacy(v3: RenderConfigV3 | undefined): RenderCo
 
   // ── style.global → typography + strokeWidth ──
   const g = style?.global;
-  if (g?.fontFamily !== undefined || g?.labelScale !== undefined) {
-    out.typography = {
-      ...(g?.fontFamily !== undefined ? { fontFamily: g.fontFamily } : {}),
-      ...(g?.labelScale !== undefined ? { labelScale: g.labelScale } : {}),
-    };
+  const typography: any = {};
+  if (g?.fontFamily !== undefined) typography.fontFamily = g.fontFamily;
+  if (g?.labelScale !== undefined) typography.labelScale = g.labelScale;
+  if (g?.textScale !== undefined) typography.textScale = g.textScale;
+
+  // ── per-element label.scale → typography.elementScales ──
+  const elementScales: any = {};
+  const labelScaleOf = (el: any) => mergeFacet(el?.default, el?.override)?.label?.scale;
+  const titleScale = labelScaleOf(style?.title);
+  const legendScale = labelScaleOf(style?.legend);
+  const axisEvoScale = labelScaleOf(style?.background?.axisEvolution);
+  const axisVcScale = labelScaleOf(style?.background?.axisValueChain);
+  if (titleScale !== undefined) elementScales.title = titleScale;
+  if (legendScale !== undefined) elementScales.legend = legendScale;
+  if (axisEvoScale !== undefined) elementScales.axisEvolution = axisEvoScale;
+  if (axisVcScale !== undefined) elementScales.axisValueChain = axisVcScale;
+  const phaseLabels = mergeFacet(
+    (style?.background?.phases as any)?.default,
+    (style?.background?.phases as any)?.override,
+  )?.labels;
+  if (Array.isArray(phaseLabels) && phaseLabels.some((l: any) => l?.scale !== undefined)) {
+    elementScales.phases = phaseLabels.map((l: any) => l?.scale);
   }
   const spatial: any = {};
   if (g?.strokeWidth !== undefined) spatial.strokeWidth = g.strokeWidth;
@@ -290,11 +311,13 @@ export function renderConfigV3ToLegacy(v3: RenderConfigV3 | undefined): RenderCo
   // ── nodes cascade → nodeRadii + palette (keyed by renderable type) ──
   const nodeRadii: Record<string, number> = {};
   const palette: Record<string, string> = {};
+  const nodeLabelScales: Record<string, number> = {};
   const applyNode = (key: string, el: any) => {
     const m = mergeFacet(el?.default, el?.override);
     if (m.symbol?.radius !== undefined) nodeRadii[key] = m.symbol.radius;
     const color = m.symbol?.stroke ?? m.symbol?.fill;
     if (color !== undefined) palette[key] = color;
+    if (m.label?.scale !== undefined) nodeLabelScales[key] = m.label.scale;
   };
   applyNode("_default", style?.nodes?.default);
   const bt = style?.nodes?.byType;
@@ -305,6 +328,10 @@ export function renderConfigV3ToLegacy(v3: RenderConfigV3 | undefined): RenderCo
   if (bs) for (const s of SUBTYPES) {
     if ((bs as any)[s]) applyNode(componentRenderableType("component", s), (bs as any)[s]);
   }
+  if (Object.keys(nodeLabelScales).length > 0) elementScales.nodes = nodeLabelScales;
+  if (Object.keys(elementScales).length > 0) typography.elementScales = elementScales;
+  if (Object.keys(typography).length > 0) out.typography = typography;
+
   if (Object.keys(nodeRadii).length > 0) {
     spatial.nodeRadii = { _default: 5, ...nodeRadii };
   }

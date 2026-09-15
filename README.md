@@ -54,6 +54,32 @@ import { renderInteractiveHTML } from "wardley-map-renderer";
 const html: string = await renderInteractiveHTML(map);
 ```
 
+## Text size
+
+Every text size is `base × style.global.textScale × element label.scale` (all default to `1`).
+
+| Option | Affects | Base size |
+|---|---|---|
+| `style.global.textScale` | all texts below (comfort factor) | — |
+| `style.global.labelScale` | component labels | 12px |
+| `style.nodes.{default,byType.*,bySubtype.*}.default.label.scale` | component labels, per type/subtype | 12px |
+| `style.title.default.label.scale` | map title | 16px |
+| `style.legend.default.label.scale` | legend title and entries (box resizes) | 12px |
+| `style.background.axisEvolution.default.label.scale` | evolution axis label and direction labels | 13px / 10px |
+| `style.background.axisValueChain.default.label.scale` | value chain axis label and visibility labels | 13px / 12px |
+| `style.background.phases.default.labels[i].scale` | phase label `i` | 12px |
+
+`override` can be used instead of `default` for any element.
+
+```json
+"renderConfig": {
+  "style": {
+    "global": { "textScale": 1.25 },
+    "legend": { "default": { "label": { "scale": 0.9 } } }
+  }
+}
+```
+
 ## Output formats
 
 | `format` | `result.data` type | Use |

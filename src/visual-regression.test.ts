@@ -12,7 +12,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { PNG } from "pngjs";
 import pixelmatch from "pixelmatch";
@@ -25,7 +25,8 @@ import { renderToSVG } from "./render-orchestrator.js";
 const DATA_DIR = join(import.meta.dirname ?? ".", "..", "data");
 const MAPKEEP_JSON = join(DATA_DIR, "mapkeep", "mapkeep-extracted-maps.json");
 const VERIFIED_DIR = join(DATA_DIR, "verified-exemples");
-const FONT_PATH = join(import.meta.dirname ?? ".", "assets", "fonts", "Inter-Regular.ttf");
+const FONT_DIR = join(import.meta.dirname ?? ".", "assets", "fonts");
+const FONT_PATHS = ["Inter-Regular.ttf", "Inter-SemiBold.ttf", "Inter-Bold.ttf"].map((f) => join(FONT_DIR, f));
 
 /** Maximum percentage of differing pixels allowed (< 1%) */
 const MAX_DIFF_PERCENT = 5;
@@ -35,27 +36,15 @@ const PIXEL_THRESHOLD = 0.1;
 
 // ── Helpers ─────────────────────────────────────────────────────────
 
-/** Load Inter font data (cached) */
-let fontData: Uint8Array | null = null;
-function loadFont(): Uint8Array {
-  if (fontData) return fontData;
-  try {
-    fontData = new Uint8Array(readFileSync(FONT_PATH));
-  } catch {
-    fontData = new Uint8Array(0);
-  }
-  return fontData;
-}
-
 /** Render SVG to PNG at a specific width using resvg */
 function renderSvgToPng(svg: string, targetWidth: number): PNG {
-  const font = loadFont();
   const opts: any = {
     background: "#ffffff",
     fitTo: { mode: "width" as const, value: targetWidth },
   };
-  if (font.length > 0) {
-    opts.font = { fontFiles: [font], defaultFontFamily: "Inter" };
+  if (existsSync(FONT_PATHS[0])) {
+    // resvg-js fontFiles takes paths (string[]), not buffers
+    opts.font = { fontFiles: FONT_PATHS.filter((p) => existsSync(p)), loadSystemFonts: false, defaultFontFamily: "Inter" };
   }
   const resvg = new Resvg(svg, opts);
   const rendered = resvg.render();

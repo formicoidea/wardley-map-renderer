@@ -46,6 +46,24 @@ export const TypographyConfigSchema = z.object({
    * Valid range: >0 to 5×.
    */
   labelScale: z.number().positive().max(5).default(1.0),
+  /**
+   * Global comfort multiplier applied to EVERY text (title, axes, phases,
+   * legend, component labels) on top of per-element scales:
+   * `fontSize = base × textScale × elementScale`. Absent → 1.
+   */
+  textScale: z.number().positive().max(5).optional(),
+  /**
+   * Per-element label scales from `style.<element>.label.scale` (absent → 1).
+   * `nodes` is keyed by renderable type (`_default` fallback).
+   */
+  elementScales: z.object({
+    title: z.number().positive().max(5).optional(),
+    legend: z.number().positive().max(5).optional(),
+    axisEvolution: z.number().positive().max(5).optional(),
+    axisValueChain: z.number().positive().max(5).optional(),
+    phases: z.array(z.number().positive().max(5).optional()).optional(),
+    nodes: z.record(z.string(), z.number().positive().max(5)).optional(),
+  }).optional(),
 });
 
 /** TypeScript type for TypographyConfig (output after Zod defaults applied) */
@@ -1327,6 +1345,8 @@ export interface RenderConfigInput {
   typography?: {
     fontFamily?: string;
     labelScale?: number;
+    textScale?: number;
+    elementScales?: TypographyConfig["elementScales"];
   };
   /** Theme, per-type palette, evolve styles, background chrome. */
   styling?: {
@@ -1925,7 +1945,7 @@ export interface ResolvedRenderConfig {
   /** Whether evolution phase dividers AND phase labels are shown (orthogonal to showEvolutionXAxis) */
   showPhaseDividerAndLabel: boolean;
   /**
-   * Typography — font family and label scale multiplier.
+   * Typography — font family, label scale, global textScale and per-element label scales.
    * All fields are fully resolved (no undefined) after resolveTheme().
    *
    * @see TypographyConfigSchema in render-config-v2.ts
@@ -2239,6 +2259,8 @@ export function resolveTheme(
     typography: {
       fontFamily: renderConfig?.typography?.fontFamily ?? baseline.typography.fontFamily,
       labelScale: renderConfig?.typography?.labelScale ?? baseline.typography.labelScale,
+      textScale: renderConfig?.typography?.textScale ?? 1,
+      elementScales: renderConfig?.typography?.elementScales ?? {},
     },
     nodeRadii: (spatial?.nodeRadii
       ? { ...baseline.nodeRadii, ...spatial.nodeRadii }
