@@ -143,7 +143,7 @@ export const renderNodesLayer: LayerRenderer = (
   if (!excluded.has("pipeline")) {
     for (const p of ctx.pipelines) {
       const pr = resolveNodeRadius("pipeline", nodeRadii);
-      parts.push(renderPipelineHandleSquare(p.handleX, p.handleY, pr, strokeWidth));
+      parts.push(renderPipelineHandleSquare(p.handleX, p.handleY, pr, strokeWidth, interactive ? p.component.id : undefined));
     }
   }
 

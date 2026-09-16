@@ -247,21 +247,30 @@ export function renderMethodIndicator(
   }
 }
 
+/** Extra hit margin around the (small) pipeline handle square in interactive mode. */
+const PIPELINE_HANDLE_HIT_PAD = 6;
+
 /**
  * Render a pipeline handle square at the same z-level as component nodes.
+ * With `pipelineId` (interactive mode) it is wrapped in a pipeline hit group
+ * marked `data-part="handle"`, with an enlarged transparent hit rect.
  */
 export function renderPipelineHandleSquare(
   hx: number,
   hy: number,
   pr: number,
   strokeWidth: number,
+  pipelineId?: string,
 ): string {
   const x = hx - pr;
   const y = hy - pr;
-  return (
+  const rect =
     `<rect x="${x}" y="${y}" width="${pr * 2}" height="${pr * 2}" ` +
-    `fill="${NODE_FILL}" stroke="${NODE_STROKE}" stroke-width="${strokeWidth}" />`
-  );
+    `fill="${NODE_FILL}" stroke="${NODE_STROKE}" stroke-width="${strokeWidth}" />`;
+  if (pipelineId === undefined) return rect;
+  const h = pr + PIPELINE_HANDLE_HIT_PAD;
+  const hit = `<rect class="hit-area" x="${hx - h}" y="${hy - h}" width="${h * 2}" height="${h * 2}" fill="transparent" />`;
+  return `<g${hitAttrs(pipelineId, "pipeline")} data-part="handle">${hit}${rect}</g>`;
 }
 
 // ── Component node assembly (type-dispatched) ────────────────────────

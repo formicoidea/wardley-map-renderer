@@ -15,10 +15,10 @@
  */
 
 import type { DiffOp } from "../diff-ops-apply.js";
-import { pxToMap, renderSVGFromPrepared, type PreparedRender } from "../render/browser-render.js";
+import { mapToPx, pxToMap, renderSVGFromPrepared, type PreparedRender } from "../render/browser-render.js";
 import type { WardleyMap } from "../schema.js";
 import {
-  addComponentOp, clamp01, componentOf, connectOp, deleteOps, dragOps, dragStart, nearestComponent, nodeCentre, rectToPipeline,
+  addComponentOp, canEvolve, clamp01, componentOf, connectOp, deleteOps, dragOps, dragStart, nearestComponent, nodeCentre, rectToPipeline,
   resolveHit, selectId, selectionExists, targetOf, type DragStart, type Hit, type Pt,
 } from "./gestures.js";
 import { buildProps, PROPS_CSS } from "./props.js";
@@ -46,6 +46,8 @@ interface Gesture {
   start: Pt;
   cur: Pt;
   from?: string;
+  /** Link/evolve: component id under the pointer (drop target preview). */
+  over?: string | null;
   drag?: DragStart;
   ops: DiffOp[];
   timer: number;
@@ -76,6 +78,7 @@ export function initEditor(doc: Document): void {
   let g: Gesture | null = null;
   let linkFrom: { tool: "link" | "evolve"; id: string } | null = null;
   let hover: Pt | null = null;
+  let hoverOver: string | null = null;
   let panelFor: string | null = null;
   let lastClick: { t: number; x: number; y: number } | null = null;
   let editing: { finish(commit: boolean): void; place(): void } | null = null;
@@ -99,9 +102,15 @@ export function initEditor(doc: Document): void {
     const m = pxToMap(prepared, s.x, s.y);
     return { x: s.x, y: s.y, evo: clamp01(m.evo), vis: clamp01(m.vis) };
   };
-  /** Element hit, else the nearest node within a finger/cursor radius. */
-  const hitFor = (target: Element | null, x: number, y: number, touch = false) =>
-    resolveHit(target) ?? nearestComponent(store.map, prepared, pt(x, y), (touch ? 16 : 6) / view.k);
+  /**
+   * Element hit, else the nearest node within a finger/cursor radius. On a
+   * pipeline body a nearby member component wins over the pipeline.
+   */
+  const hitFor = (target: Element | null, x: number, y: number, touch = false) => {
+    const h = resolveHit(target);
+    if (h && (h.kind !== "pipeline" || h.handle)) return h;
+    return nearestComponent(store.map, prepared, pt(x, y), (touch ? 16 : 6) / view.k) ?? h;
+  };
   const hitAt = (x: number, y: number) => hitFor(doc.elementFromPoint(x, y), x, y);
 
   // ── Rendering ───────────────────────────────────────────────────
@@ -148,11 +157,13 @@ export function initEditor(doc: Document): void {
       if (kind === "pipeline" && selection.length === 1) {
         const r = 6 / k;
         const xs = { w: b.x, e: b.x + b.width, "": b.x + b.width / 2 };
+        // The renderer's handle square (drags handleEvolution) wins over a top-centre resize handle.
+        const hx = nodeCentre(store.map, prepared, targetOf(sel))?.x ?? NaN;
         const ys = { n: b.y, s: b.y + b.height, "": b.y + b.height / 2 };
         for (const [v, y] of Object.entries(ys)) {
           for (const [h, x] of Object.entries(xs)) {
             const name = v + h;
-            if (!name) continue;
+            if (!name || (name === "n" && Math.abs(x - hx) < 3 * r)) continue;
             const cursor = name.length === 2 ? (name === "nw" || name === "se" ? "nwse" : "nesw") : v ? "ns" : "ew";
             s += `<rect data-handle="${name}" data-for="${targetOf(sel).replace(/[&"<]/g, (c) => `&#${c.charCodeAt(0)};`)}" x="${x - r}" y="${y - r}" width="${2 * r}" height="${2 * r}" rx="${r / 3}" style="fill:var(--surface);${accent};cursor:${cursor}-resize;touch-action:none" stroke-width="${sw}"/>`;
           }
@@ -165,10 +176,15 @@ export function initEditor(doc: Document): void {
     const to = g?.from ? g.cur : linkFrom ? hover : null;
     if (src && mode && to) {
       const a = nodeCentre(store.map, prepared, src);
-      if (a) {
-        s += mode === "evolve"
-          ? line(a, to, ` stroke-dasharray="${6 / k}" marker-end="url(#wm-arrow)"`)
-          : line(a, to, ` marker-end="url(#wm-arrow)"`);
+      if (a && mode === "link") s += line(a, to, ` marker-end="url(#wm-arrow)"`);
+      else if (a) {
+        // Ghost of the arrow a drop here would create (horizontal unless onto a component).
+        const op = connectOp(store.map, "evolve", src, g?.from ? g.over ?? null : hoverOver, to);
+        const p = op?.op === "set_evolves_to" ? op.payload : null;
+        const b = !p ? null : p.position
+          ? mapToPx(prepared, p.position.evolution, p.position.visibility)
+          : p.evolvesTo && nodeCentre(store.map, prepared, p.evolvesTo);
+        if (b) s += line(a, b, ` stroke-dasharray="${6 / k}" marker-end="url(#wm-arrow)"`);
       }
     }
     if (g?.mode === "rect" && g.moved) {
@@ -323,6 +339,7 @@ export function initEditor(doc: Document): void {
     }
     linkFrom = null;
     hover = null;
+    hoverOver = null;
     drawOverlay();
   };
   const add = (op: ReturnType<typeof addComponentOp>) => {
@@ -346,15 +363,17 @@ export function initEditor(doc: Document): void {
     if ((t === "link" || t === "evolve")) {
       const comp = componentOf(hit);
       if (!linkFrom) {
-        if (!comp) return select([]);
+        if (!comp || (t === "evolve" && !canEvolve(store.map, comp))) return select([]);
         linkFrom = { tool: t, id: comp };
         hover = c.start;
-        shell.toast("Now click the target component");
+        hoverOver = comp;
+        shell.toast(t === "link" ? "Now click the target component or pipeline" : "Now click the target position or component");
         return drawOverlay();
       }
-      const op = connectOp(store.map, linkFrom.tool, linkFrom.id, comp);
+      const op = connectOp(store.map, linkFrom.tool, linkFrom.id, comp, c.start);
       linkFrom = null;
       hover = null;
+      hoverOver = null;
       if (op) commit([op]);
       else drawOverlay();
       return;
@@ -373,11 +392,11 @@ export function initEditor(doc: Document): void {
       if (c.ops.length) commit(c.ops);
       else render();
     } else if (c.mode === "link" || c.mode === "evolve") {
-      const op = connectOp(store.map, c.mode, c.from!, componentOf(hitAt(ev.clientX, ev.clientY)));
+      const op = connectOp(store.map, c.mode, c.from!, componentOf(hitAt(ev.clientX, ev.clientY)), c.cur);
       if (op) commit([op]);
       else {
         drawOverlay();
-        shell.toast("Drop on another component");
+        if (c.mode === "link") shell.toast("Drop on another component or pipeline");
       }
     } else if (c.mode === "rect") {
       const op = rectToPipeline(store.map, c.start, c.cur);
@@ -398,8 +417,11 @@ export function initEditor(doc: Document): void {
     const comp = componentOf(hit);
     const text = hit?.kind === "label" ? (ev.target as Element).closest("text") : null;
     let mode: Gesture["mode"] = "none";
-    if (t === "select" && hit && hit.kind !== "relation" && hit.kind !== "evolve" && hit.kind !== "title") mode = "move";
-    else if ((t === "link" || t === "evolve") && comp && !linkFrom) mode = t;
+    // Evolve arrows drag their head (only when unambiguous: a single arrow).
+    const oneArrow = hit?.kind === "evolve" && store.map.components.find((x) => x.id === hit.id)?.evolvesTo?.length === 1;
+    if (t === "select" && hit && hit.kind !== "relation" && hit.kind !== "title" && (hit.kind !== "evolve" || oneArrow)) mode = "move";
+    else if (t === "link" && comp && !linkFrom) mode = t;
+    else if (t === "evolve" && canEvolve(store.map, comp) && !linkFrom) mode = t;
     else if (t === "pipeline" && !hit) mode = "rect";
     const c: Gesture = {
       mode, pid: ev.pointerId, cx: ev.clientX, cy: ev.clientY, moved: false, hit, start, cur: start,
@@ -424,6 +446,7 @@ export function initEditor(doc: Document): void {
     if (!g || ev.pointerId !== g.pid) {
       if (linkFrom && ev.isPrimary) {
         hover = pt(ev.clientX, ev.clientY);
+        if (linkFrom.tool === "evolve") hoverOver = componentOf(hitAt(ev.clientX, ev.clientY));
         drawOverlay();
       }
       return;
@@ -447,7 +470,10 @@ export function initEditor(doc: Document): void {
     if (c.mode === "move" && c.drag) {
       c.ops = dragOps(store.map, c.drag, c.cur);
       schedule(c.ops);
-    } else if (c.mode !== "none") drawOverlay();
+    } else if (c.mode !== "none") {
+      if (c.mode === "evolve") c.over = componentOf(hitAt(ev.clientX, ev.clientY));
+      drawOverlay();
+    }
   });
 
   const end = (ev: PointerEvent) => {

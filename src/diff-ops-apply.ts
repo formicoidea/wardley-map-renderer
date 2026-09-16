@@ -61,7 +61,16 @@ export interface AddEdgePayload {
   type?: RelationType; // default "DependsOn"
 }
 export interface ChangeComponentTypePayload { id: string; type: ComponentType; subtype?: Subtype }
-export interface SetEvolvesToPayload { id: string; evolvesTo: string | null }
+/**
+ * Point the component's first evolve arrow at another component's current
+ * position (`evolvesTo`) or at an explicit map point (`position`, rounded to 3
+ * decimals); `evolvesTo: null` clears all arrows. Setting a target replaces the
+ * first arrow only: its evolveType/inertia (default natural) and any further
+ * arrows are kept.
+ */
+export type SetEvolvesToPayload =
+  | { id: string; evolvesTo: string | null; position?: never }
+  | { id: string; position: { evolution: number; visibility: number }; evolvesTo?: never };
 export interface SetFlowPayload { id: string; flow: { label: string; style?: FlowStyle } | null }
 export interface ChangeEdgeTypePayload { id: string; type: RelationType }
 export interface ResizePipelinePayload {
@@ -70,6 +79,8 @@ export interface ResizePipelinePayload {
   evoEnd?: number;
   visStart?: number;
   visEnd?: number;
+  /** Handle (top-border square) evolution, clamped into [evoStart, evoEnd]. */
+  handleEvolution?: number;
 }
 export interface MovePipelinePayload { id: string; dEvo: number; dVis: number }
 export interface MoveLabelPayload { id: string; dx: number; dy: number }
@@ -542,19 +553,27 @@ function mutate(map: WardleyMap, diffOp: DiffOp): void {
 
     case "set_evolves_to": {
       const comp = getComponent(map, p.id);
-      if (p.evolvesTo === null) {
+      let evolution: number, visibility: number;
+      if (p.position !== undefined) {
+        if (p.evolvesTo !== undefined) fail("set_evolves_to takes evolvesTo or position, not both");
+        const pos = isObj(p.position) ? p.position : fail("position must be an object");
+        evolution = round3(unit(pos.evolution, "position.evolution"));
+        visibility = round3(unit(pos.visibility, "position.visibility"));
+      } else if (p.evolvesTo === null) {
         delete comp.evolvesTo;
         return;
+      } else {
+        const target = getComponent(map, p.evolvesTo);
+        if (target === comp) fail("a component cannot evolve to itself");
+        evolution = target.position.evolution.scalar;
+        visibility = target.position.visibility.scalar;
       }
-      const target = getComponent(map, p.evolvesTo);
-      if (target === comp) fail("a component cannot evolve to itself");
+      const [prev, ...rest] = comp.evolvesTo ?? [];
       comp.evolvesTo = [{
-        position: {
-          evolution: { scalar: target.position.evolution.scalar },
-          visibility: { scalar: target.position.visibility.scalar },
-        },
-        evolveType: "natural",
-      }];
+        position: { evolution: { scalar: evolution }, visibility: { scalar: visibility } },
+        evolveType: prev?.evolveType ?? "natural",
+        ...(prev?.inertia !== undefined ? { inertia: prev.inertia } : {}),
+      }, ...rest];
       return;
     }
 
@@ -564,9 +583,12 @@ function mutate(map: WardleyMap, diffOp: DiffOp): void {
       const pipe = getPipeline(map, p.id);
       const members = pipelineMembers(map, pipe.id);
       const keys = ["evoStart", "evoEnd", "visStart", "visEnd"] as const;
-      if (!keys.some((k) => p[k] !== undefined)) fail("resize_pipeline needs at least one bound");
+      if (!keys.some((k) => p[k] !== undefined) && p.handleEvolution === undefined) {
+        fail("resize_pipeline needs at least one bound or handleEvolution");
+      }
       const geo = { ...pipe.pipelineGeometry };
       for (const k of keys) if (p[k] !== undefined) geo[k] = round3(unit(p[k], k));
+      if (p.handleEvolution !== undefined) geo.handleEvolution = round3(unit(p.handleEvolution, "handleEvolution"));
       if (geo.evoStart > geo.evoEnd) [geo.evoStart, geo.evoEnd] = [geo.evoEnd, geo.evoStart];
       if (geo.visStart > geo.visEnd) [geo.visStart, geo.visEnd] = [geo.visEnd, geo.visStart];
       if (geo.handleEvolution != null) {

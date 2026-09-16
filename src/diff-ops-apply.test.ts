@@ -99,6 +99,15 @@ describe("resize_pipeline", () => {
     expect(pos(shrunkVis, "in-a")).toEqual([0.4, 0.42]);
   });
 
+  it("sets handleEvolution alone (clamped into the box), leaving the geometry and members alone", () => {
+    const map = makeMap();
+    const next = applyDiffOp(map, { op: "resize_pipeline", payload: { id: "pipe", handleEvolution: 0.4561 } });
+    expect(find(next, "pipe").pipelineGeometry).toEqual({ ...find(map, "pipe").pipelineGeometry, handleEvolution: 0.456 });
+    expect(find(next, "pipe").position).toEqual(find(map, "pipe").position);
+    const clamped = applyDiffOp(map, { op: "resize_pipeline", payload: { id: "pipe", handleEvolution: 0.95 } });
+    expect(find(clamped, "pipe").pipelineGeometry!.handleEvolution).toBe(0.7);
+  });
+
   it("normalizes inverted bounds, requires at least one bound, rejects non-pipelines", () => {
     const map = makeMap();
     const next = applyDiffOp(map, { op: "resize_pipeline", payload: { id: "pipe", evoStart: 0.9 } });

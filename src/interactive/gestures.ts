@@ -5,6 +5,10 @@
  * Selection ids: a component or relation id, or `evolve:<componentId>` for an
  * evolve arrow.
  *
+ * Pipelines are link endpoints like components (body, border or handle square);
+ * the handle square (`data-part="handle"`, drawn by the renderer) drags the
+ * pipeline's handleEvolution. Evolve arrows never start or end on a pipeline.
+ *
  * @module interactive/gestures
  */
 
@@ -16,7 +20,8 @@ import type { WardleyMap } from "../schema.js";
 /** Pointer position: SVG user units (x, y) + normalized map coords (evo, vis, clamped). */
 export interface Pt { x: number; y: number; evo: number; vis: number }
 
-export type Handle = "n" | "s" | "e" | "w" | "ne" | "nw" | "se" | "sw";
+/** Overlay resize handles, or "h": the renderer's pipeline handle square (drags handleEvolution). */
+export type Handle = "n" | "s" | "e" | "w" | "ne" | "nw" | "se" | "sw" | "h";
 export interface Hit { id: string; kind: HitKind; handle?: Handle }
 
 /** Minimal Element surface used by resolveHit (keeps it testable without a DOM). */
@@ -32,7 +37,8 @@ const HANDLES = new Set(["n", "s", "e", "w", "ne", "nw", "se", "sw"]);
 /**
  * Map an event target to the editor element under it. Relies only on the
  * renderer's `data-id`/`data-kind` groups and the overlay's own handles
- * (`data-handle` + `data-for`), which win over their pipeline.
+ * (`data-handle` + `data-for`), which win over their pipeline. The renderer's
+ * pipeline handle square is a pipeline group with `data-part="handle"` (handle "h").
  */
 export function resolveHit(el: ElLike | null | undefined): Hit | null {
   if (!el || typeof el.closest !== "function") return null;
@@ -44,7 +50,10 @@ export function resolveHit(el: ElLike | null | undefined): Hit | null {
     if (HANDLES.has(handle) && id) return { id, kind: "pipeline", handle };
   }
   const id = group?.getAttribute("data-id");
-  return id ? { id, kind: group!.getAttribute("data-kind") as HitKind } : null;
+  if (!id) return null;
+  const hit: Hit = { id, kind: group!.getAttribute("data-kind") as HitKind };
+  if (group!.getAttribute("data-part") === "handle") hit.handle = "h";
+  return hit;
 }
 
 /** Component id a hit refers to (null for relations and the title). */
@@ -164,8 +173,9 @@ export function dragOps(map: WardleyMap, d: DragStart, cur: Pt): DiffOp[] {
   const dVis = round3(cur.vis - d.start.vis);
   const { hit } = d;
   if (hit.handle) {
-    const p: { id: string; evoStart?: number; evoEnd?: number; visStart?: number; visEnd?: number } = { id: hit.id };
     const e = round3(cur.evo), v = round3(cur.vis);
+    if (hit.handle === "h") return [{ op: "resize_pipeline", payload: { id: hit.id, handleEvolution: e } }];
+    const p: { id: string; evoStart?: number; evoEnd?: number; visStart?: number; visEnd?: number } = { id: hit.id };
     if (hit.handle.includes("w")) p.evoStart = e;
     if (hit.handle.includes("e")) p.evoEnd = e;
     if (hit.handle.includes("n")) p.visStart = v;
@@ -191,6 +201,13 @@ export function dragOps(map: WardleyMap, d: DragStart, cur: Pt): DiffOp[] {
         const visibility = clamp01(round3(c.position.visibility.scalar + dVis));
         return [{ op, payload: { id, evolution, visibility } }];
       });
+    }
+    case "evolve": {
+      // Moves the (first) arrow head horizontally by the drag delta.
+      const t = map.components.find((x) => x.id === hit.id)?.evolvesTo?.[0]?.position;
+      if (!t || !dEvo) return [];
+      const evolution = clamp01(round3(t.evolution.scalar + dEvo));
+      return [{ op: "set_evolves_to", payload: { id: hit.id, position: { evolution, visibility: t.visibility.scalar } } }];
     }
     default:
       return [];
@@ -220,10 +237,25 @@ export function rectToPipeline(map: WardleyMap, a: Pt, b: Pt): (DiffOp & { op: "
   return op;
 }
 
-/** Link / evolve gesture result (null: no valid target). add_edge carries its id so replays match. */
-export function connectOp(map: WardleyMap, tool: "link" | "evolve", from: string, to: string | null): DiffOp | null {
-  if (!to || to === from) return null;
-  return tool === "link"
-    ? { op: "add_edge", payload: { id: uniqueId(map, `${from}-${to}`), consumer: from, supplier: to, type: "DependsOn" } }
-    : { op: "set_evolves_to", payload: { id: from, evolvesTo: to } };
+/** Whether an evolve gesture may start on component `id` (not pipelines: they have no arrows). */
+export const canEvolve = (map: WardleyMap, id: string | null): id is string =>
+  !!id && map.components.some((c) => c.id === id && c.type !== "pipeline");
+
+/**
+ * Link / evolve gesture result (null: no valid target). add_edge carries its id so replays match.
+ * Evolve: onto another (non-pipeline) component → that component; elsewhere (`at`) →
+ * a horizontal arrow to the pointer's evolution at the source's visibility.
+ */
+export function connectOp(map: WardleyMap, tool: "link" | "evolve", from: string, to: string | null, at?: Pt): DiffOp | null {
+  if (tool === "link") {
+    if (!to || to === from) return null;
+    return { op: "add_edge", payload: { id: uniqueId(map, `${from}-${to}`), consumer: from, supplier: to, type: "DependsOn" } };
+  }
+  const src = map.components.find((c) => c.id === from);
+  if (!src || src.type === "pipeline" || to === from) return null;
+  if (to !== null && canEvolve(map, to)) return { op: "set_evolves_to", payload: { id: from, evolvesTo: to } };
+  if (!at) return null;
+  const evolution = round3(clamp01(at.evo));
+  if (Math.abs(evolution - src.position.evolution.scalar) < 0.01) return null;
+  return { op: "set_evolves_to", payload: { id: from, position: { evolution, visibility: src.position.visibility.scalar } } };
 }

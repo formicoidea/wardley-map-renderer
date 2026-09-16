@@ -119,9 +119,11 @@ describe("DiffOp schema", () => {
     { op: "delete_edge", payload: { id: "e" } },
     { op: "change_component_type", payload: { id: "a", type: "anchor" } },
     { op: "set_evolves_to", payload: { id: "a", evolvesTo: "b" } },
+    { op: "set_evolves_to", payload: { id: "a", position: { evolution: 0.7, visibility: 0.2 } } },
     { op: "set_flow", payload: { id: "e", flow: { label: "x" } } },
     { op: "change_edge_type", payload: { id: "e", type: "Flow" } },
     { op: "resize_pipeline", payload: { id: "p", evoStart: 0.2, evoEnd: 0.8 } },
+    { op: "resize_pipeline", payload: { id: "p", handleEvolution: 0.4 } },
     { op: "rename_map", payload: { title: "T" } },
     { op: "move_label", payload: { id: "a", dx: 1, dy: 2 } },
     { op: "move_step", payload: { id: "a", evolution: 0.1, visibility: 0.2 } },
@@ -290,6 +292,27 @@ describe("set_evolves_to", () => {
     expect(find(m, "comp-1").evolvesTo!.map((t) => t.position.evolution.scalar)).toEqual([0.4]);
     m = evolve(evolve(m, "comp-1", null), "comp-1", null);
     expect(find(m, "comp-1").evolvesTo).toBeUndefined();
+  });
+
+  it("accepts an explicit position (rounded), replacing only the first arrow and keeping its type", () => {
+    const at = (m: WardleyMap, evolution: number, visibility: number) =>
+      apply(m, { op: "set_evolves_to", payload: { id: "comp-1", position: { evolution, visibility } } });
+    let m = at(makeMap(), 0.91234, 0.1);
+    expect(find(m, "comp-1").evolvesTo).toEqual([
+      { position: { evolution: { scalar: 0.912 }, visibility: { scalar: 0.1 } }, evolveType: "natural" },
+    ]);
+    const forced = { position: { evolution: { scalar: 0.5 }, visibility: { scalar: 0.5 } }, evolveType: "forced" as const, inertia: true };
+    m = apply(m, { op: "set_field", payload: { target: "comp-1", path: "evolvesTo", value: [forced, forced] } });
+    m = evolve(at(m, 0.95, 0.1), "comp-1", "comp-2");
+    expect(find(m, "comp-1").evolvesTo).toEqual([
+      { position: { evolution: { scalar: 0.6 }, visibility: { scalar: 0.3 } }, evolveType: "forced", inertia: true },
+      forced,
+    ]);
+    expect(() => at(makeMap(), 1.2, 0.1)).toThrow(/[0, 1]/);
+    expect(() => apply(makeMap(), { op: "set_evolves_to", payload: { id: "comp-1", evolvesTo: "comp-2", position: { evolution: 1, visibility: 0 } } } as unknown as Op)).toThrow(/not both/);
+    expect(SetEvolvesToPayload.safeParse({ id: "a", position: { evolution: 0.5, visibility: 0.2 } }).success).toBe(true);
+    expect(SetEvolvesToPayload.safeParse({ id: "a", position: { evolution: 1.5, visibility: 0.2 } }).success).toBe(false);
+    expect(SetEvolvesToPayload.safeParse({ id: "a" }).success).toBe(false);
   });
 
   it("rejects unknown source/target and self-evolution", () => {

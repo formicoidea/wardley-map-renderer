@@ -7,7 +7,7 @@
 import { describe, it, expect, beforeAll, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import type { DiffOp } from "../diff-ops-apply.js";
-import { renderSVGFromPrepared } from "../render/browser-render.js";
+import { pxToMap, renderSVGFromPrepared } from "../render/browser-render.js";
 import { prepareRender } from "../render/prepare-render.js";
 import { sanitizeMap, type WardleyMap } from "../schema.js";
 import { initEditor } from "./interactive.js";
@@ -18,6 +18,8 @@ const MAP = sanitizeMap({
   components: [
     { id: "a", label: { name: "Alpha" }, type: "component", position: pos(0.3, 0.3) },
     { id: "title", label: { name: "Kettle" }, type: "component", position: pos(0.7, 0.7) },
+    { id: "p", label: { name: "Brewing" }, type: "pipeline", position: pos(0.7, 0.9), pipelineGeometry: { evoStart: 0.5, evoEnd: 0.9, visStart: 0.85, visEnd: 0.95 } },
+    { id: "m", label: { name: "Member" }, type: "component", position: pos(0.6, 0.9) },
   ],
   relations: [],
 } as WardleyMap);
@@ -114,7 +116,7 @@ describe("interactive controller", () => {
     act("delete");
     expect(api().getDiff().at(-1)).toEqual({ op: "delete_component", payload: { id: "a" } });
     act("undo");
-    expect(api().getMap().components.map((c) => c.id)).toEqual(["a", "title"]);
+    expect(api().getMap().components.map((c) => c.id)).toEqual(["a", "title", "p", "m"]);
   });
 
   it("Space+drag on a component pans instead of moving it", () => {
@@ -128,6 +130,98 @@ describe("interactive controller", () => {
     key(document.body, " ", "keyup");
     expect(api().getDiff()).toHaveLength(before);
     expect(stage.style.transform).not.toBe(t0);
+  });
+
+  describe("link / evolve tools", () => {
+    const centre = (e: Element) => ({ x: +e.getAttribute("cx")!, y: +e.getAttribute("cy")! });
+    const handle = () => $(`#map [data-part=handle][data-id="p"]`).lastElementChild!;
+    const handleXY = () => {
+      const r = handle();
+      return { x: +r.getAttribute("x")! + +r.getAttribute("width")! / 2, y: +r.getAttribute("y")! + +r.getAttribute("height")! / 2 };
+    };
+    /**
+     * Drag from `from` (a to b); `under` is what the pointer is released over. Moves and
+     * the release go to the viewport, as with pointer capture (`from` is re-rendered).
+     */
+    const drag = async (from: Element, a: { x: number; y: number }, b: { x: number; y: number }, under: Element) => {
+      document.elementFromPoint = () => under;
+      const vp = $("#viewport");
+      ptr(from, "pointerdown", a.x, a.y);
+      ptr(vp, "pointermove", (a.x + b.x) / 2, (a.y + b.y) / 2);
+      ptr(vp, "pointermove", b.x, b.y);
+      await frame();
+      ptr(vp, "pointerup", b.x, b.y);
+    };
+    const svgRoot = () => $("#map svg");
+
+    it("renders the pipeline handle as a hit target", () => {
+      expect(handle().tagName.toLowerCase()).toBe("rect");
+      expect($(`#map [data-part=handle][data-id="p"]`).getAttribute("data-kind")).toBe("pipeline");
+    });
+
+    it("evolve: drop in empty space → horizontal arrow at the pointer evolution (with a horizontal ghost)", async () => {
+      key(document.body, "e");
+      const a = centre(node("a"));
+      const b = { x: a.x + 150, y: a.y + 40 };
+      document.elementFromPoint = () => svgRoot();
+      ptr(node("a"), "pointerdown", a.x, a.y);
+      ptr(node("a"), "pointermove", b.x, b.y);
+      const ghost = $("#overlay line");
+      expect(ghost.getAttribute("y1")).toBe(ghost.getAttribute("y2"));
+      expect(+ghost.getAttribute("x2")!).toBeCloseTo(b.x, -1);
+      ptr(node("a"), "pointerup", b.x, b.y);
+      const evolution = Math.round(pxToMap(prepareRender(MAP, { interactive: true }), b.x, b.y).evo * 1000) / 1000;
+      expect(api().getDiff().at(-1)).toEqual({ op: "set_evolves_to", payload: { id: "a", position: { evolution, visibility: 0.3 } } });
+      expect(api().getMap().components[0].evolvesTo).toHaveLength(1);
+      expect($("#toast").textContent).not.toMatch(/Drop on/);
+    });
+
+    it("evolve: click source, click empty space", () => {
+      const a = centre(node("title"));
+      document.elementFromPoint = () => svgRoot();
+      click(node("title"), a.x);
+      ptr(svgRoot(), "pointerdown", a.x + 60, a.y + 90);
+      ptr(svgRoot(), "pointerup", a.x + 60, a.y + 90);
+      expect(api().getDiff().at(-1)).toMatchObject({ op: "set_evolves_to", payload: { id: "title", position: { visibility: 0.7 } } });
+    });
+
+    it("select: dragging the evolve arrow moves its head horizontally", async () => {
+      key(document.body, "v");
+      const arrow = $(`#map [data-id="a"][data-kind=evolve]`).firstElementChild!;
+      const x2 = +arrow.getAttribute("x2")!, y = +arrow.getAttribute("y2")!;
+      await drag(arrow, { x: x2, y }, { x: x2 + 30, y: y + 25 }, arrow);
+      const op = api().getDiff().at(-1)!;
+      expect(op).toMatchObject({ op: "set_evolves_to", payload: { id: "a", position: { visibility: 0.3 } } });
+      expect((op.payload as { position: { evolution: number } }).position.evolution).toBeGreaterThan(api().getMap().components[0].position.evolution.scalar);
+    });
+
+    it("link: from the pipeline handle to a component, and from a component to the handle", async () => {
+      key(document.body, "l");
+      await drag(handle(), handleXY(), centre(node("a")), node("a"));
+      expect(api().getDiff().at(-1)).toMatchObject({ op: "add_edge", payload: { consumer: "p", supplier: "a", type: "DependsOn" } });
+      await drag(node("title"), centre(node("title")), handleXY(), handle());
+      expect(api().getDiff().at(-1)).toMatchObject({ op: "add_edge", payload: { consumer: "title", supplier: "p" } });
+      expect(api().getMap().relations.map((r) => [r.consumer, r.supplier])).toEqual([["p", "a"], ["title", "p"]]);
+    });
+
+    it("link: a member component inside the pipeline box wins over the box", async () => {
+      const body = $(`#map [data-id="p"][data-kind=pipeline]`).firstElementChild!;
+      await drag(node("a"), centre(node("a")), centre(node("m")), body);
+      expect(api().getDiff().at(-1)).toMatchObject({ op: "add_edge", payload: { consumer: "a", supplier: "m" } });
+      const empty = centre(node("m"));
+      await drag(node("a"), centre(node("a")), { x: empty.x + 120, y: empty.y }, body);
+      expect(api().getDiff().at(-1)).toMatchObject({ op: "add_edge", payload: { consumer: "a", supplier: "p" } });
+    });
+
+    it("select: dragging the handle square sets handleEvolution", async () => {
+      key(document.body, "v");
+      const h = handleXY();
+      await drag(handle(), h, { x: h.x + 20, y: h.y + 30 }, handle());
+      const op = api().getDiff().at(-1)!;
+      expect(op).toMatchObject({ op: "resize_pipeline", payload: { id: "p" } });
+      expect(Object.keys(op.payload)).toEqual(["id", "handleEvolution"]);
+      expect(api().getMap().components.find((c) => c.id === "p")!.pipelineGeometry!.handleEvolution).toBeGreaterThan(0.7);
+    });
   });
 
   it("send: clipboard keeps the diff; endpoint delivery checkpoints it", async () => {

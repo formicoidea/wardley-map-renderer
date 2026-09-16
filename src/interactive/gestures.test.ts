@@ -42,6 +42,9 @@ describe("resolveHit", () => {
   it("overlay handles (data-for)", () => {
     expect(resolveHit(el({ "data-handle": "se", "data-for": "pipe" }))).toEqual({ id: "pipe", kind: "pipeline", handle: "se" });
     expect(resolveHit(el({ "data-handle": "bogus", "data-for": "pipe" }))).toBeNull();
+    // Renderer's pipeline handle square: data-part="handle" on the pipeline hit group.
+    expect(resolveHit(el({ "data-part": "handle", "data-id": "pipe", "data-kind": "pipeline" }))).toEqual({ id: "pipe", kind: "pipeline", handle: "h" });
+    expect(componentOf({ id: "pipe", kind: "pipeline", handle: "h" })).toBe("pipe");
   });
 
   it("maps hits to components and selection ids", () => {
@@ -76,6 +79,8 @@ describe("dragOps", () => {
 
     const corner = dragStart(MAP, prepared, { id: "pipe", kind: "pipeline", handle: "nw" }, p(0.3, 0.35), []);
     expect(dragOps(MAP, corner, p(0.2, 0.3))).toEqual([{ op: "resize_pipeline", payload: { id: "pipe", evoStart: 0.2, visStart: 0.3 } }]);
+    const sq = dragStart(MAP, prepared, { id: "pipe", kind: "pipeline", handle: "h" }, p(0.5, 0.35), []);
+    expect(dragOps(MAP, sq, p(0.6123, 0.2))).toEqual([{ op: "resize_pipeline", payload: { id: "pipe", handleEvolution: 0.612 } }]);
     const edge = dragStart(MAP, prepared, { id: "pipe", kind: "pipeline", handle: "e" }, p(0.7, 0.4), []);
     expect(dragOps(MAP, edge, p(0.8, 0.9))).toEqual([{ op: "resize_pipeline", payload: { id: "pipe", evoEnd: 0.8 } }]);
   });
@@ -116,6 +121,32 @@ describe("creation and connection ops", () => {
     });
     expect(applyDiffOps(MAP, [op]).components.at(-1)!.pipelineGeometry).toEqual(op.payload.pipelineGeometry);
     expect(rectToPipeline(MAP, p(0.5, 0.5), p(0.51, 0.6))).toBeNull();
+  });
+
+  it("evolve arrow drag moves its head horizontally", () => {
+    const d = dragStart(MAP, prepared, { id: "b", kind: "evolve" }, p(0.5, 0.1), []);
+    expect(dragOps(MAP, d, p(0.4, 0.3))).toEqual([{ op: "set_evolves_to", payload: { id: "b", position: { evolution: 0.8, visibility: 0.1 } } }]);
+    expect(dragOps(MAP, d, p(0.5, 0.3))).toEqual([]);
+  });
+
+  it("evolve into empty space: horizontal arrow at the source visibility; pipelines are not evolve ends", () => {
+    expect(connectOp(MAP, "evolve", "a", null, p(0.8123, 0.9))).toEqual({
+      op: "set_evolves_to", payload: { id: "a", position: { evolution: 0.812, visibility: 0.4 } },
+    });
+    expect(connectOp(MAP, "evolve", "a", "pipe", p(0.6, 0.35))).toEqual({
+      op: "set_evolves_to", payload: { id: "a", position: { evolution: 0.6, visibility: 0.4 } },
+    });
+    expect(connectOp(MAP, "evolve", "a", null, p(0.402, 0.9))).toBeNull(); // no length
+    expect(connectOp(MAP, "evolve", "a", "a", p(0.8, 0.4))).toBeNull();
+    expect(connectOp(MAP, "evolve", "a", null)).toBeNull();
+    expect(connectOp(MAP, "evolve", "pipe", "c", p(0.9, 0.1))).toBeNull();
+  });
+
+  it("links to and from pipelines", () => {
+    expect(connectOp(MAP, "link", "pipe", "c")).toMatchObject({ op: "add_edge", payload: { consumer: "pipe", supplier: "c" } });
+    const op = connectOp(MAP, "link", "c", "pipe")!;
+    expect(op).toMatchObject({ op: "add_edge", payload: { consumer: "c", supplier: "pipe" } });
+    expect(applyDiffOps(MAP, [op]).relations.at(-1)).toMatchObject({ consumer: "c", supplier: "pipe" });
   });
 
   it("link and evolve", () => {

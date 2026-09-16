@@ -91,12 +91,20 @@ export const ChangeComponentTypePayload = z.object({
 });
 export type ChangeComponentTypePayload = z.infer<typeof ChangeComponentTypePayload>;
 
-export const SetEvolvesToPayload = z.object({
-  /** The component that evolves */
-  id: Id,
-  /** Target component id (its current position is copied), or null to clear */
-  evolvesTo: Id.nullable(),
-});
+/** Replaces the first evolve arrow's target (evolveType/inertia and other arrows kept); null clears all. */
+export const SetEvolvesToPayload = z.union([
+  z.object({
+    /** The component that evolves */
+    id: Id,
+    /** Target component id (its current position is copied), or null to clear */
+    evolvesTo: Id.nullable(),
+  }),
+  z.object({
+    id: Id,
+    /** Explicit target point (the editor's evolve tool keeps the source visibility: horizontal arrow) */
+    position: z.object({ evolution: EvolutionValue, visibility: VisibilityValue }),
+  }),
+]);
 export type SetEvolvesToPayload = z.infer<typeof SetEvolvesToPayload>;
 
 const FlowPayload = z.object({
@@ -117,10 +125,12 @@ export const ResizePipelinePayload = z
     evoEnd: EvolutionValue.optional(),
     visStart: VisibilityValue.optional(),
     visEnd: VisibilityValue.optional(),
+    /** Handle (top-border square) evolution, clamped into [evoStart, evoEnd] */
+    handleEvolution: EvolutionValue.optional(),
   })
   .refine(
-    (p) => p.evoStart !== undefined || p.evoEnd !== undefined || p.visStart !== undefined || p.visEnd !== undefined,
-    { message: "resize_pipeline needs at least one of evoStart, evoEnd, visStart, visEnd" },
+    (p) => [p.evoStart, p.evoEnd, p.visStart, p.visEnd, p.handleEvolution].some((v) => v !== undefined),
+    { message: "resize_pipeline needs at least one of evoStart, evoEnd, visStart, visEnd, handleEvolution" },
   );
 export type ResizePipelinePayload = z.infer<typeof ResizePipelinePayload>;
 
