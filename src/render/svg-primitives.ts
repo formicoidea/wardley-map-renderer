@@ -311,7 +311,7 @@ export function renderComponentNode(input: NodeRenderInput): string {
 
   // Interactive mode wrapping
   if (interactive) {
-    return `<g data-component-id="${id}"${hitAttrs(id, "component")}>${methodSvg}${nodeSvg}</g>`;
+    return `<g data-component-id="${esc(id)}"${hitAttrs(id, "component")}>${methodSvg}${nodeSvg}</g>`;
   } else {
     // Separate method and node SVG with newline to match server layer output format
     return methodSvg ? methodSvg + "\n" + nodeSvg : nodeSvg;
@@ -391,7 +391,7 @@ export function renderEdge(input: EdgeRenderInput): string {
     const hitArea =
       `<line class="hit-area" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" ` +
       `stroke="transparent" stroke-width="${EDGE_HIT_AREA_WIDTH}" />`;
-    return `<g data-edge-id="${relationId}"${hitAttrs(relationId, "relation")}>${hitArea}${lineEl}</g>`;
+    return `<g data-edge-id="${esc(relationId)}"${hitAttrs(relationId, "relation")}>${hitArea}${lineEl}</g>`;
   }
 
   return lineEl;
@@ -512,7 +512,7 @@ export function renderEvolveArrow(input: EvolveRenderInput): string {
       `<line class="hit-area" x1="${fromX}" y1="${fromY}" ` +
       `x2="${toX}" y2="${toY}" ` +
       `stroke="transparent" stroke-width="${EVOLVE_HIT_AREA_WIDTH}" />`;
-    return `<g data-evolves-from="${componentId}"${hitAttrs(componentId, "evolve")}>${hitArea}${lineSvg}${arrowSvg}</g>`;
+    return `<g data-evolves-from="${esc(componentId)}"${hitAttrs(componentId, "evolve")}>${hitArea}${lineSvg}${arrowSvg}</g>`;
   }
 
   return lineSvg + (arrowSvg ? "\n" + arrowSvg : "");
@@ -589,7 +589,7 @@ export function renderPipeline(input: PipelineRenderInput): string {
       `<rect data-handle="bottom" x="${cx - PIPELINE_HANDLE_HALF}" y="${y + height - PIPELINE_HANDLE_HALF}" ` +
       `width="${PIPELINE_HANDLE_HALF * 2}" height="${PIPELINE_HANDLE_HALF * 2}" ` +
       `fill="#fff" stroke="#666" stroke-width="1" style="cursor:ns-resize" />`;
-    return `<g data-pipeline-id="${componentId}"${hitAttrs(componentId, "pipeline")}>${rectSvg}${handlesSvg}</g>`;
+    return `<g data-pipeline-id="${esc(componentId)}"${hitAttrs(componentId, "pipeline")}>${rectSvg}${handlesSvg}</g>`;
   }
 
   return rectSvg;
@@ -622,7 +622,7 @@ export function renderLabel(input: LabelRenderInput): string {
   const { x, y, text, anchor, fontFamily, fontSize, componentId, interactive } = input;
 
   const labelAttr = interactive && componentId
-    ? ` data-label-for="${componentId}"${hitAttrs(componentId, "label")} style="cursor:move"`
+    ? ` data-label-for="${esc(componentId)}"${hitAttrs(componentId, "label")} style="cursor:move"`
     : "";
 
   if (text.includes("\n")) {
@@ -736,7 +736,7 @@ export function renderStep(input: StepRenderInput): string {
     `font-weight="bold" fill="${STEP_TEXT_COLOR}">${number}</text>`;
 
   if (interactive) {
-    return `<g data-step-id="${stepId}" data-step-number="${number}"${hitAttrs(stepId, "step")}>${circleSvg}${textSvg}</g>`;
+    return `<g data-step-id="${esc(stepId)}" data-step-number="${number}"${hitAttrs(stepId, "step")}>${circleSvg}${textSvg}</g>`;
   }
 
   return circleSvg + "\n" + textSvg;

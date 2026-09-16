@@ -46,13 +46,35 @@ const svgString: string = await renderToSVG(map);
 const pngBuffer: Buffer = await renderToPNG(map);
 ```
 
-### Interactive HTML artifact
+### HTML page and interactive editor
 
 ```typescript
-import { renderInteractiveHTML } from "wardley-map-renderer";
-// Returns a self-contained HTML document with embedded SVG + drag-drop editor
-const html: string = await renderInteractiveHTML(map);
+import { renderToHTML } from "wardley-map-renderer";
+
+const page = await renderToHTML(map);                          // static page, no script
+const editor = await renderToHTML(map, {
+  interactive: true,
+  editsEndpoint: "http://127.0.0.1:7777/edits",                // optional
+});
 ```
+
+The editor is a single self-contained HTML file (about 25 KB gzip of script, and the same renderer as the server). It supports:
+
+- **Tools**: Select (V), Component (C), Link (L), Evolve (E), Pipeline (P), Pan (H or hold Space).
+- **Select**: click or Shift+click to select, then drag to move. You can drag a component, a label, a step, a pipeline body (its contained components move too) or a pipeline handle (resizes it).
+- **Rename and add**: double-click a label or the title to rename it, or double-click empty space to add a component.
+- **Delete and properties**: Del deletes the selection. Right-click, long-press or Enter opens the properties panel.
+- **Keyboard**: Esc cancels or clears, Ctrl+Z / Ctrl+Shift+Z undo and redo, and F2 renames.
+- **Navigation**: pan by dragging empty space or with the wheel. Zoom with Ctrl+wheel, pinch or the zoom buttons.
+
+Every edit is a `DiffOp` (see `applyDiffOp`). The op log always equals the net diff from the original map, so undo removes ops from it. There are three ways to get the edits out of the page:
+
+- **Send** tries each route in turn, and the edits stay in the page afterwards:
+  1. the MCP-App host (`ui/message`), when the page is embedded;
+  2. otherwise `POST {title, ops}` to `editsEndpoint`;
+  3. otherwise it copies a prompt to the clipboard.
+- **Copy diff** copies the raw JSON array of ops. **Download** saves the full edited map.
+- **Scripting**: `window.__wardley` exposes `getMap()`, `getDiff()`, `clearDiff()`, `apply(op)`, `undo()` and `redo()`. `getDiff()` does not clear the ops.
 
 ## Text size
 
@@ -98,7 +120,7 @@ The package re-exports ~210 named symbols from `src/index.ts`:
 - **Phase mapping** : `PhaseMappingSchema`, `resolveStyleByPosition`, …
 - **Config resolution** : `resolveConfig` (4-tier precedence), `resolveConflict`
 - **Constraints** : `checkConstraints`, `evaluateConstraints`, `validateRenderConfig`
-- **Diff operations** (HTML interactive) : `diff-ops.ts` exports
+- **HTML / editor** : `renderToHTML`, `applyDiffOp`, `applyDiffOps`, `DiffOp`
 
 ## Architecture
 
@@ -121,7 +143,7 @@ pnpm test        # vitest run
 pnpm typecheck
 ```
 
-The `prebuild` step bundles `src/interactive/interactive.ts` via esbuild into a single IIFE inlined in the HTML template.
+The `prebuild` step bundles `src/interactive/interactive.ts` with esbuild into `dist/interactive-bundle.js` and copies `src/interactive/template.html` to `dist/interactive/`. When running from `src/` (tsx, vitest), `renderToHTML` builds the bundle on the fly.
 
 ## License
 
