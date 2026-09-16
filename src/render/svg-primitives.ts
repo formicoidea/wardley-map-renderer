@@ -539,6 +539,30 @@ export function renderInertiaBarrier(
   );
 }
 
+/** Half-height of the component-level inertia bar (shorter than phase barriers). */
+export const COMPONENT_INERTIA_HALF_HEIGHT = 10;
+/** Gap between the node's visual edge and the component-level inertia bar. */
+export const COMPONENT_INERTIA_GAP = 6;
+const EVO_RANGE_STROKE = "#000000";
+const EVO_RANGE_OPACITY = 0.3;
+const EVO_RANGE_TICK = 4;
+/** Drawn below the node so the line never strikes through a side label. */
+export const EVO_RANGE_OFFSET_Y = 12;
+
+/**
+ * Render an evolution range (`position.evolution.range`): a thin, low-opacity
+ * horizontal line from x1 to x2 at y with small end ticks. Drawn behind nodes.
+ */
+export function renderEvolutionRange(x1: number, x2: number, y: number): string {
+  return (
+    `<g class="evo-range" stroke="${EVO_RANGE_STROKE}" stroke-opacity="${EVO_RANGE_OPACITY}" stroke-width="2">` +
+    `<line x1="${x1}" y1="${y}" x2="${x2}" y2="${y}" />` +
+    `<line x1="${x1}" y1="${y - EVO_RANGE_TICK}" x2="${x1}" y2="${y + EVO_RANGE_TICK}" />` +
+    `<line x1="${x2}" y1="${y - EVO_RANGE_TICK}" x2="${x2}" y2="${y + EVO_RANGE_TICK}" />` +
+    `</g>`
+  );
+}
+
 // ══════════════════════════════════════════════════════════════════════
 //  PIPELINES
 // ══════════════════════════════════════════════════════════════════════

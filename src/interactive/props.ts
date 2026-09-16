@@ -252,13 +252,17 @@ export function buildProps(
       input.setAttribute("list", dl.id);
       form.append(dl);
     }
+    // Last committed value: an Enter commit is followed by the browser's own
+    // `change` on blur, which must not dispatch the same op twice.
+    let committed = f.value;
     input.onchange = () => {
       const v = f.kind === "checkbox" ? input.checked : input.value.trim();
-      if (v === f.value) return;
-      if (!fire(f, v)) {
+      if (v === committed) return;
+      if (fire(f, v)) committed = v;
+      else {
         // Invalid or no-op: restore the committed value.
-        if (f.kind === "checkbox") input.checked = f.value === true;
-        else if (f.kind !== "color") input.value = f.value as string;
+        if (f.kind === "checkbox") input.checked = committed === true;
+        else if (f.kind !== "color") input.value = committed as string;
       }
     };
     // Enter commits text fields (Shift+Enter: new line in text areas).

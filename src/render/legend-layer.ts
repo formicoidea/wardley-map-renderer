@@ -278,7 +278,7 @@ function collectLegendItems(ctx: RenderContext): LegendItem[] {
   }
 
   // ── Inertia ─────────────────────────────────────────────────────────
-  const hasInertia = ctx.evolves.some((e) => e.inertia);
+  const hasInertia = ctx.evolves.some((e) => e.inertia) || ctx.nodes.some((n) => n.component.inertia);
   if (hasInertia) {
     const inertiaLabel = INERTIA_LABELS[locale] ?? INERTIA_LABELS.en;
     items.push({

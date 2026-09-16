@@ -359,7 +359,8 @@ export function initEditor(doc: Document): void {
       else drawOverlay();
       return;
     }
-    if (t === "component" && !hit) return add(addComponentOp(store.map, c.start));
+    // A click inside a pipeline adds a member component.
+    if (t === "component" && (!hit || hit.kind === "pipeline")) return add(addComponentOp(store.map, c.start));
     if (t === "pipeline" && !hit) return add(addComponentOp(store.map, c.start, "pipeline"));
     const id = selectId(hit);
     if (!id) return select([]);

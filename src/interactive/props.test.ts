@@ -249,7 +249,10 @@ describe("buildProps", () => {
     step.value = "-1";
     step.onchange();
     expect(dispatch).toHaveBeenCalledTimes(1);
-    expect(step.value).toBe("2");
+    expect(step.value).toBe("4"); // restored to the last committed value
+    step.value = "4";
+    step.onchange(); // blur after an Enter commit: no duplicate op
+    expect(dispatch).toHaveBeenCalledTimes(1);
     expect(onError).toHaveBeenCalledWith(expect.stringMatching(/whole number/));
     expect(step.dataset.focus).toBe("step");
     // Enter commits; Shift+Enter does not.
