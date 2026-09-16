@@ -14,10 +14,9 @@
  */
 
 import { readFile } from "node:fs/promises";
-import { renderToSVG } from "./render-orchestrator.js";
 import type { RenderOptions } from "./render/types.js";
-import { prepareRender } from "./render/prepare-render.js";
-import { sanitizeMap, type WardleyMap } from "./schema.js";
+import { renderSVGFromPrepared, type PreparedRender } from "./render/browser-render.js";
+import { resolveTheme, sanitizeMap, type WardleyMap } from "./schema.js";
 
 export interface HTMLRenderOptions extends RenderOptions {
   /** Emit the editor (toolbar, drag & drop, properties, diff export). Defaults to false. */
@@ -62,30 +61,33 @@ const STATIC_CSS =
 /** Render a WardleyMap to a self-contained HTML document. */
 export async function renderToHTML(inputMap: WardleyMap, options: HTMLRenderOptions = {}): Promise<string> {
   const { interactive = false, editsEndpoint, ...renderOptions } = options;
+  // Sanitize and resolve the theme once: renderSVGFromPrepared(map, prepared) === renderToSVG(inputMap, options).
   const map = sanitizeMap(inputMap);
+  const prepared: PreparedRender = { config: resolveTheme(map.renderConfig), options: { ...renderOptions, interactive } };
+  const svg = renderSVGFromPrepared(map, prepared);
   const title = escapeHTML(map.title?.trim() || "Wardley Map");
 
   if (!interactive) {
     return (
       `<!DOCTYPE html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n` +
       `<meta name="viewport" content="width=device-width,initial-scale=1">\n<title>${title}</title>\n` +
-      `<style>${STATIC_CSS}</style>\n</head>\n<body>\n${renderToSVG(map, { ...renderOptions, interactive: false })}\n</body>\n</html>\n`
+      `<style>${STATIC_CSS}</style>\n</head>\n<body>\n${svg}\n</body>\n</html>\n`
     );
   }
 
-  const svgOptions: RenderOptions = { ...renderOptions, interactive: true };
-  const prepared = prepareRender(map, svgOptions);
   const [template, code] = await Promise.all([readFile(asset("./interactive/template.html"), "utf-8"), loadBundle()]);
-  const bg = prepared.config.background.color;
   const values: Record<string, string> = {
     TITLE: title,
-    STYLE_VARS: `--map-bg:${/^[#\w(),.%\s-]+$/.test(bg) ? bg : "#fff"};`,
-    SVG: renderToSVG(map, svgOptions),
+    SVG: svg,
     DATA: `${jsonScript("wardley-data", map)}\n${jsonScript("wardley-prepared", prepared)}`,
     BUNDLE: `<script>${code.replace(/<\/(script)/gi, "<\\/$1").replace(/<!--/g, "<\\!--")}</script>`,
   };
-  // Single pass: substituted content (e.g. a label containing "{{DATA}}") is never re-scanned.
+  // Function replacers only: substituted content is inserted verbatim — never
+  // re-scanned for placeholders, and `$&` / `$'` in it are not expanded.
   let html = template.replace(/\{\{(\w+)\}\}/g, (m, key: string) => values[key] ?? m);
-  if (editsEndpoint) html = html.replace("<body>", `<body data-edits-endpoint="${escapeHTML(editsEndpoint)}">`);
+  if (editsEndpoint) {
+    const body = `<body data-edits-endpoint="${escapeHTML(editsEndpoint)}">`;
+    html = html.replace("<body>", () => body);
+  }
   return html;
 }

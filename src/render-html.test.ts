@@ -52,14 +52,14 @@ describe("renderToHTML (interactive)", () => {
     expect(html).toContain('<div id="map"><svg');
     expect(html).toContain('id="props"');
     expect(html).toContain("data-diff-count");
-    expect(html).toMatch(/--map-bg:#[0-9a-f]+;/i);
   });
 
   it("embeds the interactive server SVG as first paint", () => {
     expect(html).toContain(renderToSVG(map(), { interactive: true }));
     expect(html).toContain('data-kind="component"');
     expect(html).toContain('data-id="a&quot;b"');
-    expect(html).toContain('data-component-id="a&quot;b"');
+    // Legacy hit-test attributes are gone from the SVG (data-id/data-kind only).
+    expect(renderToSVG(map(), { interactive: true })).not.toMatch(/data-(component-id|edge-id|label-for|pipeline-id|step-id|evolves-from|plot-area|handle)\b/);
   });
 
   it("embeds the sanitized map and the prepared render inputs", () => {
@@ -93,5 +93,63 @@ describe("renderToHTML (interactive)", () => {
     const plain = await renderToHTML(map(), { interactive: true });
     expect(plain).toContain("<body>");
     expect(plain).not.toContain("data-edits-endpoint");
+  });
+});
+
+describe("renderToHTML (injection)", () => {
+  const evil = '"><script>alert(1)</script><x a="';
+  const line = { override: { line: { color: `red${evil}`, dash: `4${evil}` } } };
+  const hostile = (): WardleyMap => ({
+    title: "T $' $& $` $$",
+    components: [
+      {
+        id: `c${evil}`, label: { name: "C" }, type: "anchor", color: `#fff${evil}`,
+        step: { number: 1, color: `#abc${evil}` }, method: { category: "build", recommendation: "x" },
+        evolvesTo: [{ position: { evolution: { scalar: 0.8 }, visibility: { scalar: 0.5 } } }],
+        position: { evolution: { scalar: 0.5 }, visibility: { scalar: 0.5 } },
+      },
+      { id: `e${evil}`, label: { name: "E" }, type: "component", subtype: "ecosystem", position: { evolution: { scalar: 0.2 }, visibility: { scalar: 0.7 } } },
+      {
+        id: `p${evil}`, label: { name: "P" }, type: "pipeline", position: { evolution: { scalar: 0.5 }, visibility: { scalar: 0.2 } },
+        pipelineGeometry: { evoStart: 0.3, evoEnd: 0.7, visStart: 0.15, visEnd: 0.25 },
+      },
+    ],
+    relations: [{ id: `r${evil}`, consumer: `c${evil}`, supplier: `e${evil}`, type: "Flow", flow: { label: `f${evil}` } }],
+    renderConfig: {
+      style: {
+        global: { fontFamily: `Inter${evil}` },
+        nodes: { default: { override: { symbol: { stroke: `#000${evil}` } } } },
+        movement: { default: line, natural: line },
+        decorators: { method: { build: { override: { color: `red${evil}`, legend: { x: "X", y: "Y", z: "Z" } } } } },
+      },
+    },
+  }) as unknown as WardleyMap;
+
+  it("never lets map/theme strings break out of an SVG attribute", async () => {
+    for (const interactive of [false, true]) {
+      const svg = renderToSVG(hostile(), { interactive });
+      expect(svg).toContain("&quot;&gt;&lt;script&gt;"); // the payload did reach the markup, escaped
+      const html = await renderToHTML(hostile(), { interactive });
+      const body = html.slice(html.indexOf("<body"));
+      expect(body).not.toContain('"><script');
+      expect(body).not.toContain("<script>alert");
+      expect(body).not.toContain("<x ");
+    }
+  });
+
+  it("drops malformed hex colors", () => {
+    const svg = renderToSVG(hostile());
+    expect(svg).not.toContain("#fff&quot;");
+    expect(svg).not.toContain("#abc&quot;");
+  });
+
+  it("inserts `$'` / `$&` from the title, endpoint and SVG verbatim", async () => {
+    const endpoint = "http://127.0.0.1:1/e?$'$&$`";
+    const html = await renderToHTML(hostile(), { interactive: true, editsEndpoint: endpoint });
+    expect(html).toContain("<title>T $' $&amp; $` $$</title>");
+    expect(html).toContain('<body data-edits-endpoint="http://127.0.0.1:1/e?$\'$&amp;$`">');
+    expect(html.match(/<body\b/g)).toHaveLength(1);
+    expect(html).toContain(renderToSVG(hostile(), { interactive: true }));
+    expect(await renderToHTML(hostile())).toContain(renderToSVG(hostile()));
   });
 });

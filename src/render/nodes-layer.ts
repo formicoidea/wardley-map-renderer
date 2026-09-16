@@ -114,8 +114,9 @@ export const renderNodesLayer: LayerRenderer = (
     let method: { color: string; position: number } | undefined;
     if (comp.method) {
       const methodCfg = ctx.resolvedConfig.methods.find(m => m.type === comp.method!.category);
-      if (methodCfg) {
-        const legendKeys = Object.keys(methodCfg.legend);
+      // v3 method styles may omit color/legend (no indicator then).
+      if (methodCfg?.color) {
+        const legendKeys = Object.keys(methodCfg.legend ?? {});
         const position = legendKeys.indexOf(comp.method.recommendation);
         if (position >= 0) {
           method = { color: methodCfg.color, position };

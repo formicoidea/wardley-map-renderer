@@ -24,10 +24,12 @@ describe("bundle-interactive", () => {
   it("contains the editor API and the shared renderer", () => {
     expect(code).toContain("__wardley");
     expect(code).toContain("wardley-prepared");
-    expect(code).toContain("data-plot-area");
+    expect(code).toContain("data-kind"); // hit-testing contract (no legacy data-* ids)
   });
 
-  it("stays within the size budget (25 KB gzip)", () => {
-    expect(gzipSync(code).length).toBeLessThan(25 * 1024);
+  // 26 KB: ~25 KB editor + renderer, plus headroom for the v2 fix pass
+  // (send checkpoint, props focus/validation, tooltip, mobile sheet).
+  it("stays within the size budget (26 KB gzip)", () => {
+    expect(gzipSync(code).length).toBeLessThan(26 * 1024);
   });
 });

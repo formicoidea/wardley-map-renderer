@@ -39,9 +39,7 @@ describe("resolveHit", () => {
     expect(resolveHit(null)).toBeNull();
   });
 
-  it("server handles (inside the pipeline group) and overlay handles (data-for)", () => {
-    expect(resolveHit(el({ "data-handle": "left" }, { "data-id": "pipe", "data-kind": "pipeline" })))
-      .toEqual({ id: "pipe", kind: "pipeline", handle: "w" });
+  it("overlay handles (data-for)", () => {
     expect(resolveHit(el({ "data-handle": "se", "data-for": "pipe" }))).toEqual({ id: "pipe", kind: "pipeline", handle: "se" });
     expect(resolveHit(el({ "data-handle": "bogus", "data-for": "pipe" }))).toBeNull();
   });
@@ -121,10 +119,11 @@ describe("creation and connection ops", () => {
   });
 
   it("link and evolve", () => {
-    expect(connectOp("link", "a", "c")).toEqual({ op: "add_edge", payload: { consumer: "a", supplier: "c", type: "DependsOn" } });
-    expect(connectOp("evolve", "a", "c")).toEqual({ op: "set_evolves_to", payload: { id: "a", evolvesTo: "c" } });
-    expect(connectOp("link", "a", "a")).toBeNull();
-    expect(connectOp("link", "a", null)).toBeNull();
+    // Explicit id: a receiver replaying the diff gets the same relation ids.
+    expect(connectOp(MAP, "link", "a", "c")).toEqual({ op: "add_edge", payload: { id: "a-c", consumer: "a", supplier: "c", type: "DependsOn" } });
+    expect(connectOp(MAP, "evolve", "a", "c")).toEqual({ op: "set_evolves_to", payload: { id: "a", evolvesTo: "c" } });
+    expect(connectOp(MAP, "link", "a", "a")).toBeNull();
+    expect(connectOp(MAP, "link", "a", null)).toBeNull();
   });
 });
 
@@ -180,7 +179,7 @@ describe("store", () => {
     expect(() => s.preview([move("a", 2)])).toThrow();
   });
 
-  it("reset is undoable; clearDiff rebases", () => {
+  it("reset is undoable; checkpoint rebases", () => {
     const s = createStore(MAP);
     s.commit([move("a", 0.1)]);
     s.reset();
@@ -190,11 +189,33 @@ describe("store", () => {
     expect(s.ops).toHaveLength(1);
     const edited = s.map;
     const diff = s.ops;
-    s.clearDiff();
+    expect(s.checkpoint()).toBe(true);
     expect(diff).toHaveLength(1);
     expect(s.ops).toEqual([]);
     expect(s.original).toBe(edited);
     expect(s.canUndo()).toBe(false);
+  });
+
+  it("checkpoint(sent) keeps edits made after sending; refuses a diverged log", () => {
+    const s = createStore(MAP);
+    s.commit([move("a", 0.1)]);
+    const sent = s.ops;
+    const sentMap = s.map;
+    s.commit([move("c", 0.2)]);
+    expect(s.checkpoint(sent)).toBe(true);
+    expect(s.ops).toEqual([move("c", 0.2)]);
+    expect(s.original).toEqual(sentMap);
+    expect(applyDiffOps(s.original, s.ops)).toEqual(s.map);
+    expect(s.canUndo()).toBe(false);
+
+    const t = createStore(MAP);
+    t.commit([move("a", 0.1)]);
+    const sent2 = t.ops;
+    t.undo();
+    t.commit([move("c", 0.3)]);
+    expect(t.checkpoint(sent2)).toBe(false);
+    expect(t.ops).toHaveLength(1);
+    expect(t.original).toBe(MAP);
   });
 
   it("stored ops are copies", () => {

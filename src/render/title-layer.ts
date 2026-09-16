@@ -43,7 +43,7 @@ export const renderTitleLayer: LayerRenderer = (
 
   return [
     `<text x="${textX}" y="${textY}"${hit} text-anchor="middle" ` +
-      `font-family="${fontFamily}" font-size="${fontSize}" ` +
+      `font-family="${esc(fontFamily)}" font-size="${fontSize}" ` +
       `font-weight="600" fill="#333333">${esc(trimmed)}</text>`,
   ];
 };

@@ -36,7 +36,7 @@ export function scaledFontSize(ctx: RenderContext, base: number, elementScale?: 
  */
 function renderBackground(ctx: RenderContext): string {
   const bgColor = ctx.resolvedConfig.background.color;
-  return `<rect width="${ctx.canvasWidth}" height="${ctx.canvasHeight}" fill="${bgColor}" />`;
+  return `<rect width="${ctx.canvasWidth}" height="${ctx.canvasHeight}" fill="${esc(bgColor)}" />`;
 }
 
 // ── SVG document structure ───────────────────────────────────────────
@@ -86,14 +86,6 @@ export function composeSVG(
 
   // Background (always first, before named layers)
   parts.push(renderBackground(ctx));
-
-  // Interactive mode: invisible plot-area rect for coordinate conversion
-  if (ctx.options.interactive) {
-    const { left, top, width, height } = ctx.plot;
-    parts.push(
-      `<rect data-plot-area x="${left}" y="${top}" width="${width}" height="${height}" fill="none" pointer-events="none" />`
-    );
-  }
 
   // Render each layer in z-order
   for (const layer of orderedLayers) {

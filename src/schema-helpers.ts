@@ -53,9 +53,13 @@ const COLOR_MAP: Record<string, string> = {
   "purple-600": "#9333ea",
 };
 
-/** Resolve a Tailwind-style color name to hex, with black fallback */
+/**
+ * Resolve a color to hex: a valid `#rgb`…`#rrggbbaa` hex passes through, a known
+ * Tailwind-style name maps to hex, anything else (incl. malformed hex) → black.
+ * The result is always safe to interpolate into an SVG attribute.
+ */
 export function resolveColor(color: string | undefined): string {
   if (!color) return "#000000";
-  if (color.startsWith("#")) return color;
+  if (/^#[0-9a-f]{3,8}$/i.test(color)) return color;
   return COLOR_MAP[color] ?? "#000000";
 }

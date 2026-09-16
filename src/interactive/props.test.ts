@@ -167,7 +167,7 @@ describe("propsFields", () => {
     expect(byKey(f, "rangeMax")!.toOp("1.5")).toBeNull();
     expect(byKey(f, "rangeMax")!.toOp("")).toBeNull(); // nothing to clear
     map = applies(map, byKey(f, "rangeMax")!.toOp("0.8"));
-    expect(byKey(fields(map, "kettle"), "rangeMax")!.clear).toBe(true);
+    expect(byKey(fields(map, "kettle"), "rangeMax")!.clear).toBe("Clear range");
     map = applies(map, byKey(fields(map, "kettle"), "rangeMax")!.toOp(null));
     expect(map.components[2].position.evolution.range).toBeUndefined();
   });
@@ -230,7 +230,8 @@ describe("buildProps", () => {
 
   it("builds labelled controls that dispatch on change and restore on invalid", () => {
     const dispatch = vi.fn();
-    const { title, body } = buildProps(fakeDoc, sample(), "power", dispatch)!;
+    const onError = vi.fn();
+    const { title, body } = buildProps(fakeDoc, sample(), "power", dispatch, onError)!;
     const root = body as unknown as El;
     expect(title).toBe("Power");
     expect(root.tagName).toBe("form");
@@ -244,17 +245,34 @@ describe("buildProps", () => {
     expect(step.parent.parent.dataset.row).toBe("step");
     step.value = " 4 ";
     step.onchange();
-    expect(dispatch).toHaveBeenLastCalledWith({ op: "set_field", payload: { target: "power", path: "step", value: { number: 4 } } });
+    expect(dispatch).toHaveBeenLastCalledWith({ op: "set_field", payload: { target: "power", path: "step", value: { number: 4 } } }, "step");
     step.value = "-1";
     step.onchange();
     expect(dispatch).toHaveBeenCalledTimes(1);
     expect(step.value).toBe("2");
+    expect(onError).toHaveBeenCalledWith(expect.stringMatching(/whole number/));
+    expect(step.dataset.focus).toBe("step");
+    // Enter commits; Shift+Enter does not.
+    step.value = "5";
+    const key = (shiftKey: boolean) => { let p = false; step.onkeydown({ key: "Enter", shiftKey, preventDefault: () => (p = true) }); return p; };
+    expect(key(true)).toBe(false);
+    expect(key(false)).toBe(true);
+    expect(dispatch).toHaveBeenCalledTimes(2);
+
+    const name = named("name");
+    expect(name.tagName).toBe("textarea");
+    name.value = "Power\nGrid ";
+    name.onchange();
+    expect(dispatch).toHaveBeenLastCalledWith({ op: "rename_component", payload: { id: "power", name: "Power\nGrid" } }, "name");
+    // Unset colour: no fake black, the label says so.
+    expect(named("color").dataset.unset).toBe("");
+    expect(named("color").parent.text).toBe("Color (unset)");
 
     const ck = named("inertia");
     expect(ck.type).toBe("checkbox");
     ck.checked = true;
     ck.onchange();
-    expect(dispatch).toHaveBeenLastCalledWith({ op: "set_field", payload: { target: "power", path: "inertia", value: true } });
+    expect(dispatch).toHaveBeenLastCalledWith({ op: "set_field", payload: { target: "power", path: "inertia", value: true } }, "inertia");
 
     expect(named("method").attrs.list).toBe("pf-method-list");
     expect(named("recommendation").disabled).toBe(true);
@@ -262,7 +280,7 @@ describe("buildProps", () => {
 
     const del = root.all((e) => e.tagName === "button" && e.textContent === "Delete component")[0];
     del.onclick();
-    expect(dispatch).toHaveBeenLastCalledWith({ op: "delete_component", payload: { id: "power" } });
+    expect(dispatch).toHaveBeenLastCalledWith({ op: "delete_component", payload: { id: "power" } }, "delete");
     let prevented = false;
     root.onsubmit({ preventDefault: () => (prevented = true) });
     expect(prevented).toBe(true);

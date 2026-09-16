@@ -50,7 +50,11 @@ export interface AddComponentPayload {
 export interface IdPayload { id: string }
 export interface RenameComponentPayload { id: string; name: string }
 export interface AddEdgePayload {
-  /** Omit to generate one from `consumer-supplier`. */
+  /**
+   * Omit to generate one deterministically: `uniqueId(map, "<consumer>-<supplier>")`,
+   * i.e. the slug of both ids ("App"→"User" gives "app-user"), suffixed `-2`, `-3`…
+   * while it collides with an existing component or relation id.
+   */
   id?: string;
   consumer: string;
   supplier: string;
@@ -158,6 +162,13 @@ function unit(v: unknown, name: string): number {
   const n = num(v, name);
   if (n < 0 || n > 1) fail(`${name} must be within [0, 1]`);
   return n;
+}
+/** Hex (#rgb … #rrggbbaa) or a Tailwind-style name ("red-600"): safe to put in markup. */
+function color(v: unknown, name: string): string {
+  if (typeof v !== "string" || !/^(#[0-9a-f]{3,8}|[a-z]+-\d{2,3})$/i.test(v)) {
+    fail(`${name} must be a hex color (#rgb…#rrggbbaa) or a name like "red-600"`);
+  }
+  return v;
 }
 function oneOf<T extends string>(v: unknown, allowed: readonly string[], name: string): T {
   if (typeof v !== "string" || !allowed.includes(v)) fail(`${name} must be one of: ${allowed.join(", ")}`);
@@ -333,9 +344,11 @@ function setComponentField(map: WardleyMap, comp: Component, path: string, value
       else comp.label.position = { dx: num(value.dx, "label.position.dx"), dy: num(value.dy, "label.position.dy") };
       return;
     case "description":
-    case "color":
       if (value !== null && typeof value !== "string") fail(`${path} must be a string or null`);
       setOrDelete(comp, path, value === "" ? null : value);
+      return;
+    case "color":
+      setOrDelete(comp, path, value === null || value === "" ? null : color(value, "color"));
       return;
     case "type":
       setType(comp, oneOf(value, COMPONENT_TYPES, "type"));
@@ -368,7 +381,7 @@ function setComponentField(map: WardleyMap, comp: Component, path: string, value
       const n = num(value.number, "step.number");
       if (!Number.isInteger(n) || n < 1) fail("step.number must be an integer >= 1");
       const step: StepDecorator = { number: n };
-      if (value.color !== undefined) step.color = str(value.color, "step.color");
+      if (value.color !== undefined) step.color = color(value.color, "step.color");
       comp.step = step;
       return;
     }
@@ -413,10 +426,11 @@ function mutate(map: WardleyMap, diffOp: DiffOp): void {
     case "move_step": {
       const comp = getComponent(map, p.id);
       if (diffOp.op === "move_step" && !comp.step) fail(`component "${comp.id}" has no step`);
+      // Rounded like sanitizeMap so an edited map is stable under re-sanitization.
       const e = unit(p.evolution, "evolution");
       const v = unit(p.visibility, "visibility");
-      comp.position.evolution.scalar = e;
-      comp.position.visibility.scalar = v;
+      comp.position.evolution.scalar = round3(e);
+      comp.position.visibility.scalar = round3(v);
       return;
     }
 
@@ -425,8 +439,8 @@ function mutate(map: WardleyMap, diffOp: DiffOp): void {
       const id = p.id === undefined ? uniqueId(map, name) : str(p.id, "id");
       if (map.components.some((c) => c.id === id)) fail(`component id "${id}" already exists`);
       const type = p.type === undefined ? "component" : oneOf<ComponentType>(p.type, COMPONENT_TYPES, "type");
-      const e = unit(p.evolution, "evolution");
-      const v = unit(p.visibility, "visibility");
+      const e = round3(unit(p.evolution, "evolution"));
+      const v = round3(unit(p.visibility, "visibility"));
       const comp: Component = {
         id,
         label: { name },
@@ -443,10 +457,10 @@ function mutate(map: WardleyMap, diffOp: DiffOp): void {
         if (g !== undefined) {
           if (!isObj(g)) fail("pipelineGeometry must be an object");
           const geo = {
-            evoStart: unit(g.evoStart, "pipelineGeometry.evoStart"),
-            evoEnd: unit(g.evoEnd, "pipelineGeometry.evoEnd"),
-            visStart: unit(g.visStart, "pipelineGeometry.visStart"),
-            visEnd: unit(g.visEnd, "pipelineGeometry.visEnd"),
+            evoStart: round3(unit(g.evoStart, "pipelineGeometry.evoStart")),
+            evoEnd: round3(unit(g.evoEnd, "pipelineGeometry.evoEnd")),
+            visStart: round3(unit(g.visStart, "pipelineGeometry.visStart")),
+            visEnd: round3(unit(g.visEnd, "pipelineGeometry.visEnd")),
           };
           comp.pipelineGeometry = {
             evoStart: Math.min(geo.evoStart, geo.evoEnd),
@@ -552,7 +566,7 @@ function mutate(map: WardleyMap, diffOp: DiffOp): void {
       const keys = ["evoStart", "evoEnd", "visStart", "visEnd"] as const;
       if (!keys.some((k) => p[k] !== undefined)) fail("resize_pipeline needs at least one bound");
       const geo = { ...pipe.pipelineGeometry };
-      for (const k of keys) if (p[k] !== undefined) geo[k] = unit(p[k], k);
+      for (const k of keys) if (p[k] !== undefined) geo[k] = round3(unit(p[k], k));
       if (geo.evoStart > geo.evoEnd) [geo.evoStart, geo.evoEnd] = [geo.evoEnd, geo.evoStart];
       if (geo.visStart > geo.visEnd) [geo.visStart, geo.visEnd] = [geo.visEnd, geo.visStart];
       if (geo.handleEvolution != null) {
@@ -560,10 +574,10 @@ function mutate(map: WardleyMap, diffOp: DiffOp): void {
       }
       // Recentre only the axes that were touched (a vis-less resize keeps position.visibility).
       if (p.evoStart !== undefined || p.evoEnd !== undefined) {
-        pipe.position.evolution.scalar = (geo.evoStart + geo.evoEnd) / 2;
+        pipe.position.evolution.scalar = round3((geo.evoStart + geo.evoEnd) / 2);
       }
       if (p.visStart !== undefined || p.visEnd !== undefined) {
-        pipe.position.visibility.scalar = (geo.visStart + geo.visEnd) / 2;
+        pipe.position.visibility.scalar = round3((geo.visStart + geo.visEnd) / 2);
       }
       pipe.pipelineGeometry = geo;
       for (const c of members) {
@@ -644,15 +658,6 @@ export function applyDiffOps(map: WardleyMap, ops: readonly DiffOp[]): WardleyMa
   const next = cloneMap(map);
   for (const op of ops) mutate(next, op);
   return next;
-}
-
-/**
- * Apply one op IN PLACE. Validation happens before any write, so a thrown
- * error leaves `map` untouched (used by the legacy boolean API in diff-ops.ts).
- * @throws Error like `applyDiffOp`.
- */
-export function applyDiffOpInPlace(map: WardleyMap, diffOp: DiffOp): void {
-  mutate(map, diffOp);
 }
 
 // ── Cascade expansion (pure reads) ───────────────────────────────────

@@ -27,20 +27,21 @@ export interface ElLike {
 export const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
 export const round3 = (v: number) => Math.round(v * 1000) / 1000;
 
-/** Server-rendered pipeline handles use long names; the overlay uses compass names. */
-const HANDLE_ALIAS: Record<string, Handle> = { left: "w", right: "e", top: "n", bottom: "s" };
 const HANDLES = new Set(["n", "s", "e", "w", "ne", "nw", "se", "sw"]);
 
-/** Map an event target to the editor element under it (handles win over their pipeline). */
+/**
+ * Map an event target to the editor element under it. Relies only on the
+ * renderer's `data-id`/`data-kind` groups and the overlay's own handles
+ * (`data-handle` + `data-for`), which win over their pipeline.
+ */
 export function resolveHit(el: ElLike | null | undefined): Hit | null {
   if (!el || typeof el.closest !== "function") return null;
   const group = el.closest("[data-id][data-kind]");
   const h = el.closest("[data-handle]");
   if (h) {
-    const name = h.getAttribute("data-handle") ?? "";
-    const handle = HANDLE_ALIAS[name] ?? (HANDLES.has(name) ? (name as Handle) : undefined);
-    const id = h.getAttribute("data-for") ?? group?.getAttribute("data-id");
-    if (handle && id) return { id, kind: "pipeline", handle };
+    const handle = h.getAttribute("data-handle") as Handle;
+    const id = h.getAttribute("data-for");
+    if (HANDLES.has(handle) && id) return { id, kind: "pipeline", handle };
   }
   const id = group?.getAttribute("data-id");
   return id ? { id, kind: group!.getAttribute("data-kind") as HitKind } : null;
@@ -219,10 +220,10 @@ export function rectToPipeline(map: WardleyMap, a: Pt, b: Pt): (DiffOp & { op: "
   return op;
 }
 
-/** Link / evolve gesture result (null: no valid target). */
-export function connectOp(tool: "link" | "evolve", from: string, to: string | null): DiffOp | null {
+/** Link / evolve gesture result (null: no valid target). add_edge carries its id so replays match. */
+export function connectOp(map: WardleyMap, tool: "link" | "evolve", from: string, to: string | null): DiffOp | null {
   if (!to || to === from) return null;
   return tool === "link"
-    ? { op: "add_edge", payload: { consumer: from, supplier: to, type: "DependsOn" } }
+    ? { op: "add_edge", payload: { id: uniqueId(map, `${from}-${to}`), consumer: from, supplier: to, type: "DependsOn" } }
     : { op: "set_evolves_to", payload: { id: from, evolvesTo: to } };
 }

@@ -14,6 +14,9 @@
   },
   "files": [
     "dist",
+    "!dist/interactive/*.js",
+    "!dist/interactive/*.d.ts",
+    "!dist/interactive/*.map",
     "schema",
     "README.md"
   ],
@@ -49,6 +52,7 @@
     "@types/node": "^25.3.5",
     "@types/pngjs": "^6.0.5",
     "esbuild": "^0.25.0",
+    "happy-dom": "^20.14.5",
     "pixelmatch": "^7.1.0",
     "pngjs": "^7.0.0",
     "tsx": "^4.21.0",

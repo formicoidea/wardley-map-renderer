@@ -7,7 +7,6 @@
 <style>
 :root{--canvas:#f4f5f7;--surface:#fff;--fg:#1d1f24;--muted:#6b7080;--border:#e2e4e9;--hover:#eef0f4;--accent:#4f5bd5;--accent-soft:#e7e9fb;--on-accent:#fff;--danger:#c62f2f;--on-danger:#fff;--shadow:0 1px 2px rgb(0 0 0/.06),0 4px 16px rgb(0 0 0/.08);--r:8px;--t:40px;color-scheme:light dark}
 @media(prefers-color-scheme:dark){:root{--canvas:#17181c;--surface:#24262c;--fg:#e8e9ed;--muted:#9a9eab;--border:#363841;--hover:#30323a;--accent:#8e97f0;--accent-soft:#34375a;--on-accent:#15161a;--danger:#f07070;--on-danger:#1a0d0d;--shadow:0 1px 2px rgb(0 0 0/.4),0 6px 20px rgb(0 0 0/.35)}}
-:root{ {{STYLE_VARS}} }
 *,:before,:after{box-sizing:border-box}
 [hidden]{display:none!important}
 html,body{height:100%;margin:0;overflow:hidden}
@@ -33,6 +32,7 @@ button{font:inherit;color:inherit}
 .bar [aria-pressed=true]{background:var(--accent-soft);color:var(--accent)}
 .bar .primary{background:var(--accent);color:var(--on-accent);font-weight:600;padding:0 12px}
 .bar .primary:hover{background:var(--accent);filter:brightness(1.08)}
+.bar .primary:disabled{opacity:1;background:var(--hover);color:var(--muted);filter:none}
 :focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .badge{position:absolute;top:2px;right:2px;min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:var(--danger);color:var(--on-danger);font-size:10px;font-weight:700;line-height:16px}
@@ -51,6 +51,7 @@ svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stro
 #props-body{padding:12px 16px 16px;overflow:auto;overscroll-behavior:contain}
 #toast{position:fixed;z-index:30;left:50%;bottom:24px;transform:translate(-50%,8px);max-width:calc(100% - 32px);padding:8px 14px;border-radius:var(--r);background:var(--fg);color:var(--surface);box-shadow:var(--shadow);opacity:0;pointer-events:none;transition:opacity .2s,transform .2s}
 #toast.show{opacity:1;transform:translate(-50%,0)}
+#tip{position:fixed;z-index:40;padding:3px 8px;border-radius:4px;background:var(--fg);color:var(--surface);font-size:12px;white-space:nowrap;pointer-events:none}
 #toast[data-kind=error]{background:var(--danger);color:var(--on-danger)}
 @media(max-width:639px){
 #bar{top:auto;bottom:calc(8px + env(safe-area-inset-bottom));max-width:min(calc(100% - 16px),290px);flex-wrap:wrap;justify-content:center;gap:0;overflow:visible}
@@ -60,7 +61,7 @@ svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stro
 #zoom{top:12px;bottom:auto}
 .bar .primary{padding:0}
 .primary .badge{position:absolute;background:var(--danger);color:var(--on-danger)}
-#props{top:auto;left:0;right:0;bottom:0;width:auto;max-height:60%;border-radius:14px 14px 0 0;padding-bottom:env(safe-area-inset-bottom)}
+#props{top:auto;left:8px;right:8px;bottom:calc(var(--bar-h,90px) + 16px + env(safe-area-inset-bottom));width:auto;max-height:45vh;border-radius:14px}
 #toast{bottom:auto;top:64px}
 }
 @media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
@@ -72,38 +73,39 @@ svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stro
 </main>
 
 <nav id="bar" class="bar" role="toolbar" aria-label="Editor tools">
-<button data-tool="select" title="Select (V)" aria-label="Select (V)"><svg class="i" viewBox="0 0 24 24"><path d="M5 3l14 8-6.5 1.5L9 19z"/></svg></button>
-<button data-tool="component" title="Add component (C)" aria-label="Add component (C)"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="6.5"/></svg></button>
-<button data-tool="link" title="Link components (L)" aria-label="Link components (L)"><svg class="i" viewBox="0 0 24 24"><path d="M8.5 15.5l7-7M4 18a2.5 2.5 0 1 0 5 0a2.5 2.5 0 1 0-5 0M15 6a2.5 2.5 0 1 0 5 0a2.5 2.5 0 1 0-5 0"/></svg></button>
-<button data-tool="evolve" title="Evolve (E)" aria-label="Evolve (E)"><svg class="i" viewBox="0 0 24 24"><path d="M3 12h2m3 0h2m3 0h6M15 7l5 5-5 5"/></svg></button>
-<button data-tool="pipeline" title="Pipeline (P)" aria-label="Pipeline (P)"><svg class="i" viewBox="0 0 24 24"><path d="M3 8h18v8H3zM8 12h.01M16 12h.01"/></svg></button>
-<button data-tool="pan" title="Pan (H or hold Space)" aria-label="Pan (H or hold Space)"><svg class="i" viewBox="0 0 24 24"><path d="M12 3v18M3 12h18M9 6l3-3 3 3M9 18l3 3 3-3M6 9l-3 3 3 3M18 9l3 3-3 3"/></svg></button>
+<button data-tool="select" aria-label="Select (V)"><svg class="i" viewBox="0 0 24 24"><path d="M5 3l14 8-6.5 1.5L9 19z"/></svg></button>
+<button data-tool="component" aria-label="Add component (C)"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="6.5"/></svg></button>
+<button data-tool="link" aria-label="Link components (L)"><svg class="i" viewBox="0 0 24 24"><path d="M8.5 15.5l7-7M4 18a2.5 2.5 0 1 0 5 0a2.5 2.5 0 1 0-5 0M15 6a2.5 2.5 0 1 0 5 0a2.5 2.5 0 1 0-5 0"/></svg></button>
+<button data-tool="evolve" aria-label="Evolve (E)"><svg class="i" viewBox="0 0 24 24"><path d="M3 12h2m3 0h2m3 0h6M15 7l5 5-5 5"/></svg></button>
+<button data-tool="pipeline" aria-label="Pipeline (P)"><svg class="i" viewBox="0 0 24 24"><path d="M3 8h18v8H3zM8 12h.01M16 12h.01"/></svg></button>
+<button data-tool="pan" aria-label="Pan (H or hold Space)"><svg class="i" viewBox="0 0 24 24"><path d="M12 3v18M3 12h18M9 6l3-3 3 3M9 18l3 3 3-3M6 9l-3 3 3 3M18 9l3 3-3 3"/></svg></button>
 <span class="sep"></span>
-<button data-action="undo" title="Undo (Ctrl+Z)" aria-label="Undo (Ctrl+Z)"><svg class="i" viewBox="0 0 24 24"><path d="M9 14L4 9l5-5M4 9h11a5 5 0 0 1 0 10h-3"/></svg></button>
-<button data-action="redo" title="Redo (Ctrl+Shift+Z)" aria-label="Redo (Ctrl+Shift+Z)"><svg class="i" viewBox="0 0 24 24"><path d="M15 14l5-5-5-5M20 9H9a5 5 0 0 0 0 10h3"/></svg></button>
-<button data-action="delete" title="Delete selection (Del)" aria-label="Delete selection (Del)"><svg class="i" viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></button>
+<button data-action="undo" aria-label="Undo (Ctrl+Z)"><svg class="i" viewBox="0 0 24 24"><path d="M9 14L4 9l5-5M4 9h11a5 5 0 0 1 0 10h-3"/></svg></button>
+<button data-action="redo" aria-label="Redo (Ctrl+Shift+Z)"><svg class="i" viewBox="0 0 24 24"><path d="M15 14l5-5-5-5M20 9H9a5 5 0 0 0 0 10h3"/></svg></button>
+<button data-action="delete" aria-label="Delete selection (Del)"><svg class="i" viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></button>
 <span class="sep"></span>
-<button data-action="reset" title="Reset all changes" aria-label="Reset all changes"><svg class="i" viewBox="0 0 24 24"><path d="M3.5 9a9 9 0 1 1-.5 3M3 4v5h5"/></svg></button>
-<button data-action="download-json" title="Download map JSON" aria-label="Download map JSON"><svg class="i" viewBox="0 0 24 24"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg></button>
-<button data-action="copy-diff" title="Copy diff JSON" aria-label="Copy diff JSON"><svg class="i" viewBox="0 0 24 24"><path d="M9 9h11v11H9zM5 15H4V4h11v1"/></svg></button>
-<button data-action="send" class="primary" title="Send edits to Claude" aria-label="Send edits to Claude"><svg class="i" viewBox="0 0 24 24"><path d="M21 3L10 14M21 3l-6.5 18-4.5-7-7-4.5z"/></svg><span class="lbl">Send</span><span class="badge" data-diff-count hidden>0</span></button>
+<button data-action="reset" aria-label="Reset all changes"><svg class="i" viewBox="0 0 24 24"><path d="M3.5 9a9 9 0 1 1-.5 3M3 4v5h5"/></svg></button>
+<button data-action="download-json" aria-label="Download map JSON"><svg class="i" viewBox="0 0 24 24"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg></button>
+<button data-action="copy-diff" aria-label="Copy diff JSON"><svg class="i" viewBox="0 0 24 24"><path d="M9 9h11v11H9zM5 15H4V4h11v1"/></svg></button>
+<button data-action="send" class="primary" aria-label="Send edits to Claude"><svg class="i" viewBox="0 0 24 24"><path d="M21 3L10 14M21 3l-6.5 18-4.5-7-7-4.5z"/></svg><span class="lbl">Send</span><span class="badge" data-diff-count hidden>0</span></button>
 <span class="sep"></span>
-<button data-action="collapse" title="Hide toolbar" aria-label="Hide toolbar" aria-expanded="true"><svg class="i co" viewBox="0 0 24 24"><path d="M18 14l-6-6-6 6"/></svg><svg class="i ex" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+<button data-action="collapse" aria-label="Hide toolbar" aria-expanded="true"><svg class="i co" viewBox="0 0 24 24"><path d="M18 14l-6-6-6 6"/></svg><svg class="i ex" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
 </nav>
 
 <div id="zoom" class="bar" role="group" aria-label="Zoom">
-<button data-action="zoom-out" title="Zoom out (Ctrl+-)" aria-label="Zoom out (Ctrl+-)"><svg class="i" viewBox="0 0 24 24"><path d="M6 12h12"/></svg></button>
+<button data-action="zoom-out" aria-label="Zoom out (Ctrl+-)"><svg class="i" viewBox="0 0 24 24"><path d="M6 12h12"/></svg></button>
 <output id="zoom-level">100%</output>
-<button data-action="zoom-in" title="Zoom in (Ctrl+=)" aria-label="Zoom in (Ctrl+=)"><svg class="i" viewBox="0 0 24 24"><path d="M6 12h12M12 6v12"/></svg></button>
-<button data-action="fit" title="Fit to screen (Shift+1)" aria-label="Fit to screen (Shift+1)"><svg class="i" viewBox="0 0 24 24"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/></svg></button>
+<button data-action="zoom-in" aria-label="Zoom in (Ctrl+=)"><svg class="i" viewBox="0 0 24 24"><path d="M6 12h12M12 6v12"/></svg></button>
+<button data-action="fit" aria-label="Fit to screen (Shift+1)"><svg class="i" viewBox="0 0 24 24"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/></svg></button>
 </div>
 
 <aside id="props" role="dialog" aria-labelledby="props-title" hidden>
-<header><h2 id="props-title">Properties</h2><button data-close title="Close (Esc)" aria-label="Close properties (Esc)"><svg class="i" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></header>
+<header><h2 id="props-title">Properties</h2><button data-close aria-label="Close properties (Esc)"><svg class="i" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></header>
 <div id="props-body"></div>
 </aside>
 
 <div id="toast" role="status" aria-live="polite"></div>
+<div id="tip" aria-hidden="true" hidden></div>
 {{DATA}}
 {{BUNDLE}}
 </body>

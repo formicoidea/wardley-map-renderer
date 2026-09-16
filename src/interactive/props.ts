@@ -12,7 +12,8 @@
 import type { DiffOp } from "../diff-ops-apply.js";
 import type { Component, Relation, WardleyMap } from "../schema.js";
 
-export type Dispatch = (op: DiffOp) => void;
+/** `key`: the field that committed (`<key>.clear` for its Clear button). */
+export type Dispatch = (op: DiffOp, key: string) => void;
 
 // ── Zod-free enum mirrors (props.test.ts asserts they equal src/schema.ts) ──
 export const COMPONENT_TYPES = ["anchor", "component", "pipeline"] as const;
@@ -49,8 +50,10 @@ export interface FieldDesc {
   min?: number;
   max?: number;
   step?: number;
-  /** Render a "Clear" button that calls `toOp(null)`. */
-  clear?: boolean;
+  /** Render a Clear button (text: the string, else "Clear") that calls `toOp(null)`. */
+  clear?: boolean | string;
+  /** Error reported when a non-empty value maps to no op. */
+  invalid?: string;
   disabled?: boolean;
   danger?: boolean;
   /** Fields sharing a `row` are laid out side by side. */
@@ -73,7 +76,7 @@ function componentFields(map: WardleyMap, c: Component): FieldDesc[] {
   const f: FieldDesc[] = [];
   const add = (d: Omit<FieldDesc, "kind"> & { kind?: FieldDesc["kind"] }) => f.push({ kind: "text", ...d } as FieldDesc);
 
-  add({ key: "name", label: "Name", value: c.label.name, toOp: (v) => (v ? { op: "rename_component", payload: { id, name: v as string } } : null) });
+  add({ key: "name", label: "Name", kind: "textarea", value: c.label.name, toOp: (v) => (v ? { op: "rename_component", payload: { id, name: v as string } } : null) });
   add({ key: "type", label: "Type", kind: "select", value: c.type, options: opts(COMPONENT_TYPES), toOp: (v) => (v ? set(id, "type", v) : null) });
   const subtypes = SUBTYPES_BY_TYPE[c.type];
   if (subtypes.length) {
@@ -102,7 +105,7 @@ function componentFields(map: WardleyMap, c: Component): FieldDesc[] {
 
   const s = c.step;
   add({
-    key: "step", label: "Step", kind: "number", value: s ? String(s.number) : "", min: 1, step: 1, row: "step",
+    key: "step", label: "Step", kind: "number", value: s ? String(s.number) : "", min: 1, step: 1, row: "step", invalid: "Step must be a whole number of 1 or more",
     toOp: (v) => {
       const n = numOrNull(v);
       if (n === null) return set(id, "step", null);
@@ -139,9 +142,9 @@ function componentFields(map: WardleyMap, c: Component): FieldDesc[] {
     next[i] = n;
     return next[0] >= 0 && next[1] <= 1 && next[0] <= next[1] ? set(id, "position.evolution.range", next) : null;
   };
-  const numRange = { kind: "number", min: 0, max: 1, step: 0.01, row: "range" } as const;
+  const numRange = { kind: "number", min: 0, max: 1, step: 0.01, row: "range", invalid: "Evolution range needs 0 ≤ from ≤ to ≤ 1" } as const;
   add({ key: "rangeMin", label: "Evolution from", value: r ? String(r[0]) : "", ...numRange, toOp: range(0) });
-  add({ key: "rangeMax", label: "Evolution to", value: r ? String(r[1]) : "", ...numRange, clear: !!r, toOp: range(1) });
+  add({ key: "rangeMax", label: "Evolution to", value: r ? String(r[1]) : "", ...numRange, clear: !!r && "Clear range", toOp: range(1) });
 
   add({
     key: "delete", label: c.type === "pipeline" ? "Delete pipeline" : "Delete component", kind: "button", value: "", danger: true,
@@ -190,29 +193,38 @@ export const PROPS_CSS =
   ".pf textarea{resize:vertical;min-height:56px}" +
   ".pf input[type=checkbox]{width:auto;accent-color:var(--accent)}" +
   ".pf input[type=color]{height:34px;padding:2px}" +
+  ".pf [data-unset]{opacity:.35}" +
   ".pf button{font:inherit;height:34px;padding:0 12px;border:1px solid var(--border);border-radius:6px;background:none;color:var(--fg);cursor:pointer}" +
   ".pf button:hover{background:var(--hover)}" +
   ".pf button:disabled{opacity:.4;cursor:default}" +
   ".pf .d{color:var(--danger)}";
 
-/** Build the panel form for `targetId`; null for unknown ids. */
+/**
+ * Build the panel form for `targetId`; null for unknown ids. Every control has
+ * `data-focus` (field key) so the caller can restore focus after a rebuild.
+ */
 export function buildProps(
   doc: Document,
   map: WardleyMap,
   targetId: string,
   dispatch: Dispatch,
+  onError: (msg: string) => void = () => {},
 ): { title: string; body: HTMLElement } | null {
   const spec = propsFields(map, targetId);
   if (!spec) return null;
   const el = <K extends keyof HTMLElementTagNameMap>(tag: K, props: Record<string, unknown> = {}) =>
     Object.assign(doc.createElement(tag), props);
-  const fire = (f: FieldDesc, v: FieldValue) => {
+  const fire = (f: FieldDesc, v: FieldValue, key = f.key) => {
     const op = f.toOp(v);
-    if (op) dispatch(op);
+    if (op) dispatch(op, key);
+    else if (v && f.invalid) onError(f.invalid);
     return !!op;
   };
-  const button = (text: string, onclick: () => void, extra: Record<string, unknown> = {}) =>
-    el("button", { type: "button", textContent: text, onclick, ...extra });
+  const button = (key: string, text: string, onclick: () => void, extra: Record<string, unknown> = {}) => {
+    const b = el("button", { type: "button", textContent: text, onclick, ...extra });
+    b.dataset.focus = key;
+    return b;
+  };
 
   const form = el("form", { className: "pf", onsubmit: (e: Event) => e.preventDefault() });
   const actions = el("div", { className: "r" });
@@ -220,17 +232,19 @@ export function buildProps(
 
   for (const f of spec.fields) {
     if (f.kind === "button") {
-      actions.append(button(f.label, () => fire(f, null), { disabled: !!f.disabled, className: f.danger ? "d" : "" }));
+      actions.append(button(f.key, f.label, () => fire(f, null), { disabled: !!f.disabled, className: f.danger ? "d" : "" }));
       continue;
     }
     const input = (f.kind === "textarea" || f.kind === "select" ? el(f.kind) : el("input", { type: f.kind })) as
       HTMLInputElement;
-    input.name = f.key;
+    input.name = input.dataset.focus = f.key;
     input.disabled = !!f.disabled;
+    const unset = f.kind === "color" && !/^#[0-9a-f]{6}$/i.test(f.value as string);
     for (const [value, text] of f.options ?? []) input.append(el("option", { value, textContent: text }));
     if (f.kind === "checkbox") input.checked = f.value === true;
-    else if (f.kind === "color") input.value = /^#[0-9a-f]{6}$/i.test(f.value as string) ? (f.value as string) : "#000000";
+    else if (unset) input.dataset.unset = "";
     else input.value = f.value as string;
+    if (f.kind === "textarea") input.setAttribute("rows", "2");
     if (f.kind === "number") Object.assign(input, { min: f.min ?? "", max: f.max ?? "", step: f.step ?? "any" });
     if (f.list) {
       const dl = el("datalist", { id: `pf-${f.key}-list` });
@@ -240,21 +254,33 @@ export function buildProps(
     }
     input.onchange = () => {
       const v = f.kind === "checkbox" ? input.checked : input.value.trim();
+      if (v === f.value) return;
       if (!fire(f, v)) {
         // Invalid or no-op: restore the committed value.
         if (f.kind === "checkbox") input.checked = f.value === true;
         else if (f.kind !== "color") input.value = f.value as string;
       }
     };
+    // Enter commits text fields (Shift+Enter: new line in text areas).
+    input.onkeydown = (e) => {
+      if (e.key === "Enter" && !e.shiftKey && !e.isComposing && /text|number/.test(f.kind)) {
+        e.preventDefault();
+        input.onchange!(e);
+      }
+    };
 
     const label = el("label", { className: f.kind === "checkbox" ? "ck" : "" });
-    label.append(f.label);
+    // Colors: a picker cannot be empty, so show the unset / non-hex value in the label.
+    label.append(unset ? `${f.label} (${f.value || "unset"})` : f.label);
     if (f.kind === "checkbox") label.prepend(input);
     else label.append(input);
 
     const wrap = el("div", { className: "r" });
     wrap.append(label);
-    if (f.clear) wrap.append(button("Clear", () => fire(f, null), { ariaLabel: `Clear ${f.label.toLowerCase()}` }));
+    if (f.clear) {
+      wrap.append(button(`${f.key}.clear`, typeof f.clear === "string" ? f.clear : "Clear", () => fire(f, null, `${f.key}.clear`),
+        typeof f.clear === "string" ? {} : { ariaLabel: `Clear ${f.label.toLowerCase()}` }));
+    }
     if (!f.row || f.row !== row?.dataset.row) {
       row = f.row ? el("div", { className: "r" }) : null;
       if (row) row.dataset.row = f.row;

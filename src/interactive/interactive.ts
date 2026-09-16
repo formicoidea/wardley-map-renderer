@@ -8,6 +8,8 @@
  *
  * Public API for hosts (e.g. Claude Code's browser pane):
  * `window.__wardley = { getMap, getDiff, clearDiff, apply, undo, redo }`.
+ * "Send to Claude" (host / endpoint) and `clearDiff` make the current map the new
+ * baseline (ops and undo history cleared); clipboard fallback and "Copy diff" keep them.
  *
  * @module interactive/interactive
  */
@@ -78,7 +80,9 @@ export function initEditor(doc: Document): void {
   let lastClick: { t: number; x: number; y: number } | null = null;
   let editing: { finish(commit: boolean): void; place(): void } | null = null;
   let raf = 0;
-  let pending: WardleyMap | null = null;
+  /** Drag-preview ops, applied in the next animation frame (null: nothing queued). */
+  let pending: DiffOp[] | null = null;
+  let focusKey = "";
 
   const tool = () => shell.getTool();
   // Drags on map elements (and pipeline rectangles) belong to the editor, not to panning.
@@ -102,15 +106,21 @@ export function initEditor(doc: Document): void {
 
   // ── Rendering ───────────────────────────────────────────────────
   const render = (map: WardleyMap = store.map) => {
+    pending = null;
     mapEl.innerHTML = renderSVGFromPrepared(map, prepared);
     drawOverlay();
     editing?.place();
   };
-  const schedule = (map: WardleyMap) => {
-    pending = map;
+  const schedule = (ops: DiffOp[]) => {
+    pending = ops;
     raf ||= requestAnimationFrame(() => {
       raf = 0;
-      if (pending) render(pending);
+      if (!pending || !g) return;
+      try {
+        render(store.preview(pending));
+      } catch {
+        g.ops = [];
+      }
     });
   };
 
@@ -188,7 +198,7 @@ export function initEditor(doc: Document): void {
     syncUi();
   };
   const changed = () => {
-    pending = null;
+    doc.title = title();
     selection = selection.filter((s) => selectionExists(store.map, s));
     render();
     syncUi();
@@ -198,7 +208,12 @@ export function initEditor(doc: Document): void {
     try {
       store.commit(ops);
     } catch (e) {
-      shell.toast((e as Error).message.replace(/^diff-op: /, "Invalid edit: "), "error");
+      // Engine messages quote ids; show component names where we know them.
+      const nm = (id: string) => store.map.components.find((c) => c.id === id)?.label.name.replace(/\s+/g, " ") || id;
+      shell.toast((e as Error).message
+        .replace(/^diff-op: /, "Invalid edit: ")
+        .replace(/relation (\S+) -> (\S+)/, (_, a, b) => `link "${nm(a)}" → "${nm(b)}"`)
+        .replace(/component (?:id )?"([^"]+)"/g, (_, id) => `component "${nm(id)}"`), "error");
       render();
       return false;
     }
@@ -207,27 +222,49 @@ export function initEditor(doc: Document): void {
   };
 
   // ── Properties panel ────────────────────────────────────────────
-  const openProps = (id: string) => {
-    const p = buildProps(doc, store.map, id, (op) => void commit([op]));
+  const openProps = (id: string, reveal = true) => {
+    const p = buildProps(doc, store.map, id, (op, key) => {
+      focusKey = key;
+      commit([op]);
+    }, (msg) => shell.toast(msg, "error"));
     if (!p) return;
+    const opening = reveal && panelFor !== id;
     panelFor = id;
     shell.openPanel(p.title, p.body);
+    // Narrow screens: the sheet covers the lower map; pan the target into the space above it.
+    const el = byId(id, "component,pipeline,relation");
+    if (!opening || !el || !matchMedia("(max-width:639px)").matches) return;
+    const r = el.getBoundingClientRect(), top = 64, bottom = doc.getElementById("props")!.getBoundingClientRect().top - 8;
+    if (r.top < top || r.bottom > bottom) view.panBy(0, (top + bottom - r.top - r.bottom) / 2);
   };
-  // Deferred: a `change` fired by Tab moves focus afterwards; keep it on the same field.
+  const focusables = () =>
+    [...doc.querySelectorAll<HTMLInputElement>("#props-body [data-focus]")].filter((e) => !e.disabled);
+  // Deferred: a `change` fired by Tab moves focus afterwards. Keep focus on the
+  // same control; if Tab left the committed one, go to whatever now follows it
+  // (e.g. a field this edit just enabled).
   const refreshPanel = () => setTimeout(() => {
+    const changedKey = focusKey;
+    focusKey = "";
     if (!panelFor) return;
     if (!selectionExists(store.map, panelFor)) return shell.closePanel();
-    const active = doc.activeElement as HTMLInputElement | null;
-    const name = active?.closest("#props-body") ? active.name : "";
-    openProps(panelFor);
-    if (name) (doc.querySelector(`#props-body [name="${esc(name)}"]`) as HTMLElement | null)?.focus();
+    const active = doc.activeElement as HTMLElement | null;
+    const old = focusables();
+    const i = old.findIndex((e) => e.dataset.focus === changedKey);
+    const tabbed = i >= 0 && old[i + 1] === active;
+    const key = tabbed ? changedKey : active?.closest("#props-body") ? active.dataset.focus ?? "" : "";
+    openProps(panelFor, false);
+    if (!key) return;
+    const now = focusables();
+    const find = (k: string) => now.findIndex((e) => e.dataset.focus === k);
+    let j = find(key);
+    if (j < 0) j = find(key.split(".")[0]); // its Clear button is gone
+    now[tabbed ? j + 1 : j]?.focus();
   });
   shell.on("panel-close", () => (panelFor = null));
 
   // ── Inline rename ───────────────────────────────────────────────
-  const rename = (id: string) => {
+  const rename = (id: string, isTitle = false) => {
     editing?.finish(true);
-    const isTitle = id === "title";
     const find = () => (isTitle ? mapEl.querySelector<SVGGraphicsElement>("[data-kind=title]") : byId(id, "label"));
     const el = find();
     const comp = store.map.components.find((c) => c.id === id);
@@ -281,7 +318,7 @@ export function initEditor(doc: Document): void {
   const cancel = () => {
     if (g) {
       clearTimeout(g.timer);
-      if (g.mode === "move" && g.moved) render();
+      if (g.mode === "move" && g.moved) render(); // also drops a queued preview
       g = null;
     }
     linkFrom = null;
@@ -304,7 +341,7 @@ export function initEditor(doc: Document): void {
     if (t === "select" && dbl) {
       if (!hit) return add(addComponentOp(store.map, c.start));
       if (hit.kind === "relation" || hit.kind === "evolve") return openProps(hit.id);
-      return rename(hit.id);
+      return rename(hit.id, hit.kind === "title");
     }
     if ((t === "link" || t === "evolve")) {
       const comp = componentOf(hit);
@@ -315,7 +352,7 @@ export function initEditor(doc: Document): void {
         shell.toast("Now click the target component");
         return drawOverlay();
       }
-      const op = connectOp(linkFrom.tool, linkFrom.id, comp);
+      const op = connectOp(store.map, linkFrom.tool, linkFrom.id, comp);
       linkFrom = null;
       hover = null;
       if (op) commit([op]);
@@ -335,7 +372,7 @@ export function initEditor(doc: Document): void {
       if (c.ops.length) commit(c.ops);
       else render();
     } else if (c.mode === "link" || c.mode === "evolve") {
-      const op = connectOp(c.mode, c.from!, componentOf(hitAt(ev.clientX, ev.clientY)));
+      const op = connectOp(store.map, c.mode, c.from!, componentOf(hitAt(ev.clientX, ev.clientY)));
       if (op) commit([op]);
       else {
         drawOverlay();
@@ -352,8 +389,9 @@ export function initEditor(doc: Document): void {
   vp.addEventListener("pointerdown", (ev) => {
     if (ev.button !== 0 || !ev.isPrimary) return;
     if (g) cancel();
+    // Space-drag / pan tool: the shell pans, the editor stays out of it.
+    if (shell.isPanForced(ev)) return;
     const t = tool();
-    if (t === "pan") return;
     const hit = hitFor(ev.target as Element, ev.clientX, ev.clientY, ev.pointerType !== "mouse");
     const start = pt(ev.clientX, ev.clientY);
     const comp = componentOf(hit);
@@ -407,11 +445,7 @@ export function initEditor(doc: Document): void {
     }
     if (c.mode === "move" && c.drag) {
       c.ops = dragOps(store.map, c.drag, c.cur);
-      try {
-        schedule(store.preview(c.ops));
-      } catch {
-        c.ops = [];
-      }
+      schedule(c.ops);
     } else if (c.mode !== "none") drawOverlay();
   });
 
@@ -468,12 +502,11 @@ export function initEditor(doc: Document): void {
   };
   const undo = history(store.undo);
   const redo = history(store.redo);
-  const n = () => `${store.ops.length} edit${store.ops.length === 1 ? "" : "s"}`;
-  const SENT: Record<string, [string, "success" | "info" | "error"]> = {
-    host: ["Sent %s to Claude", "success"],
-    endpoint: ["Sent %s", "success"],
-    clipboard: ["Copied %s: paste into Claude", "info"],
-    failed: ["Could not send %s: use Download", "error"],
+  const n = () => `${store.ops.length} change${store.ops.length === 1 ? "" : "s"}`;
+  const checkpoint = (sent?: readonly DiffOp[]) => {
+    const ok = store.checkpoint(sent);
+    syncUi();
+    return ok;
   };
 
   shell.on("action", async (name: string) => {
@@ -499,11 +532,14 @@ export function initEditor(doc: Document): void {
       }
       case "send": {
         if (!store.ops.length) return;
+        const sent = store.ops;
         const count = n();
         shell.toast(`Sending ${count}…`);
-        const res = await sendToClaude(store.ops, { title: title(), endpoint });
-        const [msg, kind] = SENT[res];
-        return shell.toast(msg.replace("%s", count), kind);
+        const res = await sendToClaude(sent, { title: title(), endpoint });
+        if (res === "clipboard") return shell.toast(`Copied ${count} — paste them into Claude`);
+        if (res === "failed") return shell.toast(`Could not send ${count}: use Download`, "error");
+        // Delivered (host / endpoint): the sent map becomes the baseline; edits made meanwhile stay in the diff.
+        return shell.toast(`Sent ${count} to Claude${checkpoint(sent) ? "" : " (edited meanwhile: diff kept)"}`, "success");
       }
       case "download-json": {
         const slug = title().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "wardley-map";
@@ -515,10 +551,7 @@ export function initEditor(doc: Document): void {
   (window as unknown as { __wardley: unknown }).__wardley = {
     getMap: () => structuredClone(store.map),
     getDiff: () => structuredClone(store.ops as DiffOp[]),
-    clearDiff: () => {
-      store.clearDiff();
-      syncUi();
-    },
+    clearDiff: () => void checkpoint(),
     apply: (op: DiffOp | DiffOp[]) => commit(Array.isArray(op) ? op : [op]),
     undo,
     redo,

@@ -1,12 +1,8 @@
 /**
- * Diff operations module for interactive Wardley Map editing (server side).
- *
- * - Zod payload schemas + the `DiffOp` discriminated union (validation/docs).
- * - Re-exports the zod-free engine from `./diff-ops-apply.ts` (browser bundles
- *   must import that module directly).
- * - Keeps the legacy IN-PLACE, boolean-returning `applyDiffOp`/`applyDiffOps`
- *   for existing callers; the pure, throwing versions are re-exported as
- *   `applyDiffOpPure` / `applyDiffOpsPure`.
+ * Zod schemas for the interactive editor's diff ops (server side): payload
+ * schemas + the `DiffOp` discriminated union, e.g. for an MCP server to
+ * validate ops before calling `applyDiffOp` — the pure, zod-free engine in
+ * `./diff-ops-apply.ts` (which is what browser bundles import).
  *
  * Coordinates are normalized [0, 1]; `move_label` / `label.position` dx,dy are
  * SVG user units (px) relative to the node centre (see render/labels-layer.ts).
@@ -15,7 +11,6 @@
  */
 
 import { z } from "zod";
-import type { WardleyMap } from "./schema.js";
 import {
   ComponentTypeEnum,
   EvolutionRangeSchema,
@@ -27,18 +22,7 @@ import {
   StepDecoratorSchema,
   SubtypeEnum,
 } from "./schema.js";
-import { applyDiffOpInPlace, type DiffOp as DiffOpType } from "./diff-ops-apply.js";
-
-export {
-  applyDiffOp as applyDiffOpPure,
-  applyDiffOps as applyDiffOpsPure,
-  applyDiffOpInPlace,
-  uniqueId,
-  pipelineMembers,
-  expandDeleteCascade,
-  expandChangeTypeCascade,
-} from "./diff-ops-apply.js";
-export type { DiffOpName, SetFieldPath, SetFieldValues } from "./diff-ops-apply.js";
+import type { DiffOp as DiffOpType } from "./diff-ops-apply.js";
 
 // ── Shared field schemas ─────────────────────────────────────────────
 
@@ -46,6 +30,8 @@ const EvolutionValue = z.number().min(0).max(1);
 const VisibilityValue = z.number().min(0).max(1);
 const Id = z.string().min(1);
 const IdPayload = z.object({ id: Id });
+/** Same rule as the engine: hex (#rgb … #rrggbbaa) or a Tailwind-style name ("red-600"). */
+const Color = z.string().regex(/^(#[0-9a-f]{3,8}|[a-z]+-\d{2,3})$/i, "Must be a hex color or a Tailwind-style name");
 
 // ── Payloads ─────────────────────────────────────────────────────────
 
@@ -83,7 +69,7 @@ export const RenameComponentPayload = z.object({ id: Id, name: z.string().min(1)
 export type RenameComponentPayload = z.infer<typeof RenameComponentPayload>;
 
 export const AddEdgePayload = z.object({
-  /** Optional: generated from `consumer-supplier` when omitted. */
+  /** Optional: when omitted the engine derives it deterministically (see diff-ops-apply `add_edge`). */
   id: Id.optional(),
   consumer: Id,
   supplier: Id,
@@ -178,7 +164,7 @@ export const SetFieldPayload = z.union([
   field("label.name", z.string().min(1)),
   field("label.position", LabelPositionSchema.nullable()),
   field("description", z.string().nullable()),
-  field("color", z.string().nullable()),
+  field("color", Color.nullable()),
   field("type", z.union([ComponentTypeEnum, RelationTypeEnum])),
   field("subtype", SubtypeEnum.nullable()),
   field("nature", NatureEnum.nullable()),
@@ -186,7 +172,7 @@ export const SetFieldPayload = z.union([
   field("inertia", z.boolean().nullable()),
   field("accelerator", z.boolean().nullable()),
   field("deaccelerator", z.boolean().nullable()),
-  field("step", StepDecoratorSchema.nullable()),
+  field("step", StepDecoratorSchema.extend({ color: Color.optional() }).nullable()),
   field("evolvesTo", z.array(EvolvesToSchema).nullable()),
   field("position.evolution.range", EvolutionRangeSchema.nullable()),
   field("flow", FlowPayload.nullable()),
@@ -244,38 +230,3 @@ export type DiffOp = DiffOpType;
 // Compile-time guard: every zod-parsed op is a valid engine op.
 const _zodMatchesEngine = (x: z.infer<typeof DiffOp>): DiffOpType => x;
 void _zodMatchesEngine;
-
-/** @deprecated Use DiffOp instead */
-export const ComponentDiffOp = DiffOp;
-/** @deprecated Use DiffOp instead */
-export type ComponentDiffOp = DiffOp;
-
-// ── Legacy in-place API ──────────────────────────────────────────────
-
-/**
- * @deprecated Legacy API: mutates `map` in place and returns false instead of
- * throwing. New code should use `applyDiffOp` from `./diff-ops-apply.js`.
- */
-export function applyDiffOp(map: WardleyMap, diffOp: DiffOp): boolean {
-  try {
-    applyDiffOpInPlace(map, diffOp);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-/**
- * @deprecated Legacy API: applies ops in place, returns a success flag per op.
- * Stops at the first failure when `stopOnError` is true.
- */
-export function applyDiffOps(map: WardleyMap, ops: DiffOp[], stopOnError = false): boolean[] {
-  const results: boolean[] = [];
-  for (const o of ops) {
-    const ok = applyDiffOp(map, o);
-    results.push(ok);
-    if (!ok && stopOnError) break;
-  }
-  return results;
-}
-

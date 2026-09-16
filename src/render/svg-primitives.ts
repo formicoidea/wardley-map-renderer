@@ -16,7 +16,11 @@
 
 // ── XML Escaping ────────────────────────────────────────────────────
 
-/** Escape text for XML/SVG attribute/content safety */
+/**
+ * Escape text for XML/SVG attribute/content safety. Every map/theme-derived
+ * string interpolated into markup (ids, colors, font families, labels) goes
+ * through this.
+ */
 export function esc(s: string): string {
   return s
     .replace(/&/g, "&amp;")
@@ -94,7 +98,7 @@ export function renderNodeCircle(
 ): string {
   return (
     `<circle cx="${cx}" cy="${cy}" r="${r}" ` +
-    `fill="${NODE_FILL}" stroke="${stroke}" stroke-width="${strokeWidth}" />`
+    `fill="${NODE_FILL}" stroke="${esc(stroke)}" stroke-width="${strokeWidth}" />`
   );
 }
 
@@ -120,7 +124,7 @@ export function renderPersonSilhouette(
   const sTopY = cy + r * PERSON_SHOULDER_TOP;
   const ry = sBottom - sTopY;
 
-  const clipId = `anchor-clip-${id}`;
+  const clipId = esc(`anchor-clip-${id}`);
   const clip =
     `<defs><clipPath id="${clipId}">` +
     `<circle cx="${cx}" cy="${cy}" r="${r - strokeWidth / 2}" />` +
@@ -128,13 +132,13 @@ export function renderPersonSilhouette(
 
   const head =
     `<circle cx="${cx}" cy="${hcy}" r="${hr}" ` +
-    `fill="none" stroke="${stroke}" stroke-width="${silSW}" />`;
+    `fill="none" stroke="${esc(stroke)}" stroke-width="${silSW}" />`;
 
   // Shoulders as an upward-bulging arc (dome); endpoints sit below the circle
   // and are clipped, matching the reference avatar's clipped bust.
   const shoulders =
     `<path d="M ${cx - sw} ${sBottom} A ${sw} ${ry} 0 0 1 ${cx + sw} ${sBottom}" ` +
-    `fill="none" stroke="${stroke}" stroke-width="${silSW}" stroke-linecap="round" />`;
+    `fill="none" stroke="${esc(stroke)}" stroke-width="${silSW}" stroke-linecap="round" />`;
 
   return `${clip}<g clip-path="url(#${clipId})">${head}${shoulders}</g>`;
 }
@@ -149,7 +153,7 @@ export function renderEcosystemSymbol(
   stroke: string,
   strokeWidth: number,
 ): string {
-  const patternId = `eco-hatch-${nodeId}`;
+  const patternId = esc(`eco-hatch-${nodeId}`);
 
   const defs =
     `<defs>` +
@@ -160,15 +164,15 @@ export function renderEcosystemSymbol(
 
   const outer =
     `<circle cx="${cx}" cy="${cy}" r="${ECO_OUTER_R}" ` +
-    `fill="${ECO_GREY}" stroke="${stroke}" stroke-width="${strokeWidth}" />`;
+    `fill="${ECO_GREY}" stroke="${esc(stroke)}" stroke-width="${strokeWidth}" />`;
 
   const mid =
     `<circle cx="${cx}" cy="${cy}" r="${ECO_MID_R}" ` +
-    `fill="url(#${patternId})" stroke="${stroke}" stroke-width="${strokeWidth}" />`;
+    `fill="url(#${patternId})" stroke="${esc(stroke)}" stroke-width="${strokeWidth}" />`;
 
   const inner =
     `<circle cx="${cx}" cy="${cy}" r="${ECO_INNER_R}" ` +
-    `fill="${NODE_FILL}" stroke="${stroke}" stroke-width="${strokeWidth}" />`;
+    `fill="${NODE_FILL}" stroke="${esc(stroke)}" stroke-width="${strokeWidth}" />`;
 
   return defs + outer + mid + inner;
 }
@@ -187,7 +191,7 @@ export function renderMarketSymbol(
 ): string {
   const outerCircle =
     `<circle cx="${cx}" cy="${cy}" r="${MARKET_OUTER_R}" ` +
-    `fill="${NODE_FILL}" stroke="${stroke}" stroke-width="${strokeWidth}" />`;
+    `fill="${NODE_FILL}" stroke="${esc(stroke)}" stroke-width="${strokeWidth}" />`;
 
   const topX = cx;
   const topY = cy - MARKET_TRIANGLE_R;
@@ -200,13 +204,13 @@ export function renderMarketSymbol(
   const triSW = strokeWidth * MARKET_TRI_SW_MULT;
   const triangle =
     `<polygon points="${topX},${topY} ${blX},${blY} ${brX},${brY}" ` +
-    `fill="none" stroke="${stroke}" stroke-width="${triSW}" stroke-linejoin="round" />`;
+    `fill="none" stroke="${esc(stroke)}" stroke-width="${triSW}" stroke-linejoin="round" />`;
 
   // Three bold hollow rings (white fill so the triangle is hidden behind them).
   const ringSW = strokeWidth * MARKET_RING_SW_MULT;
   const ring = (x: number, y: number) =>
     `<circle cx="${x}" cy="${y}" r="${MARKET_VERTEX_R}" ` +
-    `fill="${NODE_FILL}" stroke="${stroke}" stroke-width="${ringSW}" />`;
+    `fill="${NODE_FILL}" stroke="${esc(stroke)}" stroke-width="${ringSW}" />`;
 
   return outerCircle + triangle + ring(topX, topY) + ring(blX, blY) + ring(brX, brY);
 }
@@ -228,17 +232,17 @@ export function renderMethodIndicator(
   if (position === 0) {
     return (
       `<circle cx="${cx}" cy="${cy}" r="${METHOD_AURA_R}" ` +
-      `fill="none" stroke="${color}" stroke-width="2" />`
+      `fill="none" stroke="${esc(color)}" stroke-width="2" />`
     );
   } else if (position === 1) {
     return (
       `<circle cx="${cx}" cy="${cy}" r="${METHOD_AURA_R}" ` +
-      `fill="${color}" fill-opacity="0.4" stroke="${color}" stroke-width="1.5" />`
+      `fill="${esc(color)}" fill-opacity="0.4" stroke="${esc(color)}" stroke-width="1.5" />`
     );
   } else {
     return (
       `<circle cx="${cx}" cy="${cy}" r="${METHOD_AURA_R}" ` +
-      `fill="${color}" fill-opacity="1" stroke="${color}" stroke-width="1.5" />`
+      `fill="${esc(color)}" fill-opacity="1" stroke="${esc(color)}" stroke-width="1.5" />`
     );
   }
 }
@@ -276,7 +280,7 @@ export interface NodeRenderInput {
     readonly color: string;
     readonly position: number;
   };
-  /** Whether to wrap in interactive <g> with data-component-id */
+  /** Whether to wrap in the interactive hit-test <g> (data-id/data-kind) */
   readonly interactive?: boolean;
 }
 
@@ -311,7 +315,7 @@ export function renderComponentNode(input: NodeRenderInput): string {
 
   // Interactive mode wrapping
   if (interactive) {
-    return `<g data-component-id="${esc(id)}"${hitAttrs(id, "component")}>${methodSvg}${nodeSvg}</g>`;
+    return `<g${hitAttrs(id, "component")}>${methodSvg}${nodeSvg}</g>`;
   } else {
     // Separate method and node SVG with newline to match server layer output format
     return methodSvg ? methodSvg + "\n" + nodeSvg : nodeSvg;
@@ -391,7 +395,7 @@ export function renderEdge(input: EdgeRenderInput): string {
     const hitArea =
       `<line class="hit-area" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" ` +
       `stroke="transparent" stroke-width="${EDGE_HIT_AREA_WIDTH}" />`;
-    return `<g data-edge-id="${esc(relationId)}"${hitAttrs(relationId, "relation")}>${hitArea}${lineEl}</g>`;
+    return `<g${hitAttrs(relationId, "relation")}>${hitArea}${lineEl}</g>`;
   }
 
   return lineEl;
@@ -499,12 +503,12 @@ export function renderEvolveArrow(input: EvolveRenderInput): string {
   const lineSvg =
     `<line x1="${fromX}" y1="${fromY}" ` +
     `x2="${toX}" y2="${toY}" ` +
-    `stroke="${style.stroke}" stroke-width="${arrowStrokeWidth}" ` +
-    `stroke-dasharray="${style.dasharray}" />`;
+    `stroke="${esc(style.stroke)}" stroke-width="${arrowStrokeWidth}" ` +
+    `stroke-dasharray="${esc(style.dasharray)}" />`;
 
   const pts = arrowheadPoints(fromX, fromY, toX, toY, ARROWHEAD_SIZE);
   const arrowSvg = pts
-    ? `<polygon points="${pts}" fill="${style.stroke}" />`
+    ? `<polygon points="${pts}" fill="${esc(style.stroke)}" />`
     : "";
 
   if (interactive) {
@@ -512,7 +516,7 @@ export function renderEvolveArrow(input: EvolveRenderInput): string {
       `<line class="hit-area" x1="${fromX}" y1="${fromY}" ` +
       `x2="${toX}" y2="${toY}" ` +
       `stroke="transparent" stroke-width="${EVOLVE_HIT_AREA_WIDTH}" />`;
-    return `<g data-evolves-from="${esc(componentId)}"${hitAttrs(componentId, "evolve")}>${hitArea}${lineSvg}${arrowSvg}</g>`;
+    return `<g${hitAttrs(componentId, "evolve")}>${hitArea}${lineSvg}${arrowSvg}</g>`;
   }
 
   return lineSvg + (arrowSvg ? "\n" + arrowSvg : "");
@@ -543,10 +547,9 @@ const PIPELINE_FILL = "rgba(255, 255, 255, 0.35)";
 const PIPELINE_STROKE = "#999999";
 const PIPELINE_STROKE_WIDTH = 1;
 const PIPELINE_RX = 0;
-const PIPELINE_HANDLE_HALF = 7;
 
 // Re-export pipeline constants
-export { PIPELINE_FILL, PIPELINE_STROKE, PIPELINE_STROKE_WIDTH, PIPELINE_RX, PIPELINE_HANDLE_HALF };
+export { PIPELINE_FILL, PIPELINE_STROKE, PIPELINE_STROKE_WIDTH, PIPELINE_RX };
 
 /** Pipeline rendering input */
 export interface PipelineRenderInput {
@@ -559,7 +562,8 @@ export interface PipelineRenderInput {
 }
 
 /**
- * Render a pipeline background rectangle with optional interactive resize handles.
+ * Render a pipeline background rectangle (interactive: wrapped in a hit-test group;
+ * resize handles are drawn by the editor overlay, not here).
  */
 export function renderPipeline(input: PipelineRenderInput): string {
   const { x, y, width, height, componentId, interactive } = input;
@@ -573,26 +577,7 @@ export function renderPipeline(input: PipelineRenderInput): string {
     `fill="${PIPELINE_FILL}" stroke="${PIPELINE_STROKE}" ` +
     `stroke-width="${PIPELINE_STROKE_WIDTH}" />`;
 
-  if (interactive) {
-    const cx = x + width / 2;
-    const cy = y + height / 2;
-    const handlesSvg =
-      `<rect data-handle="left" x="${x - PIPELINE_HANDLE_HALF}" y="${cy - PIPELINE_HANDLE_HALF}" ` +
-      `width="${PIPELINE_HANDLE_HALF * 2}" height="${PIPELINE_HANDLE_HALF * 2}" ` +
-      `fill="#fff" stroke="#666" stroke-width="1" style="cursor:ew-resize" />` +
-      `<rect data-handle="right" x="${x + width - PIPELINE_HANDLE_HALF}" y="${cy - PIPELINE_HANDLE_HALF}" ` +
-      `width="${PIPELINE_HANDLE_HALF * 2}" height="${PIPELINE_HANDLE_HALF * 2}" ` +
-      `fill="#fff" stroke="#666" stroke-width="1" style="cursor:ew-resize" />` +
-      `<rect data-handle="top" x="${cx - PIPELINE_HANDLE_HALF}" y="${y - PIPELINE_HANDLE_HALF}" ` +
-      `width="${PIPELINE_HANDLE_HALF * 2}" height="${PIPELINE_HANDLE_HALF * 2}" ` +
-      `fill="#fff" stroke="#666" stroke-width="1" style="cursor:ns-resize" />` +
-      `<rect data-handle="bottom" x="${cx - PIPELINE_HANDLE_HALF}" y="${y + height - PIPELINE_HANDLE_HALF}" ` +
-      `width="${PIPELINE_HANDLE_HALF * 2}" height="${PIPELINE_HANDLE_HALF * 2}" ` +
-      `fill="#fff" stroke="#666" stroke-width="1" style="cursor:ns-resize" />`;
-    return `<g data-pipeline-id="${esc(componentId)}"${hitAttrs(componentId, "pipeline")}>${rectSvg}${handlesSvg}</g>`;
-  }
-
-  return rectSvg;
+  return interactive ? `<g${hitAttrs(componentId, "pipeline")}>${rectSvg}</g>` : rectSvg;
 }
 
 // ══════════════════════════════════════════════════════════════════════
@@ -622,7 +607,7 @@ export function renderLabel(input: LabelRenderInput): string {
   const { x, y, text, anchor, fontFamily, fontSize, componentId, interactive } = input;
 
   const labelAttr = interactive && componentId
-    ? ` data-label-for="${esc(componentId)}"${hitAttrs(componentId, "label")} style="cursor:move"`
+    ? `${hitAttrs(componentId, "label")} style="cursor:move"`
     : "";
 
   if (text.includes("\n")) {
@@ -634,14 +619,14 @@ export function renderLabel(input: LabelRenderInput): string {
       .join("");
     return (
       `<text x="${x}" y="${y}" text-anchor="${anchor}" ` +
-      `font-family="${fontFamily}" font-size="${fontSize}" ` +
+      `font-family="${esc(fontFamily)}" font-size="${fontSize}" ` +
       `fill="${COMPONENT_LABEL_COLOR}"${labelAttr}>${firstLine}${restLines}</text>`
     );
   }
 
   return (
     `<text x="${x}" y="${y}" text-anchor="${anchor}" ` +
-    `font-family="${fontFamily}" font-size="${fontSize}" ` +
+    `font-family="${esc(fontFamily)}" font-size="${fontSize}" ` +
     `fill="${COMPONENT_LABEL_COLOR}"${labelAttr}>${esc(text)}</text>`
   );
 }
@@ -679,7 +664,7 @@ export function renderNote(input: NoteRenderInput): string {
   if (lines.length === 1) {
     return (
       `<text x="${cx}" y="${cy}" text-anchor="start" ` +
-      `font-family="${fontFamily}" font-size="${NOTE_FONT_SIZE}" ` +
+      `font-family="${esc(fontFamily)}" font-size="${NOTE_FONT_SIZE}" ` +
       `font-style="${NOTE_FONT_STYLE}" fill="${NOTE_COLOR}">${esc(lines[0])}</text>`
     );
   }
@@ -693,7 +678,7 @@ export function renderNote(input: NoteRenderInput): string {
 
   return (
     `<text x="${cx}" y="${cy}" text-anchor="start" ` +
-    `font-family="${fontFamily}" font-size="${NOTE_FONT_SIZE}" ` +
+    `font-family="${esc(fontFamily)}" font-size="${NOTE_FONT_SIZE}" ` +
     `font-style="${NOTE_FONT_STYLE}" fill="${NOTE_COLOR}">${tspans}</text>`
   );
 }
@@ -728,15 +713,15 @@ export function renderStep(input: StepRenderInput): string {
 
   const circleSvg =
     `<circle cx="${cx}" cy="${cy}" r="${STEP_RADIUS}" ` +
-    `fill="${fill}" stroke="none" />`;
+    `fill="${esc(fill)}" stroke="none" />`;
 
   const textSvg =
     `<text x="${cx}" y="${cy}" text-anchor="middle" dominant-baseline="central" ` +
-    `font-family="${fontFamily}" font-size="${STEP_FONT_SIZE}" ` +
+    `font-family="${esc(fontFamily)}" font-size="${STEP_FONT_SIZE}" ` +
     `font-weight="bold" fill="${STEP_TEXT_COLOR}">${number}</text>`;
 
   if (interactive) {
-    return `<g data-step-id="${esc(stepId)}" data-step-number="${number}"${hitAttrs(stepId, "step")}>${circleSvg}${textSvg}</g>`;
+    return `<g data-step-number="${number}"${hitAttrs(stepId, "step")}>${circleSvg}${textSvg}</g>`;
   }
 
   return circleSvg + "\n" + textSvg;
@@ -827,7 +812,7 @@ export function renderAccelerator(input: AcceleratorRenderInput): string {
   const labelSvg =
     `<text x="${labelX}" y="${cy}" text-anchor="${textAnchor}" ` +
     `dominant-baseline="central" ` +
-    `font-family="${fontFamily}" font-size="${ACC_LABEL_FONT_SIZE}" ` +
+    `font-family="${esc(fontFamily)}" font-size="${ACC_LABEL_FONT_SIZE}" ` +
     `fill="${ARROW_STROKE}">${esc(label)}</text>`;
 
   return arrowSvg + "\n" + labelSvg;
@@ -852,19 +837,7 @@ export function svgHeader(canvasWidth: number, canvasHeight: number): string {
  * Generate the SVG background rect.
  */
 export function svgBackground(canvasWidth: number, canvasHeight: number, bgColor: string): string {
-  return `<rect width="${canvasWidth}" height="${canvasHeight}" fill="${bgColor}" />`;
-}
-
-/**
- * Generate the invisible plot-area rect for interactive coordinate conversion.
- */
-export function svgPlotArea(
-  left: number,
-  top: number,
-  width: number,
-  height: number,
-): string {
-  return `<rect data-plot-area x="${left}" y="${top}" width="${width}" height="${height}" fill="none" pointer-events="none" />`;
+  return `<rect width="${canvasWidth}" height="${canvasHeight}" fill="${esc(bgColor)}" />`;
 }
 
 /**

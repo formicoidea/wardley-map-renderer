@@ -17,6 +17,8 @@ export interface View {
   fit(): void;
   /** Multiply zoom by `factor`, keeping client point (cx, cy) fixed. */
   zoomAt(factor: number, cx: number, cy: number): void;
+  /** Pan by (dx, dy) screen px. */
+  panBy(dx: number, dy: number): void;
   /** Client coordinates → SVG user units of the map viewBox. */
   screenToSvg(clientX: number, clientY: number): { x: number; y: number };
   /** Overridable: may a primary-button drag starting here pan the view? */
@@ -35,6 +37,8 @@ export interface Shell {
   openPanel(title: string, body: Node): void;
   closePanel(): void;
   setDiffCount(n: number): void;
+  /** True when this pointerdown pans regardless of its target (middle button, pan tool, Space held). */
+  isPanForced(ev: PointerEvent): boolean;
   view: View;
   on(event: string, cb: (...args: any[]) => void): void;
 }
@@ -46,7 +50,7 @@ const clamp = (k: number) => Math.min(8, Math.max(0.1, k));
 export function initShell(doc: Document): Shell {
   const $ = (s: string) => doc.querySelector(s) as HTMLElement;
   const vp = $("#viewport"), stage = $("#stage"), map = $("#map"), bar = $("#bar"), props = $("#props");
-  const toastEl = $("#toast"), overlay = $("#overlay");
+  const toastEl = $("#toast"), overlay = $("#overlay"), tip = $("#tip");
   const subs: Record<string, ((...a: any[]) => void)[]> = {};
   const emit = (e: string, ...a: unknown[]) => subs[e]?.forEach((f) => f(...a));
   let tool: Tool = "select", space = false, fitted = true, timer = 0;
@@ -92,6 +96,12 @@ export function initShell(doc: Document): Shell {
       fitted = true;
       apply();
     },
+    panBy(dx, dy) {
+      view.x += dx;
+      view.y += dy;
+      fitted = false;
+      apply();
+    },
     zoomAt(f, cx, cy) {
       const r = vp.getBoundingClientRect(), px = cx - r.left, py = cy - r.top, k = clamp(view.k * f);
       view.x = px - ((px - view.x) * k) / view.k;
@@ -119,7 +129,6 @@ export function initShell(doc: Document): Shell {
     bar.classList.toggle("collapsed", c);
     const b = bar.querySelector("[data-action=collapse]")!, label = c ? "Show toolbar" : "Hide toolbar";
     b.setAttribute("aria-expanded", String(!c));
-    b.setAttribute("title", label);
     b.setAttribute("aria-label", label);
     try { localStorage.setItem(STORE, c ? "1" : ""); } catch { /* storage unavailable */ }
   };
@@ -176,6 +185,17 @@ export function initShell(doc: Document): Shell {
     space = false;
     vp.classList.remove("grab");
   };
+  // Icon buttons carry only aria-label (a title would duplicate it for screen
+  // readers and cannot be styled); mouse users get this tooltip instead.
+  doc.addEventListener("pointerover", (ev) => {
+    const b = ev.pointerType === "mouse" && (ev.target as Element).closest?.("button[aria-label]");
+    tip.hidden = !b;
+    if (!b) return;
+    const r = b.getBoundingClientRect(), up = r.top > innerHeight / 2;
+    tip.textContent = b.getAttribute("aria-label");
+    tip.style.cssText = `left:${r.left + r.width / 2}px;top:${up ? r.top - 6 : r.bottom + 6}px;translate:-50% ${up ? -100 : 0}%`;
+  });
+  doc.addEventListener("pointerdown", () => (tip.hidden = true), true);
   doc.addEventListener("keyup", (ev) => ev.key === " " && spaceUp());
   addEventListener("blur", spaceUp);
 
@@ -209,7 +229,7 @@ export function initShell(doc: Document): Shell {
       pts.forEach((_, id) => capture(id));
       return emit("gesture");
     }
-    const forced = ev.button === 1 || tool === "pan" || space;
+    const forced = isPanForced(ev);
     if (pts.size === 1 && (forced || (ev.button === 0 && view.shouldPan(ev)))) {
       if (forced) ev.preventDefault();
       drag = { id: ev.pointerId, sx: ev.clientX, sy: ev.clientY, ox: view.x, oy: view.y, on: false };
@@ -259,12 +279,10 @@ export function initShell(doc: Document): Shell {
       return view.zoomAt(Math.exp(-d * 0.01), ev.clientX, ev.clientY);
     }
     const sideways = ev.shiftKey && !ev.deltaX;
-    view.x -= (sideways ? ev.deltaY : ev.deltaX) * m;
-    view.y -= (sideways ? 0 : ev.deltaY) * m;
-    fitted = false;
-    apply();
+    view.panBy(-(sideways ? ev.deltaY : ev.deltaX) * m, sideways ? 0 : -ev.deltaY * m);
   }, { passive: false });
 
+  const isPanForced = (ev: PointerEvent) => ev.button === 1 || tool === "pan" || space;
   const setDiffCount = (n: number) => {
     doc.querySelectorAll<HTMLElement>("[data-diff-count]").forEach((e) => {
       e.textContent = n > 99 ? "99+" : String(n);
@@ -282,7 +300,13 @@ export function initShell(doc: Document): Shell {
   setDiffCount(0);
   sync();
   new MutationObserver(sync).observe(map, { childList: true });
-  new ResizeObserver(() => fitted && view.fit()).observe(vp);
+  const ro = new ResizeObserver(() => {
+    // Mobile: the properties sheet docks above the (bottom) toolbar.
+    doc.body.style.setProperty("--bar-h", bar.offsetHeight + "px");
+    if (fitted) view.fit();
+  });
+  ro.observe(vp);
+  ro.observe(bar);
   view.fit();
 
   return {
@@ -302,6 +326,7 @@ export function initShell(doc: Document): Shell {
     },
     closePanel,
     setDiffCount,
+    isPanForced,
     view,
     on(event, cb) {
       (subs[event] ??= []).push(cb);

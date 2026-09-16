@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, it, expect } from "vitest";
 import { applyDiffOp, applyDiffOps, uniqueId, pipelineMembers, type DiffOp } from "./diff-ops-apply.js";
 import { DiffOp as DiffOpSchema, SetFieldPayload, ResizePipelinePayload } from "./diff-ops.js";
-import type { WardleyMap } from "./schema.js";
+import { sanitizeMap, type WardleyMap } from "./schema.js";
 
 function makeMap(): WardleyMap {
   return {
@@ -110,6 +110,22 @@ describe("resize_pipeline", () => {
   it("zod schema requires at least one bound", () => {
     expect(ResizePipelinePayload.safeParse({ id: "p" }).success).toBe(false);
     expect(ResizePipelinePayload.safeParse({ id: "p", visEnd: 0.5 }).success).toBe(true);
+  });
+});
+
+describe("rounding (stable under sanitizeMap)", () => {
+  it("move/add/resize/move_pipeline round coordinates to 3 decimals", () => {
+    const m = applyDiffOps(makeMap(), [
+      { op: "move_component", payload: { id: "out", evolution: 0.123456, visibility: 0.0999999 } },
+      { op: "add_component", payload: { id: "n", name: "N", evolution: 0.33333, visibility: 0.66666 } },
+      { op: "resize_pipeline", payload: { id: "pipe", evoStart: 0.2 + 0.1, evoEnd: 0.71234, visStart: 0.35 } },
+      { op: "move_pipeline", payload: { id: "pipe", dEvo: 0.1 / 3, dVis: 0 } },
+    ]);
+    expect(pos(m, "out")).toEqual([0.123, 0.1]);
+    expect(pos(m, "n")).toEqual([0.333, 0.667]);
+    expect(find(m, "pipe").pipelineGeometry).toEqual({ evoStart: 0.333, evoEnd: 0.745, visStart: 0.35, visEnd: 0.45 });
+    expect(pos(m, "pipe")).toEqual([0.539, 0.4]);
+    expect(sanitizeMap(m).components).toEqual(m.components);
   });
 });
 
@@ -268,6 +284,18 @@ describe("set_field", () => {
     expect(() => set(m, "out", "flow", null)).toThrow(/unknown target/);
     expect(() => set(m, "out", "inertia", "yes")).toThrow(/boolean/);
     expect(() => set(m, "out", "label.name", null)).toThrow(/non-empty/);
+  });
+
+  it("accepts only hex / Tailwind-style colors (component and step)", () => {
+    const m = makeMap();
+    expect(find(set(m, "out", "color", "#A1b2C3"), "out").color).toBe("#A1b2C3");
+    expect(find(set(m, "out", "step", { number: 1, color: "#fff" }), "out").step).toEqual({ number: 1, color: "#fff" });
+    for (const bad of ['#fff"><script>', "red", "url(x)", "#12", 3]) {
+      expect(() => set(m, "out", "color", bad)).toThrow(/color/);
+      expect(() => set(m, "out", "step", { number: 1, color: bad })).toThrow(/step\.color/);
+      expect(SetFieldPayload.safeParse({ target: "a", path: "color", value: bad }).success).toBe(false);
+      expect(SetFieldPayload.safeParse({ target: "a", path: "step", value: { number: 1, color: bad } }).success).toBe(false);
+    }
   });
 
   it("zod SetFieldPayload validates per path", () => {

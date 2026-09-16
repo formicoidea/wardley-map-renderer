@@ -7,7 +7,7 @@
  * @module interactive/store
  */
 
-import { applyDiffOp, type DiffOp } from "../diff-ops-apply.js";
+import { applyDiffOps, type DiffOp } from "../diff-ops-apply.js";
 import type { WardleyMap } from "../schema.js";
 
 interface Snap { map: WardleyMap; ops: DiffOp[] }
@@ -19,7 +19,6 @@ export function createStore(initial: WardleyMap) {
   let cur: Snap = { map: initial, ops: [] };
   let past: Snap[] = [];
   let future: Snap[] = [];
-  const applyAll = (map: WardleyMap, ops: readonly DiffOp[]) => ops.reduce((m, op) => applyDiffOp(m, op), map);
   const push = (next: Snap) => {
     past.push(cur);
     if (past.length > HISTORY) past.shift();
@@ -40,12 +39,12 @@ export function createStore(initial: WardleyMap) {
     get original() { return original; },
     canUndo: () => past.length > 0,
     canRedo: () => future.length > 0,
-    /** Map with `ops` applied, without committing. @throws on an invalid op */
-    preview: (ops: readonly DiffOp[]) => applyAll(cur.map, ops),
+    /** Map with `ops` applied (one clone), without committing. @throws on an invalid op */
+    preview: (ops: readonly DiffOp[]) => applyDiffOps(cur.map, ops),
     /** Apply `ops` as ONE undo step (all or nothing). @throws on an invalid op (state unchanged) */
     commit(ops: readonly DiffOp[]): void {
       if (!ops.length) return;
-      const map = applyAll(cur.map, ops);
+      const map = applyDiffOps(cur.map, ops);
       push({ map, ops: [...cur.ops, ...structuredClone(ops as DiffOp[])] });
     },
     undo: () => step(past, future),
@@ -54,12 +53,18 @@ export function createStore(initial: WardleyMap) {
     reset(): void {
       if (cur.ops.length) push({ map: original, ops: [] });
     },
-    /** Accept the current map as the new baseline (edits were delivered). */
-    clearDiff(): void {
-      original = cur.map;
-      cur = { map: cur.map, ops: [] };
+    /**
+     * `sent` (the current or an earlier `ops` value) was delivered: the map it
+     * produces becomes the baseline, `ops` keeps only later edits and history is
+     * cleared. False (state unchanged) when `ops` no longer extends `sent`.
+     */
+    checkpoint(sent: readonly DiffOp[] = cur.ops): boolean {
+      if (sent.some((op, i) => cur.ops[i] !== op)) return false;
+      original = sent === cur.ops ? cur.map : applyDiffOps(original, sent);
+      cur = { map: cur.map, ops: cur.ops.slice(sent.length) };
       past = [];
       future = [];
+      return true;
     },
   };
 }

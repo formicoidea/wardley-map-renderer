@@ -137,45 +137,13 @@ describe("composeSVG()", () => {
   });
 });
 
-// ── Interactive mode: data-plot-area rect ─────────────────────────────
+// ── No legacy plot-area rect ─────────────────────────────────────────
 
-describe("composeSVG() interactive plot-area rect", () => {
-  it("adds data-plot-area rect when interactive=true", () => {
-    const ctx = buildRenderContext(MINIMAL_MAP, { interactive: true });
-    const svg = composeSVG(ctx, []);
-    expect(svg).toContain("data-plot-area");
-    // Verify rect dimensions match the computed plot area
-    expect(svg).toContain(`x="${ctx.plot.left}"`);
-    expect(svg).toContain(`y="${ctx.plot.top}"`);
-    expect(svg).toContain(`width="${ctx.plot.width}"`);
-    expect(svg).toContain(`height="${ctx.plot.height}"`);
-    expect(svg).toContain('fill="none"');
-    expect(svg).toContain('pointer-events="none"');
-  });
-
-  it("does NOT add data-plot-area rect when interactive is false/undefined", () => {
-    const ctx = buildRenderContext(MINIMAL_MAP);
-    const svg = composeSVG(ctx, []);
-    expect(svg).not.toContain("data-plot-area");
-
-    const ctx2 = buildRenderContext(MINIMAL_MAP, { interactive: false });
-    const svg2 = composeSVG(ctx2, []);
-    expect(svg2).not.toContain("data-plot-area");
-  });
-
-  it("places data-plot-area rect before layer groups", () => {
-    const ctx = buildRenderContext(MINIMAL_MAP, { interactive: true });
-    const testLayer: LayerRegistration = {
-      name: "nodes",
-      order: 60,
-      render: () => ["<!-- NODES -->"],
-    };
-    const svg = composeSVG(ctx, [testLayer]);
-    const plotIdx = svg.indexOf("data-plot-area");
-    const layerIdx = svg.indexOf('data-layer="nodes"');
-    expect(plotIdx).toBeGreaterThan(-1);
-    expect(layerIdx).toBeGreaterThan(-1);
-    expect(plotIdx).toBeLessThan(layerIdx);
+describe("composeSVG() plot-area rect (removed)", () => {
+  it("never adds a data-plot-area rect", () => {
+    for (const options of [undefined, { interactive: false }, { interactive: true }]) {
+      expect(composeSVG(buildRenderContext(MINIMAL_MAP, options), [])).not.toContain("data-plot-area");
+    }
   });
 });
 

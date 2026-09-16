@@ -144,7 +144,7 @@ function collectLegendItems(ctx: RenderContext): LegendItem[] {
 
   for (const type of TYPE_ORDER) {
     if (!presentTypes.has(type) || excluded.has(type)) continue;
-    const color = resolveTypeStyle<string>(typeColors, type) ?? "#000000";
+    const color = esc(resolveTypeStyle<string>(typeColors, type) ?? "#000000");
     const label = labels[type] ?? type;
 
     if (type === "anchor") {
@@ -304,7 +304,7 @@ function collectLegendItems(ctx: RenderContext): LegendItem[] {
   ];
   for (const m of orderedMethodTypes) {
     const mc = methodConfigMap.get(m);
-    const mColor = mc?.color ?? "#888888";
+    const mColor = esc(mc?.color ?? "#888888");
     // Legend label: capitalize the method type name (e.g., "buying-policy" → "Buying Policy")
     const mLabel = m.split("-").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
     items.push({

@@ -2,8 +2,8 @@
  * AC 26 — SVG and PNG formats remain clean without interactive elements.
  *
  * Verifies that renderToSVG() (default, no interactive flag) produces SVG
- * without any data-component-id, data-edge-id, data-evolves-from,
- * data-pipeline-id, data-plot-area, data-handle attributes, or hit-area rects.
+ * without the editor hit-test attributes (data-id / data-kind) or hit areas,
+ * and that the legacy data-* ids are gone in interactive mode too.
  *
  * These interactive elements must only appear when interactive=true (text/html).
  */
@@ -57,8 +57,8 @@ const FULL_MAP: WardleyMap = WardleyMapSchema.parse({
   ],
 });
 
-// All interactive data-* attributes that should never appear in clean SVG
-const INTERACTIVE_MARKERS = [
+// Legacy interactive attributes (superseded by data-id/data-kind): never emitted
+const LEGACY_MARKERS = [
   "data-component-id",
   "data-edge-id",
   "data-evolves-from",
@@ -67,7 +67,10 @@ const INTERACTIVE_MARKERS = [
   "data-handle",
   "data-step-number",
   "data-label-for",
+  "data-step-id",
 ];
+// All interactive data-* attributes that should never appear in clean SVG
+const INTERACTIVE_MARKERS = [...LEGACY_MARKERS, "data-id=", "data-kind="];
 
 // ── Tests ─────────────────────────────────────────────────────────────
 
@@ -86,15 +89,16 @@ describe("SVG format is clean (no interactive elements)", () => {
     }
   });
 
-  it("renderToSVG() with interactive=true DOES have interactive attributes", () => {
+  it("renderToSVG() with interactive=true has only the data-id/data-kind contract", () => {
     const svg = renderToSVG(FULL_MAP, { interactive: true });
     // At minimum these should be present for a map with components, edges, pipelines, evolvesTo
-    expect(svg).toContain("data-component-id");
-    expect(svg).toContain("data-edge-id");
-    expect(svg).toContain("data-pipeline-id");
-    expect(svg).toContain("data-evolves-from");
-    expect(svg).toContain("data-plot-area");
-    expect(svg).toContain("data-handle");
+    for (const kind of ["component", "relation", "pipeline", "evolve", "label"]) {
+      expect(svg).toContain(`data-kind="${kind}"`);
+    }
+    for (const marker of LEGACY_MARKERS) {
+      if (marker !== "data-step-number") expect(svg).not.toContain(marker);
+    }
+    expect(svg).not.toContain("ew-resize"); // no server-drawn pipeline handles
   });
 
   it("clean SVG still contains actual visual elements (not stripped)", () => {
