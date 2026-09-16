@@ -343,6 +343,58 @@ const RELATION_TYPE_STYLES: Record<RelationType, RelationVisualStyle> = {
 /** Width of the invisible hit area for edge click detection in interactive mode */
 const EDGE_HIT_AREA_WIDTH = 16;
 
+/** Flow label base font size (smaller than component labels: 12). */
+const FLOW_LABEL_BASE_FONT_SIZE = 10;
+/** Flow label text colour per relation type — a darker shade of the stroke family. */
+const FLOW_LABEL_COLORS: Record<RelationType, string> = {
+  DependsOn: "#555555",
+  Flow: "#1d4ed8",
+  Constraint: "#b91c1c",
+};
+/** Gap (px) between the edge line and the flow label baseline. */
+const FLOW_LABEL_GAP = 3;
+
+const r2 = (n: number): number => Math.round(n * 100) / 100;
+
+/** Flow label input (optional part of an edge). */
+export interface FlowLabelInput {
+  readonly text: string;
+  readonly fontSize: number;
+  readonly fontFamily: string;
+  /** Halo colour — the map background, so the label stays legible over lines. */
+  readonly haloColor: string;
+}
+
+/**
+ * Render a flow label at the edge midpoint, offset perpendicular to the line
+ * and rotated to follow it; the direction is flipped so text is never upside down.
+ */
+export function renderFlowLabel(
+  x1: number, y1: number, x2: number, y2: number,
+  relationType: string,
+  label: FlowLabelInput,
+): string {
+  let dx = x2 - x1;
+  let dy = y2 - y1;
+  // Readable direction: always left-to-right (vertical edges read bottom-to-top)
+  if (dx < 0 || (dx === 0 && dy > 0)) { dx = -dx; dy = -dy; }
+  const len = Math.hypot(dx, dy) || 1;
+  const ux = dx / len;
+  const uy = dy / len;
+  // Shift along the normal pointing "above" the text direction
+  const x = r2((x1 + x2) / 2 + uy * FLOW_LABEL_GAP);
+  const y = r2((y1 + y2) / 2 - ux * FLOW_LABEL_GAP);
+  const angle = r2((Math.atan2(uy, ux) * 180) / Math.PI);
+  const color = FLOW_LABEL_COLORS[relationType as RelationType] ?? FLOW_LABEL_COLORS.DependsOn;
+  const transform = angle !== 0 ? ` transform="rotate(${angle} ${x} ${y})"` : "";
+  return (
+    `<text class="flow-label" x="${x}" y="${y}"${transform} text-anchor="middle" ` +
+    `font-family="${esc(label.fontFamily)}" font-size="${label.fontSize}" fill="${color}" ` +
+    `stroke="${esc(label.haloColor)}" stroke-width="3" stroke-linejoin="round" paint-order="stroke">` +
+    `${esc(label.text)}</text>`
+  );
+}
+
 /** Edge rendering input */
 export interface EdgeRenderInput {
   readonly x1: number;
@@ -354,6 +406,8 @@ export interface EdgeRenderInput {
   readonly baseStrokeWidth: number;
   readonly relationId?: string;
   readonly interactive?: boolean;
+  /** Optional flow label drawn along the edge (relation.flow.label). */
+  readonly flowLabel?: FlowLabelInput;
 }
 
 /**
@@ -368,6 +422,7 @@ export function renderEdge(input: EdgeRenderInput): string {
     baseStrokeWidth,
     relationId,
     interactive,
+    flowLabel,
   } = input;
 
   const typeStyle = RELATION_TYPE_STYLES[relationType as RelationType] ?? RELATION_TYPE_STYLES.DependsOn;
@@ -391,18 +446,22 @@ export function renderEdge(input: EdgeRenderInput): string {
     `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" ` +
     `stroke="${typeStyle.color}" stroke-width="${strokeWidth}"${dashAttr} />`;
 
+  const labelEl = flowLabel && flowLabel.text.trim() !== ""
+    ? renderFlowLabel(x1, y1, x2, y2, relationType, flowLabel)
+    : "";
+
   if (interactive && relationId) {
     const hitArea =
       `<line class="hit-area" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" ` +
       `stroke="transparent" stroke-width="${EDGE_HIT_AREA_WIDTH}" />`;
-    return `<g${hitAttrs(relationId, "relation")}>${hitArea}${lineEl}</g>`;
+    return `<g${hitAttrs(relationId, "relation")}>${hitArea}${lineEl}${labelEl}</g>`;
   }
 
-  return lineEl;
+  return lineEl + labelEl;
 }
 
 // Re-export edge style constants for external use
-export { RELATION_TYPE_STYLES };
+export { RELATION_TYPE_STYLES, FLOW_LABEL_BASE_FONT_SIZE, FLOW_LABEL_COLORS };
 
 // ══════════════════════════════════════════════════════════════════════
 //  EVOLVES-TO ARROWS

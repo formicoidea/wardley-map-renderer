@@ -21,9 +21,9 @@ body{font:14px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;backgrou
 #overlay{position:absolute;inset:0;overflow:visible;pointer-events:none}
 #overlay [data-handle]{pointer-events:all}
 .bar{position:fixed;z-index:10;display:flex;align-items:center;gap:2px;padding:4px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);box-shadow:var(--shadow)}
-#bar{top:12px;left:0;right:0;margin:auto;width:max-content;max-width:calc(100% - 24px);overflow-x:auto;scrollbar-width:none}
+#bar{bottom:calc(12px + env(safe-area-inset-bottom));left:0;right:0;margin:auto;width:max-content;max-width:calc(100% - 24px);overflow-x:auto;scrollbar-width:none}
 #bar::-webkit-scrollbar{display:none}
-#zoom{left:12px;bottom:12px}
+#zoom{left:12px;top:12px}
 .sep{flex:none;width:1px;height:24px;margin:0 4px;background:var(--border)}
 button{font:inherit;color:inherit}
 .bar button,#props header button{position:relative;flex:none;display:inline-flex;align-items:center;justify-content:center;gap:6px;min-width:var(--t);height:var(--t);padding:0 8px;border:0;border-radius:6px;background:none;cursor:pointer;transition:background .12s,color .12s}
@@ -39,26 +39,24 @@ svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stro
 .primary .badge{position:static;background:var(--on-accent);color:var(--accent)}
 #zoom-level{min-width:48px;text-align:center;font-variant-numeric:tabular-nums;font-size:12px;color:var(--muted)}
 #bar .ex{display:none}
-#bar.collapsed{padding:4px;border-radius:24px}
+#bar.collapsed{padding:0}
 #bar.collapsed>:not([data-action=collapse]){display:none}
-#bar.collapsed [data-action=collapse]{border-radius:50%}
+#bar.collapsed [data-action=collapse]{border-radius:7px}
 #bar.collapsed .co{display:none}
 #bar.collapsed .ex{display:block}
-#props{position:fixed;z-index:20;top:68px;right:12px;width:300px;max-height:calc(100% - 80px);display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);box-shadow:var(--shadow)}
+#props{position:fixed;z-index:20;top:12px;right:12px;width:300px;max-height:calc(100% - var(--bar-h,50px) - 48px);display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);box-shadow:var(--shadow)}
 #props header{display:flex;align-items:center;gap:8px;padding:4px 4px 4px 16px;border-bottom:1px solid var(--border)}
 #props h2{flex:1;margin:0;font-size:14px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #props header button:hover{background:var(--hover)}
 #props-body{padding:12px 16px 16px;overflow:auto;overscroll-behavior:contain}
-#toast{position:fixed;z-index:30;left:50%;bottom:24px;transform:translate(-50%,8px);max-width:calc(100% - 32px);padding:8px 14px;border-radius:var(--r);background:var(--fg);color:var(--surface);box-shadow:var(--shadow);opacity:0;pointer-events:none;transition:opacity .2s,transform .2s}
+#toast{position:fixed;z-index:30;left:50%;bottom:calc(var(--bar-h,50px) + 24px + env(safe-area-inset-bottom));transform:translate(-50%,8px);max-width:calc(100% - 32px);padding:8px 14px;border-radius:var(--r);background:var(--fg);color:var(--surface);box-shadow:var(--shadow);opacity:0;pointer-events:none;transition:opacity .2s,transform .2s}
 #toast.show{opacity:1;transform:translate(-50%,0)}
 #tip{position:fixed;z-index:40;padding:3px 8px;border-radius:4px;background:var(--fg);color:var(--surface);font-size:12px;white-space:nowrap;pointer-events:none}
 #toast[data-kind=error]{background:var(--danger);color:var(--on-danger)}
-@media(max-width:639px){
-#bar{top:auto;bottom:calc(8px + env(safe-area-inset-bottom));max-width:min(calc(100% - 16px),290px);flex-wrap:wrap;justify-content:center;gap:0;overflow:visible}
+@media(max-width:699px){
+#bar{bottom:calc(8px + env(safe-area-inset-bottom));max-width:min(calc(100% - 16px),290px);flex-wrap:wrap;justify-content:center;gap:0;overflow:visible}
 #bar>[data-action]:not([data-action=delete]){order:1}
 .sep,.lbl,#zoom [data-action^=zoom-]{display:none}
-.co{rotate:180deg}
-#zoom{top:12px;bottom:auto}
 .bar .primary{padding:0}
 .primary .badge{position:absolute;background:var(--danger);color:var(--on-danger)}
 #props{top:auto;left:8px;right:8px;bottom:calc(var(--bar-h,90px) + 16px + env(safe-area-inset-bottom));width:auto;max-height:45vh;border-radius:14px}
@@ -89,7 +87,7 @@ svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stro
 <button data-action="copy-diff" aria-label="Copy diff JSON"><svg class="i" viewBox="0 0 24 24"><path d="M9 9h11v11H9zM5 15H4V4h11v1"/></svg></button>
 <button data-action="send" class="primary" aria-label="Send edits to Claude"><svg class="i" viewBox="0 0 24 24"><path d="M21 3L10 14M21 3l-6.5 18-4.5-7-7-4.5z"/></svg><span class="lbl">Send</span><span class="badge" data-diff-count hidden>0</span></button>
 <span class="sep"></span>
-<button data-action="collapse" aria-label="Hide toolbar" aria-expanded="true"><svg class="i co" viewBox="0 0 24 24"><path d="M18 14l-6-6-6 6"/></svg><svg class="i ex" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+<button data-action="collapse" aria-label="Hide toolbar" aria-expanded="true"><svg class="i co" viewBox="0 0 24 24"><path d="M6 10l6 6 6-6"/></svg><svg class="i ex" viewBox="0 0 24 24"><path d="M18 14l-6-6-6 6"/></svg></button>
 </nav>
 
 <div id="zoom" class="bar" role="group" aria-label="Zoom">

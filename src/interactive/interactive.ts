@@ -233,7 +233,7 @@ export function initEditor(doc: Document): void {
     shell.openPanel(p.title, p.body);
     // Narrow screens: the sheet covers the lower map; pan the target into the space above it.
     const el = byId(id, "component,pipeline,relation");
-    if (!opening || !el || !matchMedia("(max-width:639px)").matches) return;
+    if (!opening || !el || !matchMedia("(max-width:699px)").matches) return;
     const r = el.getBoundingClientRect(), top = 64, bottom = doc.getElementById("props")!.getBoundingClientRect().top - 8;
     if (r.top < top || r.bottom > bottom) view.panBy(0, (top + bottom - r.top - r.bottom) / 2);
   };

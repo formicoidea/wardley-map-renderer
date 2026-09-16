@@ -193,7 +193,8 @@ export function initShell(doc: Document): Shell {
     if (!b) return;
     const r = b.getBoundingClientRect(), up = r.top > innerHeight / 2;
     tip.textContent = b.getAttribute("aria-label");
-    tip.style.cssText = `left:${r.left + r.width / 2}px;top:${up ? r.top - 6 : r.bottom + 6}px;translate:-50% ${up ? -100 : 0}%`;
+    const w = tip.offsetWidth / 2 + 4; // keep it on screen (zoom cluster hugs the left edge)
+    tip.style.cssText = `left:${Math.min(Math.max(r.left + r.width / 2, w), innerWidth - w)}px;top:${up ? r.top - 6 : r.bottom + 6}px;translate:-50% ${up ? -100 : 0}%`;
   });
   doc.addEventListener("pointerdown", () => (tip.hidden = true), true);
   doc.addEventListener("keyup", (ev) => ev.key === " " && spaceUp());
@@ -301,7 +302,7 @@ export function initShell(doc: Document): Shell {
   sync();
   new MutationObserver(sync).observe(map, { childList: true });
   const ro = new ResizeObserver(() => {
-    // Mobile: the properties sheet docks above the (bottom) toolbar.
+    // Properties panel/sheet and toast stay clear of the bottom toolbar.
     doc.body.style.setProperty("--bar-h", bar.offsetHeight + "px");
     if (fitted) view.fit();
   });
