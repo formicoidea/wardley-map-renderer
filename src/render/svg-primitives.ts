@@ -605,8 +605,6 @@ export const COMPONENT_INERTIA_GAP = 6;
 const EVO_RANGE_STROKE = "#000000";
 const EVO_RANGE_OPACITY = 0.3;
 const EVO_RANGE_TICK = 4;
-/** Drawn below the node so the line never strikes through a side label. */
-export const EVO_RANGE_OFFSET_Y = 12;
 
 /**
  * Render an evolution range (`position.evolution.range`): a thin, low-opacity

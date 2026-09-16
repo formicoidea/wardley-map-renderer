@@ -10,7 +10,6 @@
 import { describe, it, expect } from "vitest";
 import { buildRenderContext } from "./build-context.js";
 import { renderEvolvesToLayer } from "./evolvesto-layer.js";
-import { EVO_RANGE_OFFSET_Y } from "./svg-primitives.js";
 import { sanitizeMap, WardleyMapSchema } from "../schema.js";
 import type { WardleyMap } from "../schema.js";
 
@@ -316,7 +315,7 @@ describe("Component-level inertia bar", () => {
 });
 
 describe("Evolution range line", () => {
-  it("spans evoToX(min)→evoToX(max) just below the node's y, before arrows", () => {
+  it("spans evoToX(min)→evoToX(max) through the node centre, before arrows", () => {
     const ctx = buildRenderContext(mapWith({
       position: { evolution: { scalar: 0.5, range: [0.3, 0.65] }, visibility: { scalar: 0.4 } },
       evolvesTo: [{ position: { evolution: { scalar: 0.8 }, visibility: { scalar: 0.4 } } }],
@@ -327,8 +326,8 @@ describe("Evolution range line", () => {
     const main = parts[idx].match(/<line [^>]*\/>/)![0];
     expect(num(main, "x1")).toBeCloseTo(ctx.evoToX(0.3), 5);
     expect(num(main, "x2")).toBeCloseTo(ctx.evoToX(0.65), 5);
-    expect(num(main, "y1")).toBeCloseTo(ctx.visToY(0.4) + EVO_RANGE_OFFSET_Y, 5);
-    expect(num(main, "y2")).toBeCloseTo(ctx.visToY(0.4) + EVO_RANGE_OFFSET_Y, 5);
+    expect(num(main, "y1")).toBeCloseTo(ctx.visToY(0.4), 5);
+    expect(num(main, "y2")).toBeCloseTo(ctx.visToY(0.4), 5);
     expect(parts[idx]).toContain('stroke-opacity="0.3"');
   });
 

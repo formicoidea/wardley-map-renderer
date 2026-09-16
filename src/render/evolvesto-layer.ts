@@ -27,7 +27,6 @@ import {
   renderEvolveArrow,
   renderInertiaBarrier,
   renderEvolutionRange,
-  EVO_RANGE_OFFSET_Y,
   COMPONENT_INERTIA_GAP,
   COMPONENT_INERTIA_HALF_HEIGHT,
 } from "./svg-primitives.js";
@@ -59,7 +58,7 @@ export const renderEvolvesToLayer: LayerRenderer = (
   for (const node of nodes) {
     const range = node.component.position.evolution.range;
     if (!range) continue;
-    parts.push(renderEvolutionRange(ctx.evoToX(range[0]), ctx.evoToX(range[1]), node.cy + EVO_RANGE_OFFSET_Y));
+    parts.push(renderEvolutionRange(ctx.evoToX(range[0]), ctx.evoToX(range[1]), node.cy));
   }
 
   const configEvolveStyles = ctx.resolvedConfig.evolveStyles;
