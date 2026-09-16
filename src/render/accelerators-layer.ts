@@ -16,7 +16,7 @@
 
 import type { RenderContext, LayerRenderer } from "./types.js";
 import type { Component } from "../schema.js";
-import { resolveTypeStyle } from "../schema.js";
+import { resolveTypeStyle } from "../schema-helpers.js";
 import { componentRenderableType } from "../renderable-type.js";
 import {
   renderAccelerator,

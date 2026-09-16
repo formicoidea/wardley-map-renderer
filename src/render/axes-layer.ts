@@ -20,7 +20,7 @@ import {
   PHASE_LABEL_FONT_SIZE,
   DIRECTION_LABEL_FONT_SIZE,
 } from "../blocks/wardley-map/wardley-map-consts.js";
-import { esc, scaledFontSize } from "./svg-composer.js";
+import { esc, scaledFontSize } from "./compose-core.js";
 
 // ── Layer renderer ──────────────────────────────────────────────────
 

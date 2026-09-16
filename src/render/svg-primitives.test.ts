@@ -217,7 +217,7 @@ describe("renderComponentNode", () => {
       radius: 5, stroke: "#000", strokeWidth: 1,
       interactive: true,
     });
-    expect(svg).toContain('<g data-component-id="c1">');
+    expect(svg).toContain('<g data-component-id="c1" data-id="c1" data-kind="component">');
     expect(svg).toContain("</g>");
   });
 
@@ -297,7 +297,7 @@ describe("renderEdge", () => {
       relationId: "edge-1",
       interactive: true,
     });
-    expect(svg).toContain('<g data-edge-id="edge-1">');
+    expect(svg).toContain('<g data-edge-id="edge-1" data-id="edge-1" data-kind="relation">');
     expect(svg).toContain('class="hit-area"');
     expect(svg).toContain("</g>");
   });
@@ -351,7 +351,7 @@ describe("renderEvolveArrow", () => {
       arrowStrokeWidth: 1,
       interactive: true,
     });
-    expect(svg).toContain('<g data-evolves-from="c1">');
+    expect(svg).toContain('<g data-evolves-from="c1" data-id="c1" data-kind="evolve">');
     expect(svg).toContain('class="hit-area"');
   });
 });
@@ -390,7 +390,7 @@ describe("renderPipeline", () => {
       x: 10, y: 20, width: 100, height: 50, componentId: "p1",
       interactive: true,
     });
-    expect(svg).toContain('<g data-pipeline-id="p1">');
+    expect(svg).toContain('<g data-pipeline-id="p1" data-id="p1" data-kind="pipeline">');
     expect(svg).toContain('data-handle="left"');
     expect(svg).toContain('data-handle="right"');
     expect(svg).toContain('data-handle="top"');

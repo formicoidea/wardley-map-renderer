@@ -14,8 +14,8 @@
  */
 
 import type { RenderContext, LayerRenderer } from "./types.js";
-import { esc, scaledFontSize } from "./svg-composer.js";
-import { resolveTypeStyle } from "../schema.js";
+import { esc, scaledFontSize } from "./compose-core.js";
+import { resolveTypeStyle } from "../schema-helpers.js";
 import { componentRenderableType } from "../renderable-type.js";
 import { SIN60, COS60 } from "./nodes-layer.js";
 

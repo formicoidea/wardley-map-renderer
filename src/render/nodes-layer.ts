@@ -17,7 +17,7 @@
  */
 
 import type { RenderContext, LayerRenderer } from "./types.js";
-import { resolveColor, resolveTypeStyle } from "../schema.js";
+import { resolveColor, resolveTypeStyle } from "../schema-helpers.js";
 import type { NodeRadii } from "../schema.js";
 import { componentRenderableType } from "../renderable-type.js";
 import {

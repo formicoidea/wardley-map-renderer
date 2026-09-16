@@ -21,6 +21,10 @@ import {
   type RenderConfigV3Input,
 } from "./render-config-v3.js";
 
+// Zod-free render helpers (browser-safe). Imported for internal use and re-exported.
+import { evo, vis, evoTarget, visTarget, resolveColor, resolveTypeStyle } from "./schema-helpers.js";
+export { evo, vis, evoTarget, visTarget, resolveColor, resolveTypeStyle };
+
 // Re-export coordinate space types and defaults for convenience
 export { DEFAULT_COORDINATE_SPACE } from "./coordinate-space.js";
 export type { CoordinateSpace } from "./coordinate-space.js";
@@ -568,30 +572,6 @@ export function typeStyleMapSchema<TValue extends z.ZodTypeAny>(
  * Use `Partial<TypeStyleMap<T>>` where `_default` must not be required.
  */
 export type TypeStyleMap<T> = { _default: T } & { [K in KnownRenderableType]?: T } & { [key: string]: T | undefined };
-
-/**
- * Resolve a value from a TypeStyleMap by component type, falling back to `_default`.
- *
- * This is the canonical per-type-with-fallback lookup used across all TypeStyleMap
- * consumers (nodeRadii, typeColors, evolveStyles).  Centralising the logic here
- * ensures every consumer behaves identically and avoids duplicated cast patterns.
- *
- * Lookup precedence: `map[type]` → `map._default`
- *
- * @param map  - A TypeStyleMap<T> (required _default) or Partial<TypeStyleMap<T>> (optional _default)
- * @param type - The component / evolve type string to look up
- * @returns The per-type value if present, otherwise the `_default`, otherwise `undefined`
- *
- * @example
- *   const r = resolveTypeStyle(nodeRadii, comp.type); // number
- *   const c = resolveTypeStyle(typeColors, "anchor");  // string | undefined
- */
-export function resolveTypeStyle<T>(
-  map: Partial<TypeStyleMap<T>>,
-  type: string
-): T | undefined {
-  return (map as Record<string, T | undefined>)[type] ?? map._default;
-}
 
 // ── TypeColors (per-component-type color overrides) ──────────────────────
 // TypeColors uses makeTypeStyleMapSchema which enforces _default as a REQUIRED
@@ -1462,43 +1442,14 @@ export type WardleyMap = z.infer<typeof WardleyMapSchema>;
 // TypeStyleMap<V> is defined earlier alongside makeTypeStyleMapSchema and TypeColorsSchema.
 // See the "TypeStyleMap — generic per-type styling abstraction" section above.
 
-// ── Accessor shortcuts ──────────────────────────────────────
-// Reduce verbosity of .position.evolution.scalar everywhere
-
-/** Get evolution scalar from a component */
-export function evo(c: Component): number { return c.position.evolution.scalar; }
-
-/** Get visibility scalar from a component */
-export function vis(c: Component): number { return c.position.visibility.scalar; }
-
-/** Get evolution scalar from an evolvesTo target */
-export function evoTarget(e: EvolvesTo): number { return e.position.evolution.scalar; }
-
-/** Get visibility scalar from an evolvesTo target */
-export function visTarget(e: EvolvesTo): number { return e.position.visibility.scalar; }
+// ── Accessor shortcuts ── evo/vis/evoTarget/visTarget live in schema-helpers.ts
 
 // The legacy `rc*` accessors (rcWidth/rcHeight/rcStrokeWidth/rcFontFamily/
 // rcLabelScale/rcTheme/rcLocale) and `resolveRenderConfigDefaults` have been
 // removed in the v3-only cutover. Consumers read fully-resolved values from
 // `resolveTheme(...)` (ResolvedRenderConfig) instead of the raw input config.
 
-// ── Color mapping ──────────────────────────────────────────
-// Minimal Tailwind-to-hex mapping with black fallback
-const COLOR_MAP: Record<string, string> = {
-  "red-600": "#dc2626",
-  "blue-600": "#2563eb",
-  "green-600": "#16a34a",
-  "yellow-600": "#ca8a04",
-  "orange-600": "#ea580c",
-  "purple-600": "#9333ea",
-};
-
-/** Resolve a Tailwind-style color name to hex, with black fallback */
-export function resolveColor(color: string | undefined): string {
-  if (!color) return "#000000";
-  if (color.startsWith("#")) return color;
-  return COLOR_MAP[color] ?? "#000000";
-}
+// ── Color mapping ── resolveColor lives in schema-helpers.ts
 
 // ── Engine 3: Hardcoded validation ─────────────────────────
 

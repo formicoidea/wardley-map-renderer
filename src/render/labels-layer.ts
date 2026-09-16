@@ -18,8 +18,8 @@
 import type { RenderContext, LayerRenderer } from "./types.js";
 import type { LabelPlacement, EdgeSegment } from "./label-placement.js";
 import { avoidLabelCollisions } from "./label-placement.js";
-import { scaledFontSize } from "./svg-composer.js";
-import { resolveTypeStyle } from "../schema.js";
+import { scaledFontSize } from "./compose-core.js";
+import { resolveTypeStyle } from "../schema-helpers.js";
 import { componentRenderableType } from "../renderable-type.js";
 
 // ── Visual constants ─────────────────────────────────────────────────

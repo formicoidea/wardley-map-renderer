@@ -14,7 +14,8 @@
 
 import type { RenderContext, LayerRenderer } from "./types.js";
 import { TITLE_FONT_SIZE } from "../blocks/wardley-map/wardley-map-consts.js";
-import { esc, scaledFontSize } from "./svg-composer.js";
+import { esc, scaledFontSize } from "./compose-core.js";
+import { hitAttrs } from "./svg-primitives.js";
 
 // ── Layer renderer ──────────────────────────────────────────────────
 
@@ -38,9 +39,10 @@ export const renderTitleLayer: LayerRenderer = (
 
   const { fontFamily, elementScales } = ctx.resolvedConfig.typography;
   const fontSize = scaledFontSize(ctx, TITLE_FONT_SIZE, elementScales?.title);
+  const hit = ctx.options?.interactive === true ? hitAttrs("title", "title") : "";
 
   return [
-    `<text x="${textX}" y="${textY}" text-anchor="middle" ` +
+    `<text x="${textX}" y="${textY}"${hit} text-anchor="middle" ` +
       `font-family="${fontFamily}" font-size="${fontSize}" ` +
       `font-weight="600" fill="#333333">${esc(trimmed)}</text>`,
   ];

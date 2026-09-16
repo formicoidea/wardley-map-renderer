@@ -17,74 +17,15 @@
  * @module render-orchestrator
  */
 
-import {
-  sanitizeMap,
-  type WardleyMap,
-  type LayerToggles,
-} from "./schema.js";
+import { sanitizeMap, type WardleyMap } from "./schema.js";
 import {
   buildRenderContext,
   composeSVG,
   type RenderContext,
-  type RenderGeometry,
   type RenderOptions,
-  type LayerRegistration,
-  LAYER_ORDER,
 } from "./render/index.js";
-
-// ── Import all 9 layer renderers ─────────────────────────────────────
-import { renderTitleLayer } from "./render/title-layer.js";
-import { renderAxesLayer } from "./render/axes-layer.js";
-import { renderPipelinesLayer } from "./render/pipelines-layer.js";
-import { renderEdgesLayer } from "./render/edges-layer.js";
-import { renderEvolvesToLayer } from "./render/evolvesto-layer.js";
-import { renderNodesLayer } from "./render/nodes-layer.js";
-import { renderStepsLayer } from "./render/steps-layer.js";
-import { renderAcceleratorsLayer } from "./render/accelerators-layer.js";
-import { renderLabelsLayer } from "./render/labels-layer.js";
-import { renderNotesLayer } from "./render/notes-layer.js";
-import { renderLegendLayer } from "./render/legend-layer.js";
-
-// ── Build explicit layer list (no global registry mutation) ──────────
-
-const LAYERS: readonly LayerRegistration[] = [
-  { name: "title", order: LAYER_ORDER.title, render: renderTitleLayer },
-  { name: "axes", order: LAYER_ORDER.axes, render: renderAxesLayer },
-  { name: "pipelines", order: LAYER_ORDER.pipelines, render: renderPipelinesLayer },
-  { name: "edges", order: LAYER_ORDER.edges, render: renderEdgesLayer },
-  { name: "evolvesTo", order: LAYER_ORDER.evolvesTo, render: renderEvolvesToLayer },
-  { name: "nodes", order: LAYER_ORDER.nodes, render: renderNodesLayer },
-  { name: "steps", order: LAYER_ORDER.steps, render: renderStepsLayer },
-  { name: "accelerators", order: LAYER_ORDER.accelerators, render: renderAcceleratorsLayer },
-  { name: "labels", order: LAYER_ORDER.labels, render: renderLabelsLayer },
-  { name: "notes", order: LAYER_ORDER.notes, render: renderNotesLayer },
-  { name: "legend", order: LAYER_ORDER.legend, render: renderLegendLayer },
-];
-
-/**
- * Apply renderConfig.filters.layers to filter the layer list.
- *
- * Rules:
- *  - 'axes' and 'legend' layers are NOT in layerToggles — always included.
- *    Their own dedicated controls (background.* and legend.show) govern visibility.
- *  - The 7 content layers (title, pipelines, edges, evolvesTo, nodes, labels, notes)
- *    are included unless their toggle is explicitly set to false.
- *  - undefined toggle → defaults to visible (true).
- */
-function applyLayerToggles(
-  layers: readonly LayerRegistration[],
-  toggles: LayerToggles | undefined
-): readonly LayerRegistration[] {
-  if (!toggles) return layers;
-  return layers.filter((layer) => {
-    // axes and legend have separate controls — always pass through
-    if (layer.name === "axes" || layer.name === "legend") return true;
-    const key = layer.name as keyof LayerToggles;
-    const toggle = toggles[key];
-    // Default to visible (true) when toggle is undefined
-    return toggle !== false;
-  });
-}
+// Layer list + filters.layers toggle filter (shared with the browser renderer)
+import { LAYERS, applyLayerToggles } from "./render/layer-list.js";
 
 // ── Public types ────────────────────────────────────────────────────
 

@@ -1357,14 +1357,14 @@ describe("resize_pipeline apply", () => {
     expect(ok).toBe(false);
   });
 
-  it("does not modify other components", () => {
+  it("clamps former members into the new bounds (membership preserved)", () => {
     const map = makePipelineMap();
-    const origPos = map.components.find((c) => c.id === "inside-1")!.position.evolution.scalar;
     applyDiffOp(map, {
       op: "resize_pipeline",
       payload: { id: "pipe-1", evoStart: 0.6, evoEnd: 0.9 },
     });
-    expect(map.components.find((c) => c.id === "inside-1")!.position.evolution.scalar).toBe(origPos);
+    expect(map.components.find((c) => c.id === "inside-1")!.position.evolution.scalar).toBe(0.6);
+    expect(map.components.find((c) => c.id === "inside-2")!.position.evolution.scalar).toBe(0.6);
   });
 
   it("preserves visStart and visEnd", () => {
@@ -1490,8 +1490,8 @@ describe("integration: full workflow with all op types", () => {
     expect(map.components.find((c) => c.id === "comp-new")!.position.visibility.scalar).toBe(0.5);
 
     // 5. change_component_type
-    expect(applyDiffOp(map, { op: "change_component_type", payload: { id: "comp-new", type: "market" } })).toBe(true);
-    expect(map.components.find((c) => c.id === "comp-new")!.type).toBe("market");
+    expect(applyDiffOp(map, { op: "change_component_type", payload: { id: "comp-new", type: "component", subtype: "market" } })).toBe(true);
+    expect(map.components.find((c) => c.id === "comp-new")!.subtype).toBe("market");
 
     // 6. add_edge
     expect(applyDiffOp(map, {
@@ -1657,17 +1657,15 @@ describe("cascade integrity", () => {
     expect(map.relations[0].id).toBe("r-direct");
   });
 
-  it("set_evolves_to then delete target: evolvesTo array remains (position-based)", () => {
+  it("set_evolves_to then delete target: evolvesTo entry targeting its position is removed", () => {
     const map = makeMap();
     applyDiffOp(map, { op: "set_evolves_to", payload: { id: "comp-1", evolvesTo: "comp-2" } });
     const evolvesBefore = map.components.find((c) => c.id === "comp-1")!.evolvesTo;
     expect(evolvesBefore).toHaveLength(1);
 
-    // Delete comp-2 — evolvesTo is position-based, so it stays
+    // Delete comp-2 — the evolvesTo entry matching its position is cascaded away
     applyDiffOp(map, { op: "delete_component", payload: { id: "comp-2" } });
-    const evolvesAfter = map.components.find((c) => c.id === "comp-1")!.evolvesTo;
-    // Position-based evolvesTo array persists (no component reference to cascade)
-    expect(evolvesAfter).toHaveLength(1);
+    expect(map.components.find((c) => c.id === "comp-1")!.evolvesTo).toBeUndefined();
   });
 
   it("set_flow then delete_edge: flow annotation is gone with the edge", () => {
