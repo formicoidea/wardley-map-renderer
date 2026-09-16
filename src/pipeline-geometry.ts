@@ -14,7 +14,7 @@
  */
 
 import type { Component, PipelineGeometry, WardleyMap } from "./schema.js";
-import { evo, vis } from "./schema.js";
+import { evo, vis } from "./schema-helpers.js";
 
 // ── Types ──────────────────────────────────────────────────────────
 

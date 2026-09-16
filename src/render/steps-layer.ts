@@ -14,7 +14,7 @@
  */
 
 import type { RenderContext, LayerRenderer } from "./types.js";
-import { resolveColor } from "../schema.js";
+import { resolveColor } from "../schema-helpers.js";
 import { renderStep, STEP_DEFAULT_FILL } from "./svg-primitives.js";
 
 // ── Layer renderer ───────────────────────────────────────────────────

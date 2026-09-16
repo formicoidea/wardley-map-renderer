@@ -1,63 +1,46 @@
 /**
- * Diff operations module for interactive Wardley Map editing.
+ * Zod schemas for the interactive editor's diff ops (server side): payload
+ * schemas + the `DiffOp` discriminated union, e.g. for an MCP server to
+ * validate ops before calling `applyDiffOp` — the pure, zod-free engine in
+ * `./diff-ops-apply.ts` (which is what browser bundles import).
  *
- * Defines Zod schemas for each diff operation type and an `applyDiffOp`
- * function that mutates a WardleyMap JSON object in place.
- *
- * Operations covered:
- *   Component CRUD:
- *   - move_component: reposition a component (evolution + visibility)
- *   - add_component: add a new component to the map
- *   - delete_component: remove a component and cascade-delete related edges/evolvesTo refs
- *   - rename_component: change a component's label.name
- *
- *   Component property mutations:
- *   - change_component_type: change a component's type (e.g. "component" → "anchor")
- *   - set_evolves_to: set or clear the evolvesTo target component id
- *   - set_flow: set or clear a flow annotation on a relation
- *
- *   Edge CRUD:
- *   - add_edge: add a new relation (edge) between two existing components
- *   - delete_edge: remove a relation by id
- *   - change_edge_type: change a relation's type (e.g. "DependsOn" → "Flow")
- *
- *   Label positioning:
- *   - move_label: reposition a component's label offset (dx, dy relative to node)
- *
- *   Step positioning:
- *   - move_step: reposition a numbered step sticker on the map
- *
- *   Container-level:
- *   - resize_pipeline: change a pipeline's evolution bounds (evoStart, evoEnd)
- *
- *   Map-level:
- *   - rename_map: change the map title
- *
- * The diff format is an implicit contract — no client-side Zod validation.
- * These schemas exist for server-side validation and documentation only.
+ * Coordinates are normalized [0, 1]; `move_label` / `label.position` dx,dy are
+ * SVG user units (px) relative to the node centre (see render/labels-layer.ts).
  *
  * @module diff-ops
  */
 
 import { z } from "zod";
-import type { WardleyMap } from "./schema.js";
+import {
+  ComponentTypeEnum,
+  EvolutionRangeSchema,
+  EvolvesToSchema,
+  LabelPositionSchema,
+  MethodSchema,
+  NatureEnum,
+  RelationTypeEnum,
+  StepDecoratorSchema,
+  SubtypeEnum,
+} from "./schema.js";
+import type { DiffOp as DiffOpType } from "./diff-ops-apply.js";
 
 // ── Shared field schemas ─────────────────────────────────────────────
 
 const EvolutionValue = z.number().min(0).max(1);
 const VisibilityValue = z.number().min(0).max(1);
-const ComponentId = z.string().min(1);
+const Id = z.string().min(1);
+const IdPayload = z.object({ id: Id });
+/** Same rule as the engine: hex (#rgb … #rrggbbaa) or a Tailwind-style name ("red-600"). */
+const Color = z.string().regex(/^(#[0-9a-f]{3,8}|[a-z]+-\d{2,3})$/i, "Must be a hex color or a Tailwind-style name");
 
-// ── Move Component ───────────────────────────────────────────────────
+// ── Payloads ─────────────────────────────────────────────────────────
 
 export const MoveComponentPayload = z.object({
-  id: ComponentId,
+  id: Id,
   evolution: EvolutionValue,
   visibility: VisibilityValue,
 });
 export type MoveComponentPayload = z.infer<typeof MoveComponentPayload>;
-
-// ── Add Component ────────────────────────────────────────────────────
 
 const PipelineGeometryPayload = z.object({
   evoStart: EvolutionValue,
@@ -66,216 +49,169 @@ const PipelineGeometryPayload = z.object({
   visEnd: VisibilityValue,
 });
 
-// Node taxonomy enums (mirror schema.ts: type → subtype → nature).
-const NodeType = z.enum(["anchor", "component", "pipeline"]);
-const NodeSubtype = z.enum(["userNeed", "market", "ecosystem", "solution", "functional", "supplier"]);
-const NodeNature = z.enum(["personae", "generic", "group", "natural", "anthropic", "practice", "data", "activity", "knowledge"]);
-
 export const AddComponentPayload = z.object({
-  id: ComponentId,
+  /** Optional: generated with `uniqueId(map, name)` when omitted. */
+  id: Id.optional(),
   name: z.string().min(1),
-  type: NodeType.default("component"),
-  subtype: NodeSubtype.optional(),
-  nature: NodeNature.optional(),
+  type: ComponentTypeEnum.default("component"),
+  subtype: SubtypeEnum.optional(),
+  nature: NatureEnum.optional(),
   evolution: EvolutionValue,
   visibility: VisibilityValue,
   pipelineGeometry: PipelineGeometryPayload.optional(),
 });
 export type AddComponentPayload = z.infer<typeof AddComponentPayload>;
 
-// ── Delete Component ─────────────────────────────────────────────────
-
-export const DeleteComponentPayload = z.object({
-  id: ComponentId,
-});
+export const DeleteComponentPayload = IdPayload;
 export type DeleteComponentPayload = z.infer<typeof DeleteComponentPayload>;
 
-// ── Rename Component ─────────────────────────────────────────────────
-
-export const RenameComponentPayload = z.object({
-  id: ComponentId,
-  name: z.string().min(1),
-});
+export const RenameComponentPayload = z.object({ id: Id, name: z.string().min(1) });
 export type RenameComponentPayload = z.infer<typeof RenameComponentPayload>;
 
-// ── Add Edge ─────────────────────────────────────────────────────────
-
-const EdgeId = z.string().min(1);
-const RelationType = z.enum(["DependsOn", "Flow", "Constraint"]).default("DependsOn");
-
 export const AddEdgePayload = z.object({
-  id: EdgeId,
-  consumer: ComponentId,
-  supplier: ComponentId,
-  type: RelationType,
+  /** Optional: when omitted the engine derives it deterministically (see diff-ops-apply `add_edge`). */
+  id: Id.optional(),
+  consumer: Id,
+  supplier: Id,
+  type: RelationTypeEnum.default("DependsOn"),
 });
 export type AddEdgePayload = z.infer<typeof AddEdgePayload>;
 
-// ── Delete Edge ──────────────────────────────────────────────────────
-
-export const DeleteEdgePayload = z.object({
-  id: EdgeId,
-});
+export const DeleteEdgePayload = IdPayload;
 export type DeleteEdgePayload = z.infer<typeof DeleteEdgePayload>;
 
-// ── Change Component Type ───────────────────────────────────────────
+export const ReverseEdgePayload = IdPayload;
+export type ReverseEdgePayload = z.infer<typeof ReverseEdgePayload>;
 
 export const ChangeComponentTypePayload = z.object({
-  id: ComponentId,
-  type: NodeType,
-  /** Optional component subtype (set/cleared together with the type). */
-  subtype: NodeSubtype.optional(),
+  id: Id,
+  type: ComponentTypeEnum,
+  /** Set/cleared together with the type. */
+  subtype: SubtypeEnum.optional(),
 });
 export type ChangeComponentTypePayload = z.infer<typeof ChangeComponentTypePayload>;
 
-// ── Set EvolvesTo ───────────────────────────────────────────────────
-
-export const SetEvolvesToPayload = z.object({
-  /** The source component id (the one that evolves) */
-  id: ComponentId,
-  /** The target component id to evolve towards, or null to clear */
-  evolvesTo: z.string().min(1).nullable(),
-});
+/** Replaces the first evolve arrow's target (evolveType/inertia and other arrows kept); null clears all. */
+export const SetEvolvesToPayload = z.union([
+  z.object({
+    /** The component that evolves */
+    id: Id,
+    /** Target component id (its current position is copied), or null to clear */
+    evolvesTo: Id.nullable(),
+  }),
+  z.object({
+    id: Id,
+    /** Explicit target point (the editor's evolve tool keeps the source visibility: horizontal arrow) */
+    position: z.object({ evolution: EvolutionValue, visibility: VisibilityValue }),
+  }),
+]);
 export type SetEvolvesToPayload = z.infer<typeof SetEvolvesToPayload>;
 
-// ── Set Flow ────────────────────────────────────────────────────────
-
-export const SetFlowPayload = z.object({
-  /** The relation (edge) id */
-  id: EdgeId,
-  /** Flow annotation to set, or null to clear */
-  flow: z
-    .object({
-      label: z.string().min(1),
-      style: z.enum(["solid", "dashed", "bold"]).default("solid"),
-    })
-    .nullable(),
+const FlowPayload = z.object({
+  label: z.string().min(1),
+  style: z.enum(["solid", "dashed", "bold"]).default("solid"),
 });
+
+export const SetFlowPayload = z.object({ id: Id, flow: FlowPayload.nullable() });
 export type SetFlowPayload = z.infer<typeof SetFlowPayload>;
 
-// ── Change Edge Type ────────────────────────────────────────────────
-
-export const ChangeEdgeTypePayload = z.object({
-  id: EdgeId,
-  type: z.enum(["DependsOn", "Flow", "Constraint"]),
-});
+export const ChangeEdgeTypePayload = z.object({ id: Id, type: RelationTypeEnum });
 export type ChangeEdgeTypePayload = z.infer<typeof ChangeEdgeTypePayload>;
 
-// ── Resize Pipeline ────────────────────────────────────────────────
-
-export const ResizePipelinePayload = z.object({
-  /** The pipeline component id */
-  id: ComponentId,
-  /** New evolution start (left edge) of the pipeline */
-  evoStart: EvolutionValue,
-  /** New evolution end (right edge) of the pipeline */
-  evoEnd: EvolutionValue,
-});
+export const ResizePipelinePayload = z
+  .object({
+    id: Id,
+    evoStart: EvolutionValue.optional(),
+    evoEnd: EvolutionValue.optional(),
+    visStart: VisibilityValue.optional(),
+    visEnd: VisibilityValue.optional(),
+    /** Handle (top-border square) evolution, clamped into [evoStart, evoEnd] */
+    handleEvolution: EvolutionValue.optional(),
+  })
+  .refine(
+    (p) => [p.evoStart, p.evoEnd, p.visStart, p.visEnd, p.handleEvolution].some((v) => v !== undefined),
+    { message: "resize_pipeline needs at least one of evoStart, evoEnd, visStart, visEnd, handleEvolution" },
+  );
 export type ResizePipelinePayload = z.infer<typeof ResizePipelinePayload>;
 
-// ── Move Label ──────────────────────────────────────────────────────
+export const MovePipelinePayload = z.object({
+  id: Id,
+  /** Evolution delta (clamped so the pipeline stays inside [0, 1]) */
+  dEvo: z.number().min(-1).max(1),
+  /** Visibility delta (clamped so the pipeline stays inside [0, 1]) */
+  dVis: z.number().min(-1).max(1),
+});
+export type MovePipelinePayload = z.infer<typeof MovePipelinePayload>;
+
+export const DeletePipelinePayload = IdPayload;
+export type DeletePipelinePayload = z.infer<typeof DeletePipelinePayload>;
 
 export const MoveLabelPayload = z.object({
-  /** The component id whose label is being repositioned */
-  id: ComponentId,
-  /** Horizontal offset relative to the node center (in normalized coordinates) */
+  id: Id,
+  /** Horizontal offset from the node centre, SVG user units (px) */
   dx: z.number(),
-  /** Vertical offset relative to the node center (in normalized coordinates) */
+  /** Vertical offset from the node centre, SVG user units (px) */
   dy: z.number(),
 });
 export type MoveLabelPayload = z.infer<typeof MoveLabelPayload>;
 
-// ── Move Step ───────────────────────────────────────────────────────
-
 export const MoveStepPayload = z.object({
-  /** Unique id identifying the step sticker to move */
+  /** Id of the component carrying the step decorator */
   id: z.string(),
-  /** New evolution position [0, 1] */
   evolution: EvolutionValue,
-  /** New visibility position [0, 1] */
   visibility: VisibilityValue,
 });
 export type MoveStepPayload = z.infer<typeof MoveStepPayload>;
 
-// ── Rename Map ─────────────────────────────────────────────────────
-
-export const RenameMapPayload = z.object({
-  /** New title for the map */
-  title: z.string().min(1),
-});
+export const RenameMapPayload = z.object({ title: z.string().min(1) });
 export type RenameMapPayload = z.infer<typeof RenameMapPayload>;
+
+// set_field: one object per allowed path so each value is validated exactly.
+const field = <P extends string, V extends z.ZodTypeAny>(path: P, value: V) =>
+  z.object({ target: Id, path: z.literal(path), value });
+
+export const SetFieldPayload = z.union([
+  field("label.name", z.string().min(1)),
+  field("label.position", LabelPositionSchema.nullable()),
+  field("description", z.string().nullable()),
+  field("color", Color.nullable()),
+  field("type", z.union([ComponentTypeEnum, RelationTypeEnum])),
+  field("subtype", SubtypeEnum.nullable()),
+  field("nature", NatureEnum.nullable()),
+  field("method", MethodSchema.nullable()),
+  field("inertia", z.boolean().nullable()),
+  field("accelerator", z.boolean().nullable()),
+  field("deaccelerator", z.boolean().nullable()),
+  field("step", StepDecoratorSchema.extend({ color: Color.optional() }).nullable()),
+  field("evolvesTo", z.array(EvolvesToSchema).nullable()),
+  field("position.evolution.range", EvolutionRangeSchema.nullable()),
+  field("flow", FlowPayload.nullable()),
+]);
+export type SetFieldPayload = z.infer<typeof SetFieldPayload>;
 
 // ── Discriminated union of all diff ops ──────────────────────────────
 
-export const MoveComponentOp = z.object({
-  op: z.literal("move_component"),
-  payload: MoveComponentPayload,
-});
+const op = <N extends string, P extends z.ZodTypeAny>(name: N, payload: P) =>
+  z.object({ op: z.literal(name), payload });
 
-export const AddComponentOp = z.object({
-  op: z.literal("add_component"),
-  payload: AddComponentPayload,
-});
-
-export const DeleteComponentOp = z.object({
-  op: z.literal("delete_component"),
-  payload: DeleteComponentPayload,
-});
-
-export const RenameComponentOp = z.object({
-  op: z.literal("rename_component"),
-  payload: RenameComponentPayload,
-});
-
-export const AddEdgeOp = z.object({
-  op: z.literal("add_edge"),
-  payload: AddEdgePayload,
-});
-
-export const DeleteEdgeOp = z.object({
-  op: z.literal("delete_edge"),
-  payload: DeleteEdgePayload,
-});
-
-export const ChangeComponentTypeOp = z.object({
-  op: z.literal("change_component_type"),
-  payload: ChangeComponentTypePayload,
-});
-
-export const SetEvolvesToOp = z.object({
-  op: z.literal("set_evolves_to"),
-  payload: SetEvolvesToPayload,
-});
-
-export const SetFlowOp = z.object({
-  op: z.literal("set_flow"),
-  payload: SetFlowPayload,
-});
-
-export const ChangeEdgeTypeOp = z.object({
-  op: z.literal("change_edge_type"),
-  payload: ChangeEdgeTypePayload,
-});
-
-export const ResizePipelineOp = z.object({
-  op: z.literal("resize_pipeline"),
-  payload: ResizePipelinePayload,
-});
-
-export const MoveLabelOp = z.object({
-  op: z.literal("move_label"),
-  payload: MoveLabelPayload,
-});
-
-export const MoveStepOp = z.object({
-  op: z.literal("move_step"),
-  payload: MoveStepPayload,
-});
-
-export const RenameMapOp = z.object({
-  op: z.literal("rename_map"),
-  payload: RenameMapPayload,
-});
+export const MoveComponentOp = op("move_component", MoveComponentPayload);
+export const AddComponentOp = op("add_component", AddComponentPayload);
+export const DeleteComponentOp = op("delete_component", DeleteComponentPayload);
+export const RenameComponentOp = op("rename_component", RenameComponentPayload);
+export const AddEdgeOp = op("add_edge", AddEdgePayload);
+export const DeleteEdgeOp = op("delete_edge", DeleteEdgePayload);
+export const ReverseEdgeOp = op("reverse_edge", ReverseEdgePayload);
+export const ChangeComponentTypeOp = op("change_component_type", ChangeComponentTypePayload);
+export const SetEvolvesToOp = op("set_evolves_to", SetEvolvesToPayload);
+export const SetFlowOp = op("set_flow", SetFlowPayload);
+export const ChangeEdgeTypeOp = op("change_edge_type", ChangeEdgeTypePayload);
+export const ResizePipelineOp = op("resize_pipeline", ResizePipelinePayload);
+export const MovePipelineOp = op("move_pipeline", MovePipelinePayload);
+export const DeletePipelineOp = op("delete_pipeline", DeletePipelinePayload);
+export const MoveLabelOp = op("move_label", MoveLabelPayload);
+export const MoveStepOp = op("move_step", MoveStepPayload);
+export const RenameMapOp = op("rename_map", RenameMapPayload);
+export const SetFieldOp = op("set_field", SetFieldPayload);
 
 export const DiffOp = z.discriminatedUnion("op", [
   MoveComponentOp,
@@ -284,551 +220,23 @@ export const DiffOp = z.discriminatedUnion("op", [
   RenameComponentOp,
   AddEdgeOp,
   DeleteEdgeOp,
+  ReverseEdgeOp,
   ChangeComponentTypeOp,
   SetEvolvesToOp,
   SetFlowOp,
   ChangeEdgeTypeOp,
   ResizePipelineOp,
+  MovePipelineOp,
+  DeletePipelineOp,
   MoveLabelOp,
   MoveStepOp,
   RenameMapOp,
+  SetFieldOp,
 ]);
 
-export type DiffOp = z.infer<typeof DiffOp>;
-
-/** @deprecated Use DiffOp instead */
-export const ComponentDiffOp = DiffOp;
-/** @deprecated Use DiffOp instead */
-export type ComponentDiffOp = DiffOp;
-
-// ── Apply functions ──────────────────────────────────────────────────
-
-/**
- * Move a component to a new position. Mutates the map in place.
- * @returns true if the component was found and moved, false otherwise.
- */
-function applyMoveComponent(map: WardleyMap, payload: MoveComponentPayload): boolean {
-  const comp = map.components.find((c) => c.id === payload.id);
-  if (!comp) return false;
-  comp.position.evolution.scalar = payload.evolution;
-  comp.position.visibility.scalar = payload.visibility;
-  return true;
-}
-
-/**
- * Add a new component to the map. Mutates the map in place.
- * @returns true if the component was added (no duplicate id), false otherwise.
- */
-function applyAddComponent(map: WardleyMap, payload: AddComponentPayload): boolean {
-  const exists = map.components.some((c) => c.id === payload.id);
-  if (exists) return false;
-  const comp: WardleyMap["components"][number] = {
-    id: payload.id,
-    label: { name: payload.name },
-    type: payload.type,
-    subtype: payload.subtype,
-    nature: payload.nature,
-    position: {
-      evolution: { scalar: payload.evolution },
-      visibility: { scalar: payload.visibility },
-    },
-  };
-  if (payload.pipelineGeometry) {
-    (comp as any).pipelineGeometry = {
-      evoStart: payload.pipelineGeometry.evoStart,
-      evoEnd: payload.pipelineGeometry.evoEnd,
-      visStart: payload.pipelineGeometry.visStart,
-      visEnd: payload.pipelineGeometry.visEnd,
-    };
-  }
-  map.components.push(comp);
-  return true;
-}
-
-/**
- * Delete a component and cascade-delete all related edges and evolvesTo references.
- * Mutates the map in place.
- * @returns true if the component was found and deleted, false otherwise.
- */
-function applyDeleteComponent(map: WardleyMap, payload: DeleteComponentPayload): boolean {
-  const idx = map.components.findIndex((c) => c.id === payload.id);
-  if (idx === -1) return false;
-
-  // Remove the component
-  map.components.splice(idx, 1);
-
-  // Cascade-delete relations referencing this component (consumer or supplier)
-  map.relations = map.relations.filter(
-    (r) => r.consumer !== payload.id && r.supplier !== payload.id,
-  );
-
-  // Cascade-delete evolvesTo references from other components that point to this id
-  // (evolvesTo targets don't reference by id, they're inline position objects,
-  //  but if any component had evolvesTo entries we clean up orphaned pipeline children)
-
-  return true;
-}
-
-/**
- * Rename a component (change label.name). Mutates the map in place.
- * @returns true if the component was found and renamed, false otherwise.
- */
-function applyRenameComponent(map: WardleyMap, payload: RenameComponentPayload): boolean {
-  const comp = map.components.find((c) => c.id === payload.id);
-  if (!comp) return false;
-  comp.label.name = payload.name;
-  return true;
-}
-
-// ── Edge apply functions ─────────────────────────────────────────────
-
-/**
- * Add a new edge (relation) to the map. Validates that:
- * - No duplicate edge id exists
- * - Consumer component exists
- * - Supplier component exists
- * - Consumer and supplier are different components
- * Mutates the map in place.
- * @returns true if the edge was added, false otherwise.
- */
-function applyAddEdge(map: WardleyMap, payload: AddEdgePayload): boolean {
-  // Reject duplicate edge id
-  const exists = map.relations.some((r) => r.id === payload.id);
-  if (exists) return false;
-
-  // Validate consumer component exists
-  const consumerExists = map.components.some((c) => c.id === payload.consumer);
-  if (!consumerExists) return false;
-
-  // Validate supplier component exists
-  const supplierExists = map.components.some((c) => c.id === payload.supplier);
-  if (!supplierExists) return false;
-
-  // Reject self-links
-  if (payload.consumer === payload.supplier) return false;
-
-  map.relations.push({
-    id: payload.id,
-    consumer: payload.consumer,
-    supplier: payload.supplier,
-    type: payload.type,
-  });
-  return true;
-}
-
-/**
- * Delete an edge (relation) by id. Mutates the map in place.
- * @returns true if the edge was found and deleted, false otherwise.
- */
-function applyDeleteEdge(map: WardleyMap, payload: DeleteEdgePayload): boolean {
-  const idx = map.relations.findIndex((r) => r.id === payload.id);
-  if (idx === -1) return false;
-  map.relations.splice(idx, 1);
-  return true;
-}
-
-// ── Component property mutation apply functions ──────────────────────
-
-/** Default half-width for auto-generated pipeline evolution bounds */
-const PIPELINE_DEFAULT_HALF_EVO = 0.15;
-/** Default half-height for auto-generated pipeline visibility bounds */
-const PIPELINE_DEFAULT_HALF_VIS = 0.05;
-
-/**
- * Generate default pipelineGeometry centered on the component's current position.
- *
- * Uses ±0.15 evolution and ±0.05 visibility around the center, clamped to [0, 1].
- */
-function generateDefaultPipelineGeometry(
-  evolution: number,
-  visibility: number,
-): { evoStart: number; evoEnd: number; visStart: number; visEnd: number } {
-  const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
-  return {
-    evoStart: clamp01(evolution - PIPELINE_DEFAULT_HALF_EVO),
-    evoEnd: clamp01(evolution + PIPELINE_DEFAULT_HALF_EVO),
-    visStart: clamp01(visibility - PIPELINE_DEFAULT_HALF_VIS),
-    visEnd: clamp01(visibility + PIPELINE_DEFAULT_HALF_VIS),
-  };
-}
-
-/**
- * Change a component's type. Mutates the map in place.
- *
- * When changing TO 'pipeline', auto-generates default pipelineGeometry
- * centered on the component's current position (if none exists).
- * When changing AWAY FROM 'pipeline', removes pipelineGeometry and
- * silently ejects any contained components (they preserve their positions;
- * pipeline-component association is purely positional with epsilon 0.015).
- *
- * @returns true if the component was found and its type changed, false otherwise.
- */
-function applyChangeComponentType(map: WardleyMap, payload: ChangeComponentTypePayload): boolean {
-  const comp = map.components.find((c) => c.id === payload.id);
-  if (!comp) return false;
-
-  const wasPipeline = comp.type === "pipeline" && !!comp.pipelineGeometry;
-  comp.type = payload.type;
-  comp.subtype = payload.subtype;
-
-  if (payload.type === "pipeline") {
-    // Auto-generate default pipelineGeometry if not already present
-    if (!comp.pipelineGeometry) {
-      comp.pipelineGeometry = generateDefaultPipelineGeometry(
-        comp.position.evolution.scalar,
-        comp.position.visibility.scalar,
-      );
-    }
-  } else if (wasPipeline) {
-    // Changing away from pipeline — clean up geometry.
-    // Contained components are silently ejected: their positions are preserved,
-    // but they are no longer inside a pipeline (association is purely positional).
-    delete comp.pipelineGeometry;
-  }
-
-  return true;
-}
-
-/**
- * Set or clear the evolvesTo target on a component. Mutates the map in place.
- *
- * When `payload.evolvesTo` is a component id string, looks up the target component
- * and sets `comp.evolvesTo` to an array with a single entry using the target's position.
- * When `payload.evolvesTo` is null, clears the evolvesTo array.
- *
- * @returns true if the source component was found (and target when setting), false otherwise.
- */
-function applySetEvolvesTo(map: WardleyMap, payload: SetEvolvesToPayload): boolean {
-  const comp = map.components.find((c) => c.id === payload.id);
-  if (!comp) return false;
-
-  if (payload.evolvesTo === null) {
-    // Clear evolvesTo
-    delete comp.evolvesTo;
-    return true;
-  }
-
-  // Validate target exists
-  const target = map.components.find((c) => c.id === payload.evolvesTo);
-  if (!target) return false;
-
-  // Cannot self-evolve
-  if (payload.id === payload.evolvesTo) return false;
-
-  // Set evolvesTo to a single entry using the target's position
-  comp.evolvesTo = [
-    {
-      position: {
-        evolution: { scalar: target.position.evolution.scalar },
-        visibility: { scalar: target.position.visibility.scalar },
-      },
-      evolveType: "natural" as const,
-    },
-  ];
-
-  return true;
-}
-
-/**
- * Set or clear a flow annotation on a relation. Mutates the map in place.
- *
- * When `payload.flow` is an object `{ label, style? }`, sets the flow annotation.
- * When `payload.flow` is null, clears the flow annotation.
- *
- * @returns true if the relation was found, false otherwise.
- */
-function applySetFlow(map: WardleyMap, payload: SetFlowPayload): boolean {
-  const rel = map.relations.find((r) => r.id === payload.id);
-  if (!rel) return false;
-
-  if (payload.flow === null) {
-    delete rel.flow;
-  } else {
-    rel.flow = { label: payload.flow.label, style: payload.flow.style };
-  }
-
-  return true;
-}
-
-/**
- * Change a relation's type. Mutates the map in place.
- * @returns true if the relation was found and its type changed, false otherwise.
- */
-function applyChangeEdgeType(map: WardleyMap, payload: ChangeEdgeTypePayload): boolean {
-  const rel = map.relations.find((r) => r.id === payload.id);
-  if (!rel) return false;
-  rel.type = payload.type;
-  return true;
-}
-
-// ── Container-level apply functions ──────────────────────────────────
-
-/** Epsilon for pipeline containment checks (matches pipeline-geometry.ts) */
-const PIPELINE_EPSILON = 0.015;
-
-/**
- * Resize a pipeline's evolution bounds. Mutates the map in place.
- *
- * - Ensures evoStart ≤ evoEnd (swaps if inverted)
- * - Recalculates pipeline center position from new bounds
- * - Ejects components that fall outside the new pipeline bounds
- *   (removes their positional association — they remain on the map)
- *
- * Note: "ejection" here means nothing — pipeline-component association is
- * purely positional (epsilon 0.015), so components outside bounds are simply
- * no longer inside the pipeline. No explicit field to clear.
- *
- * @returns true if the pipeline was found and resized, false otherwise.
- */
-function applyResizePipeline(map: WardleyMap, payload: ResizePipelinePayload): boolean {
-  const comp = map.components.find((c) => c.id === payload.id);
-  if (!comp) return false;
-  if (comp.type !== "pipeline") return false;
-  if (!comp.pipelineGeometry) return false;
-
-  let evoStart = payload.evoStart;
-  let evoEnd = payload.evoEnd;
-
-  // Ensure evoStart ≤ evoEnd
-  if (evoStart > evoEnd) {
-    [evoStart, evoEnd] = [evoEnd, evoStart];
-  }
-
-  // Update pipeline geometry
-  comp.pipelineGeometry.evoStart = evoStart;
-  comp.pipelineGeometry.evoEnd = evoEnd;
-
-  // Recalculate pipeline center position
-  comp.position.evolution.scalar = (evoStart + evoEnd) / 2;
-
-  return true;
-}
-
-// ── Label apply functions ────────────────────────────────────────────
-
-/**
- * Move a component's label to a new offset position. Mutates the map in place.
- * Sets `label.position = { dx, dy }` using the existing LabelSchema.position format.
- * @returns true if the component was found and label moved, false otherwise.
- */
-function applyMoveLabel(map: WardleyMap, payload: MoveLabelPayload): boolean {
-  const comp = map.components.find((c) => c.id === payload.id);
-  if (!comp) return false;
-  comp.label.position = { dx: payload.dx, dy: payload.dy };
-  return true;
-}
-
-// ── Step apply functions ─────────────────────────────────────────────
-
-/**
- * Move the component carrying a step decorator. Mutates the map in place.
- * A step is now a COMPONENT DECORATOR (no own position) — `payload.id` is the
- * decorated component's id, and moving the step moves that component.
- * @returns true if a component with a step decorator was found and moved, false otherwise.
- */
-function applyMoveStep(map: WardleyMap, payload: MoveStepPayload): boolean {
-  const comp = map.components.find((c) => c.id === payload.id);
-  if (!comp || !comp.step) return false;
-  comp.position.evolution.scalar = payload.evolution;
-  comp.position.visibility.scalar = payload.visibility;
-  return true;
-}
-
-// ── Map-level apply functions ────────────────────────────────────────
-
-/**
- * Rename the map (change title). Mutates the map in place.
- * @returns true always (map title is always settable).
- */
-function applyRenameMap(map: WardleyMap, payload: RenameMapPayload): boolean {
-  map.title = payload.title;
-  return true;
-}
-
-// ── Cascade expansion ────────────────────────────────────────────────
-
-/**
- * Compute the explicit cascade operations for deleting a component.
- *
- * Returns an ordered array of DiffOp that should be appended to the diff
- * buffer BEFORE the final `delete_component` op so that Claude sees every
- * state change with zero inference required:
- *
- *   1. `delete_edge` for every relation where consumer or supplier === componentId
- *   2. `set_evolves_to` { id, evolvesTo: null } for every component whose
- *      evolvesTo array references positions matching the deleted component
- *
- * The caller is responsible for actually mutating the map model — this
- * function is a pure read that inspects the current state.
- *
- * @param map  - Current map model (read-only inspection)
- * @param componentId - The id of the component about to be deleted
- * @returns Array of explicit cascade DiffOps (may be empty)
- */
-export function expandDeleteCascade(map: WardleyMap, componentId: string): DiffOp[] {
-  const ops: DiffOp[] = [];
-
-  // 1. Explicit delete_edge for every relation referencing this component
-  for (const r of map.relations) {
-    if (r.consumer === componentId || r.supplier === componentId) {
-      ops.push({ op: "delete_edge", payload: { id: r.id } });
-    }
-  }
-
-  // 2. Explicit set_evolves_to null for components that evolve towards this component
-  //    We detect this by checking if any component's evolvesTo target position matches
-  //    the deleted component's position (since evolvesTo is position-based).
-  //    Additionally, the interactive model may store evolvesTo as a direct id reference.
-  const deletedComp = map.components.find((c) => c.id === componentId);
-  if (deletedComp) {
-    for (const c of map.components) {
-      if (c.id === componentId) continue;
-      if (!c.evolvesTo) continue;
-
-      // Check if evolvesTo is stored as a string id (interactive model simplification)
-      if (typeof c.evolvesTo === "string") {
-        if (c.evolvesTo === componentId) {
-          ops.push({ op: "set_evolves_to", payload: { id: c.id, evolvesTo: null } });
-        }
-        continue;
-      }
-
-      // Schema-compliant: evolvesTo is an array of position-based targets
-      // Match by position proximity to the deleted component
-      if (Array.isArray(c.evolvesTo) && c.evolvesTo.length > 0) {
-        const targetEvo = deletedComp.position.evolution.scalar;
-        const targetVis = deletedComp.position.visibility.scalar;
-        const matches = c.evolvesTo.some((e: any) => {
-          const eEvo = e?.position?.evolution?.scalar;
-          const eVis = e?.position?.visibility?.scalar;
-          return (
-            typeof eEvo === "number" &&
-            typeof eVis === "number" &&
-            Math.abs(eEvo - targetEvo) < 0.001 &&
-            Math.abs(eVis - targetVis) < 0.001
-          );
-        });
-        if (matches) {
-          ops.push({ op: "set_evolves_to", payload: { id: c.id, evolvesTo: null } });
-        }
-      }
-    }
-  }
-
-  return ops;
-}
-
-/**
- * Compute the explicit cascade operations for changing a pipeline component
- * to a non-pipeline type.
- *
- * Returns an ordered array of DiffOp representing the components that will
- * be ejected from the pipeline. Since pipeline-component association is purely
- * positional (epsilon 0.015), ejection is implicit — contained components
- * keep their positions and simply stop being inside a pipeline. These
- * move_component ops (with unchanged positions) are emitted for diff
- * exhaustiveness so Claude sees every affected component explicitly.
- *
- * @param map  - Current map model (read-only inspection)
- * @param componentId - The id of the pipeline component being type-changed
- * @returns Array of explicit cascade DiffOps (may be empty)
- */
-export function expandChangeTypeCascade(map: WardleyMap, componentId: string): DiffOp[] {
-  const ops: DiffOp[] = [];
-
-  const comp = map.components.find((c) => c.id === componentId);
-  if (!comp || comp.type !== "pipeline" || !comp.pipelineGeometry) return ops;
-
-  const geo = comp.pipelineGeometry;
-
-  // Find all components positionally inside this pipeline
-  for (const c of map.components) {
-    if (c.id === componentId) continue;
-    if (c.type === "pipeline") continue;
-
-    const cEvo = c.position.evolution.scalar;
-    const cVis = c.position.visibility.scalar;
-
-    if (
-      cEvo >= geo.evoStart - PIPELINE_EPSILON &&
-      cEvo <= geo.evoEnd + PIPELINE_EPSILON &&
-      cVis >= geo.visStart - PIPELINE_EPSILON &&
-      cVis <= geo.visEnd + PIPELINE_EPSILON
-    ) {
-      // Emit a move_component with unchanged position to document the ejection
-      ops.push({
-        op: "move_component",
-        payload: { id: c.id, evolution: cEvo, visibility: cVis },
-      });
-    }
-  }
-
-  return ops;
-}
-
-// ── Central dispatch ─────────────────────────────────────────────────
-
-/**
- * Apply a single diff operation to a WardleyMap, mutating it in place.
- *
- * @param map - The WardleyMap to mutate
- * @param diffOp - A validated diff operation object
- * @returns true if the operation was applied successfully, false if skipped
- */
-export function applyDiffOp(map: WardleyMap, diffOp: DiffOp): boolean {
-  switch (diffOp.op) {
-    case "move_component":
-      return applyMoveComponent(map, diffOp.payload);
-    case "add_component":
-      return applyAddComponent(map, diffOp.payload);
-    case "delete_component":
-      return applyDeleteComponent(map, diffOp.payload);
-    case "rename_component":
-      return applyRenameComponent(map, diffOp.payload);
-    case "add_edge":
-      return applyAddEdge(map, diffOp.payload);
-    case "delete_edge":
-      return applyDeleteEdge(map, diffOp.payload);
-    case "change_component_type":
-      return applyChangeComponentType(map, diffOp.payload);
-    case "set_evolves_to":
-      return applySetEvolvesTo(map, diffOp.payload);
-    case "set_flow":
-      return applySetFlow(map, diffOp.payload);
-    case "change_edge_type":
-      return applyChangeEdgeType(map, diffOp.payload);
-    case "resize_pipeline":
-      return applyResizePipeline(map, diffOp.payload);
-    case "move_label":
-      return applyMoveLabel(map, diffOp.payload);
-    case "move_step":
-      return applyMoveStep(map, diffOp.payload);
-    case "rename_map":
-      return applyRenameMap(map, diffOp.payload);
-    default: {
-      // Exhaustiveness check
-      const _exhaustive: never = diffOp;
-      return false;
-    }
-  }
-}
-
-/**
- * Apply a batch of diff operations sequentially.
- * Stops on first failure if `stopOnError` is true (default: false).
- *
- * @returns Array of booleans indicating success/failure for each op.
- */
-export function applyDiffOps(
-  map: WardleyMap,
-  ops: DiffOp[],
-  stopOnError = false,
-): boolean[] {
-  const results: boolean[] = [];
-  for (const op of ops) {
-    const ok = applyDiffOp(map, op);
-    results.push(ok);
-    if (!ok && stopOnError) break;
-  }
-  return results;
-}
+/** The engine's op type (source of truth, zod-free). */
+export type DiffOp = DiffOpType;
+
+// Compile-time guard: every zod-parsed op is a valid engine op.
+const _zodMatchesEngine = (x: z.infer<typeof DiffOp>): DiffOpType => x;
+void _zodMatchesEngine;

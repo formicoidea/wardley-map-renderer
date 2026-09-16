@@ -30,7 +30,6 @@ import {
   arrowheadPoints,
   svgHeader,
   svgBackground,
-  svgPlotArea,
   svgFooter,
   svgLayerGroup,
   NODE_FILL,
@@ -211,13 +210,13 @@ describe("renderComponentNode", () => {
     expect(circles.length).toBe(3);
   });
 
-  it("interactive mode wraps in g with data-component-id", () => {
+  it("interactive mode wraps in a data-id/data-kind group", () => {
     const svg = renderComponentNode({
       id: "c1", type: "component", cx: 100, cy: 200,
       radius: 5, stroke: "#000", strokeWidth: 1,
       interactive: true,
     });
-    expect(svg).toContain('<g data-component-id="c1">');
+    expect(svg).toContain('<g data-id="c1" data-kind="component">');
     expect(svg).toContain("</g>");
   });
 
@@ -289,7 +288,7 @@ describe("renderEdge", () => {
     expect(svg).toContain('stroke-width="2"');
   });
 
-  it("interactive mode wraps with data-edge-id and hit area", () => {
+  it("interactive mode wraps in a data-id/data-kind group with a hit area", () => {
     const svg = renderEdge({
       x1: 10, y1: 20, x2: 30, y2: 40,
       relationType: "DependsOn",
@@ -297,7 +296,7 @@ describe("renderEdge", () => {
       relationId: "edge-1",
       interactive: true,
     });
-    expect(svg).toContain('<g data-edge-id="edge-1">');
+    expect(svg).toContain('<g data-id="edge-1" data-kind="relation">');
     expect(svg).toContain('class="hit-area"');
     expect(svg).toContain("</g>");
   });
@@ -343,7 +342,7 @@ describe("renderEvolveArrow", () => {
     expect(svg).toContain('stroke="#2563eb"');
   });
 
-  it("interactive mode wraps with data-evolves-from", () => {
+  it("interactive mode wraps in a data-id/data-kind group", () => {
     const svg = renderEvolveArrow({
       fromX: 10, fromY: 20, toX: 100, toY: 20,
       evolveType: "natural",
@@ -351,7 +350,7 @@ describe("renderEvolveArrow", () => {
       arrowStrokeWidth: 1,
       interactive: true,
     });
-    expect(svg).toContain('<g data-evolves-from="c1">');
+    expect(svg).toContain('<g data-id="c1" data-kind="evolve">');
     expect(svg).toContain('class="hit-area"');
   });
 });
@@ -385,22 +384,39 @@ describe("renderPipeline", () => {
     expect(renderPipeline({ x: 10, y: 20, width: 100, height: -1, componentId: "p1" })).toBe("");
   });
 
-  it("interactive mode adds 4 resize handles", () => {
+  it("interactive mode wraps the rect in a hit-test group, without handles", () => {
     const svg = renderPipeline({
       x: 10, y: 20, width: 100, height: 50, componentId: "p1",
       interactive: true,
     });
-    expect(svg).toContain('<g data-pipeline-id="p1">');
-    expect(svg).toContain('data-handle="left"');
-    expect(svg).toContain('data-handle="right"');
-    expect(svg).toContain('data-handle="top"');
-    expect(svg).toContain('data-handle="bottom"');
+    expect(svg).toMatch(/^<g data-id="p1" data-kind="pipeline"><rect [^>]*\/><\/g>$/);
+    expect(svg).not.toContain("data-handle");
   });
 });
 
 // ══════════════════════════════════════════════════════════════════════
 //  Label primitives
 // ══════════════════════════════════════════════════════════════════════
+
+describe("attribute escaping", () => {
+  const evil = '"><x y="';
+  it("escapes ids, colors and font families in every primitive", () => {
+    const out = [
+      renderComponentNode({ id: evil, type: "anchor", cx: 0, cy: 0, radius: 5, stroke: evil, strokeWidth: 1, method: { color: evil, position: 1 }, interactive: true }),
+      renderComponentNode({ id: evil, type: "ecosystem", cx: 0, cy: 0, radius: 5, stroke: evil, strokeWidth: 1 }),
+      renderComponentNode({ id: evil, type: "market", cx: 0, cy: 0, radius: 5, stroke: evil, strokeWidth: 1 }),
+      renderEvolveArrow({ fromX: 0, fromY: 0, toX: 9, toY: 0, evolveType: "natural", componentId: evil, arrowStrokeWidth: 1, styleOverride: { stroke: evil, strokeDasharray: evil }, interactive: true }),
+      renderLabel({ x: 0, y: 0, text: evil, anchor: "start", fontFamily: evil, fontSize: 12, componentId: evil, interactive: true }),
+      renderLabel({ x: 0, y: 0, text: "a\nb", anchor: "start", fontFamily: evil, fontSize: 12 }),
+      renderNote({ cx: 0, cy: 0, text: evil, fontFamily: evil }),
+      renderStep({ cx: 0, cy: 0, number: 1, fill: evil, fontFamily: evil, stepId: evil, interactive: true }),
+      renderAccelerator({ cx: 0, cy: 0, label: evil, type: "accelerator", fontFamily: evil }),
+      svgBackground(1, 1, evil),
+    ].join("");
+    expect(out).not.toContain('"><x');
+    expect(out).toContain("&quot;&gt;&lt;x y=&quot;");
+  });
+});
 
 describe("renderLabel", () => {
   it("renders text element with correct attributes", () => {
@@ -430,13 +446,13 @@ describe("renderLabel", () => {
     expect(svg).toContain("A &amp; B");
   });
 
-  it("interactive mode adds data-label-for", () => {
+  it("interactive mode adds data-id/data-kind", () => {
     const svg = renderLabel({
       x: 100, y: 200, text: "Svc", anchor: "start",
       fontFamily: "Inter", fontSize: 12,
       componentId: "c1", interactive: true,
     });
-    expect(svg).toContain('data-label-for="c1"');
+    expect(svg).toContain(' data-id="c1" data-kind="label"');
   });
 });
 
@@ -473,13 +489,12 @@ describe("renderStep", () => {
     expect(svg).toContain('fill="#ffffff"');
   });
 
-  it("interactive mode wraps with data-step-id", () => {
+  it("interactive mode wraps in a data-id/data-kind group", () => {
     const svg = renderStep({
       cx: 100, cy: 200, number: 1, fill: STEP_DEFAULT_FILL,
       fontFamily: "Inter", stepId: "s1", interactive: true,
     });
-    expect(svg).toContain('<g data-step-id="s1"');
-    expect(svg).toContain('data-step-number="1"');
+    expect(svg).toContain('<g data-step-number="1" data-id="s1" data-kind="step">');
   });
 });
 
@@ -617,11 +632,10 @@ describe("svg-primitives server render parity", () => {
     const svg = renderToSVG(map, { interactive: true });
 
     // Interactive data attributes from svg-primitives
-    expect(svg).toContain('data-component-id="c1"');
-    expect(svg).toContain('data-component-id="c2"');
-    expect(svg).toContain('data-edge-id="r1"');
-    expect(svg).toContain('data-label-for="c1"');
-    expect(svg).toContain("data-plot-area");
+    expect(svg).toContain('<g data-id="c1" data-kind="component">');
+    expect(svg).toContain('<g data-id="c2" data-kind="component">');
+    expect(svg).toContain('<g data-id="r1" data-kind="relation">');
+    expect(svg).toContain(' data-id="c1" data-kind="label"');
   });
 
   it("pipeline rendering via primitives matches server output", () => {

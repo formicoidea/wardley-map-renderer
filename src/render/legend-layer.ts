@@ -14,8 +14,8 @@
  */
 
 import type { RenderContext, LayerRenderer } from "./types.js";
-import { esc, scaledFontSize } from "./svg-composer.js";
-import { resolveTypeStyle } from "../schema.js";
+import { esc, scaledFontSize } from "./compose-core.js";
+import { resolveTypeStyle } from "../schema-helpers.js";
 import { componentRenderableType } from "../renderable-type.js";
 import { SIN60, COS60 } from "./nodes-layer.js";
 
@@ -144,7 +144,7 @@ function collectLegendItems(ctx: RenderContext): LegendItem[] {
 
   for (const type of TYPE_ORDER) {
     if (!presentTypes.has(type) || excluded.has(type)) continue;
-    const color = resolveTypeStyle<string>(typeColors, type) ?? "#000000";
+    const color = esc(resolveTypeStyle<string>(typeColors, type) ?? "#000000");
     const label = labels[type] ?? type;
 
     if (type === "anchor") {
@@ -278,7 +278,7 @@ function collectLegendItems(ctx: RenderContext): LegendItem[] {
   }
 
   // ── Inertia ─────────────────────────────────────────────────────────
-  const hasInertia = ctx.evolves.some((e) => e.inertia);
+  const hasInertia = ctx.evolves.some((e) => e.inertia) || ctx.nodes.some((n) => n.component.inertia);
   if (hasInertia) {
     const inertiaLabel = INERTIA_LABELS[locale] ?? INERTIA_LABELS.en;
     items.push({
@@ -304,7 +304,7 @@ function collectLegendItems(ctx: RenderContext): LegendItem[] {
   ];
   for (const m of orderedMethodTypes) {
     const mc = methodConfigMap.get(m);
-    const mColor = mc?.color ?? "#888888";
+    const mColor = esc(mc?.color ?? "#888888");
     // Legend label: capitalize the method type name (e.g., "buying-policy" → "Buying Policy")
     const mLabel = m.split("-").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
     items.push({

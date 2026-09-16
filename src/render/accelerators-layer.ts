@@ -16,7 +16,7 @@
 
 import type { RenderContext, LayerRenderer } from "./types.js";
 import type { Component } from "../schema.js";
-import { resolveTypeStyle } from "../schema.js";
+import { resolveTypeStyle } from "../schema-helpers.js";
 import { componentRenderableType } from "../renderable-type.js";
 import {
   renderAccelerator,
@@ -35,7 +35,7 @@ export const buildArrowPath = buildArrowPathPrimitive;
  *   - ecosystem / market glyphs use fixed radii independent of nodeRadii
  *   - a method aura (when present) extends the footprint to METHOD_AURA_R
  */
-function effectiveVisualRadius(comp: Component, ctx: RenderContext): number {
+export function effectiveVisualRadius(comp: Component, ctx: RenderContext): number {
   const rt = componentRenderableType(comp.type, comp.subtype);
   if (rt === "ecosystem") return ECO_OUTER_R;
   if (rt === "market") return MARKET_OUTER_R;

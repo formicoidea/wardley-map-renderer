@@ -208,10 +208,8 @@ export interface RenderOptions {
   readonly avoidCollisions?: boolean;
 
   /**
-   * Enable interactive SVG elements (data-* attributes, hit areas, handles,
-   * plot-area rect). Used by the HTML renderer for drag-and-drop.
-   * When true, composeSVG adds an invisible `<rect data-plot-area>` covering
-   * the drawable area for client-side coordinate conversion.
+   * Enable the editor hit-test contract: `data-id` / `data-kind` groups and
+   * invisible hit areas (edges, evolve arrows). Used by `renderToHTML({ interactive })`.
    */
   readonly interactive?: boolean;
 

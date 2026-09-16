@@ -1,47 +1,35 @@
 /**
- * Tests for esbuild interactive bundle compilation.
+ * The editor bundle: one self-contained, zod-free IIFE within the size budget.
  */
-import { describe, it, expect } from "vitest";
-import { bundleInteractive, wrapInScriptTag } from "../../scripts/bundle-interactive.js";
+import { describe, it, expect, beforeAll } from "vitest";
+import { gzipSync } from "node:zlib";
+import { bundleInteractive } from "../../scripts/bundle-interactive.js";
 
 describe("bundle-interactive", () => {
-  it("produces a non-empty JS string", async () => {
-    const code = await bundleInteractive();
-    expect(code.length).toBeGreaterThan(0);
-    expect(typeof code).toBe("string");
+  let code: string;
+  beforeAll(async () => {
+    code = await bundleInteractive();
   });
 
-  it("produces an IIFE (self-executing function)", async () => {
-    const code = await bundleInteractive();
-    // esbuild IIFE wraps in (() => { ... })();
-    expect(code).toContain("(()=>");
+  it("is a self-contained IIFE", () => {
+    expect(code).toMatch(/^("use strict";)?\(\(\)=>\{/);
     expect(code.trimEnd().endsWith("})();")).toBe(true);
+    expect(code).not.toMatch(/\bimport\s*\(|\brequire\(|__require/);
   });
 
-  it("bundles svg-primitives functions inline (no imports)", async () => {
-    const code = await bundleInteractive();
-    // Should NOT contain import/require statements
-    expect(code).not.toContain("import ");
-    expect(code).not.toContain("require(");
-    // Should contain inlined svg-primitive code (e.g., the esc function logic)
-    expect(code).toContain("&amp;");
-    expect(code).toContain("&lt;");
+  it("does not pull in zod or node modules", () => {
+    expect(code).not.toMatch(/zod|ZodError|node:fs|resvg/i);
   });
 
-  it("contains the bootstrap log message", async () => {
-    const code = await bundleInteractive();
-    expect(code).toContain("wardley-interactive");
+  it("contains the editor API and the shared renderer", () => {
+    expect(code).toContain("__wardley");
+    expect(code).toContain("wardley-prepared");
+    expect(code).toContain("data-kind"); // hit-testing contract (no legacy data-* ids)
   });
 
-  it("wrapInScriptTag wraps code in script tags", () => {
-    const wrapped = wrapInScriptTag("console.log('hello');");
-    expect(wrapped).toBe("<script>\nconsole.log('hello');\n</script>");
-  });
-
-  it("bundle has no external dependencies (fully self-contained)", async () => {
-    const code = await bundleInteractive();
-    // No dynamic imports or module references
-    expect(code).not.toMatch(/from\s+["']/);
-    expect(code).not.toContain("__require");
+  // 27 KB: editor + renderer (~11 KB incl. flow labels), plus headroom for the v2 fix pass
+  // (send checkpoint, props focus/validation, tooltip, mobile sheet).
+  it("stays within the size budget (27 KB gzip)", () => {
+    expect(gzipSync(code).length).toBeLessThan(27 * 1024);
   });
 });

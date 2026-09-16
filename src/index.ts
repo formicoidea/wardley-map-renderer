@@ -15,6 +15,14 @@ export {
   type RenderResult,
 } from "./render-orchestrator.js";
 
+// ── HTML (static page or interactive editor) ─────────────────────
+export { renderToHTML, type HTMLRenderOptions } from "./render-html.js";
+
+// ── Diff ops (what the interactive editor emits) ─────────────────
+export { applyDiffOp, applyDiffOps, type DiffOp, type DiffOpName } from "./diff-ops-apply.js";
+/** Zod schema of a single diff op (validate untrusted ops before `applyDiffOp`). */
+export { DiffOp as DiffOpSchema } from "./diff-ops.js";
+
 // ── Types from the modular renderer ──────────────────────────────
 export type {
   Margins,

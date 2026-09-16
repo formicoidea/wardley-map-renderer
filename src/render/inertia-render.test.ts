@@ -253,3 +253,86 @@ describe("Inertia barrier rendering", () => {
     expect(ctx.geometry.inertiaBarriers).toHaveLength(2);
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════
+// Component-level inertia bar + evolution range
+// ═══════════════════════════════════════════════════════════════════
+
+function mapWith(comp: Record<string, unknown>): WardleyMap {
+  return sanitizeMap(WardleyMapSchema.parse({
+    title: "Decorators",
+    components: [{
+      id: "a",
+      label: { name: "A" },
+      type: "component",
+      position: { evolution: { scalar: 0.5 }, visibility: { scalar: 0.5 } },
+      ...comp,
+    }],
+    relations: [],
+  }));
+}
+
+const thick = (parts: string[]) => parts.filter((p) => p.includes('stroke-width="6"'));
+const num = (s: string, attr: string) => Number(s.match(new RegExp(`${attr}="([^"]+)"`))![1]);
+
+describe("Component-level inertia bar", () => {
+  it("draws one short vertical bar right of the node when inertia=true", () => {
+    const ctx = buildRenderContext(mapWith({ inertia: true }));
+    const bars = thick(renderEvolvesToLayer(ctx));
+    expect(bars).toHaveLength(1);
+    const node = ctx.nodes[0];
+    expect(num(bars[0], "x1")).toBe(num(bars[0], "x2"));
+    expect(num(bars[0], "x1")).toBeGreaterThan(node.cx);
+    expect(num(bars[0], "y1")).toBeLessThan(node.cy);
+    expect(num(bars[0], "y2")).toBeGreaterThan(node.cy);
+  });
+
+  it("draws nothing when inertia is absent or false", () => {
+    expect(thick(renderEvolvesToLayer(buildRenderContext(mapWith({}))))).toHaveLength(0);
+    expect(thick(renderEvolvesToLayer(buildRenderContext(mapWith({ inertia: false }))))).toHaveLength(0);
+  });
+
+  it("points towards a leftward evolvesTo target", () => {
+    const ctx = buildRenderContext(mapWith({
+      inertia: true,
+      evolvesTo: [{ position: { evolution: { scalar: 0.45 }, visibility: { scalar: 0.5 } } }],
+    }));
+    const bars = thick(renderEvolvesToLayer(ctx));
+    expect(bars).toHaveLength(1);
+    expect(num(bars[0], "x1")).toBeLessThan(ctx.nodes[0].cx);
+  });
+
+  it("is not double-drawn when an inertia evolvesTo arrow already draws barriers", () => {
+    const ctx = buildRenderContext(mapWith({
+      inertia: true,
+      evolvesTo: [{ position: { evolution: { scalar: 0.8 }, visibility: { scalar: 0.5 } }, inertia: true }],
+    }));
+    // only the phase barrier at 0.7
+    const bars = thick(renderEvolvesToLayer(ctx));
+    expect(bars).toHaveLength(1);
+    expect(num(bars[0], "x1")).toBeCloseTo(ctx.evoToX(0.7), 5);
+  });
+});
+
+describe("Evolution range line", () => {
+  it("spans evoToX(min)→evoToX(max) through the node centre, before arrows", () => {
+    const ctx = buildRenderContext(mapWith({
+      position: { evolution: { scalar: 0.5, range: [0.3, 0.65] }, visibility: { scalar: 0.4 } },
+      evolvesTo: [{ position: { evolution: { scalar: 0.8 }, visibility: { scalar: 0.4 } } }],
+    }));
+    const parts = renderEvolvesToLayer(ctx);
+    const idx = parts.findIndex((p) => p.includes('class="evo-range"'));
+    expect(idx).toBe(0);
+    const main = parts[idx].match(/<line [^>]*\/>/)![0];
+    expect(num(main, "x1")).toBeCloseTo(ctx.evoToX(0.3), 5);
+    expect(num(main, "x2")).toBeCloseTo(ctx.evoToX(0.65), 5);
+    expect(num(main, "y1")).toBeCloseTo(ctx.visToY(0.4), 5);
+    expect(num(main, "y2")).toBeCloseTo(ctx.visToY(0.4), 5);
+    expect(parts[idx]).toContain('stroke-opacity="0.3"');
+  });
+
+  it("is absent when no range is set", () => {
+    const parts = renderEvolvesToLayer(buildRenderContext(mapWith({})));
+    expect(parts.some((p) => p.includes("evo-range"))).toBe(false);
+  });
+});

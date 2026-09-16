@@ -17,7 +17,7 @@
  */
 
 import type { RenderContext, LayerRenderer } from "./types.js";
-import { resolveColor, resolveTypeStyle } from "../schema.js";
+import { resolveColor, resolveTypeStyle } from "../schema-helpers.js";
 import type { NodeRadii } from "../schema.js";
 import { componentRenderableType } from "../renderable-type.js";
 import {
@@ -114,8 +114,9 @@ export const renderNodesLayer: LayerRenderer = (
     let method: { color: string; position: number } | undefined;
     if (comp.method) {
       const methodCfg = ctx.resolvedConfig.methods.find(m => m.type === comp.method!.category);
-      if (methodCfg) {
-        const legendKeys = Object.keys(methodCfg.legend);
+      // v3 method styles may omit color/legend (no indicator then).
+      if (methodCfg?.color) {
+        const legendKeys = Object.keys(methodCfg.legend ?? {});
         const position = legendKeys.indexOf(comp.method.recommendation);
         if (position >= 0) {
           method = { color: methodCfg.color, position };
@@ -142,7 +143,7 @@ export const renderNodesLayer: LayerRenderer = (
   if (!excluded.has("pipeline")) {
     for (const p of ctx.pipelines) {
       const pr = resolveNodeRadius("pipeline", nodeRadii);
-      parts.push(renderPipelineHandleSquare(p.handleX, p.handleY, pr, strokeWidth));
+      parts.push(renderPipelineHandleSquare(p.handleX, p.handleY, pr, strokeWidth, interactive ? p.component.id : undefined));
     }
   }
 

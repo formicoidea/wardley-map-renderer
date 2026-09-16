@@ -13,6 +13,7 @@
  *   - "solid" (default): simple solid line
  *   - "dashed": dashed line with stroke-dasharray
  *   - "bold": thicker solid line (2× width)
+ * and its label is drawn at the edge midpoint (rotated, never upside down, haloed).
  *
  * Pure function: takes RenderContext, returns SVG fragment strings.
  *
@@ -20,7 +21,8 @@
  */
 
 import type { RenderContext, LayerRenderer } from "./types.js";
-import { renderEdge } from "./svg-primitives.js";
+import { renderEdge, FLOW_LABEL_BASE_FONT_SIZE } from "./svg-primitives.js";
+import { scaledFontSize } from "./compose-core.js";
 
 // ── Layer renderer ──────────────────────────────────────────────────
 
@@ -46,6 +48,9 @@ export const renderEdgesLayer: LayerRenderer = (
   const excluded = new Set(ctx.resolvedConfig.excludeComponentTypes);
   const baseStrokeWidth = ctx.resolvedConfig.strokeWidth;
   const interactive = ctx.options?.interactive === true;
+  const labelFontSize = scaledFontSize(ctx, FLOW_LABEL_BASE_FONT_SIZE);
+  const fontFamily = ctx.resolvedConfig.typography.fontFamily;
+  const haloColor = ctx.resolvedConfig.background.color;
 
   for (const edge of ctx.edges) {
     const { x1, y1, x2, y2, relation } = edge;
@@ -66,6 +71,9 @@ export const renderEdgesLayer: LayerRenderer = (
       baseStrokeWidth,
       relationId: relation.id,
       interactive,
+      flowLabel: relation.flow?.label
+        ? { text: relation.flow.label, fontSize: labelFontSize, fontFamily, haloColor }
+        : undefined,
     }));
   }
 

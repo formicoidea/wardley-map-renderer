@@ -2,251 +2,109 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>{{TITLE}}</title>
 <style>
-/* ── Reset ──────────────────────────────────────────────────────────── */
-*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-html,body{height:100%;overflow:hidden}
-body{font-family:var(--map-font,Inter,system-ui,sans-serif);background:var(--bg);color:var(--fg)}
-
-/* ── CSS Variables (injected at build time) ─────────────────────────── */
-:root{{{CSS_VARS_LIGHT}}}
-@media(prefers-color-scheme:dark){
-  :root{{{CSS_VARS_DARK}}}
+:root{--canvas:#f4f5f7;--surface:#fff;--fg:#1d1f24;--muted:#6b7080;--border:#e2e4e9;--hover:#eef0f4;--accent:#4f5bd5;--accent-soft:#e7e9fb;--on-accent:#fff;--danger:#c62f2f;--on-danger:#fff;--shadow:0 1px 2px rgb(0 0 0/.06),0 4px 16px rgb(0 0 0/.08);--r:8px;--t:40px;color-scheme:light dark}
+@media(prefers-color-scheme:dark){:root{--canvas:#17181c;--surface:#24262c;--fg:#e8e9ed;--muted:#9a9eab;--border:#363841;--hover:#30323a;--accent:#8e97f0;--accent-soft:#34375a;--on-accent:#15161a;--danger:#f07070;--on-danger:#1a0d0d;--shadow:0 1px 2px rgb(0 0 0/.4),0 6px 20px rgb(0 0 0/.35)}}
+*,:before,:after{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%;margin:0;overflow:hidden}
+body{font:14px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--canvas);color:var(--fg);-webkit-tap-highlight-color:transparent}
+#viewport{position:fixed;inset:0;overflow:hidden;touch-action:none;cursor:default}
+#viewport[data-tool=pan],#viewport.grab{cursor:grab}
+#viewport.panning{cursor:grabbing}
+#viewport[data-tool=component]{cursor:crosshair}
+#stage{position:absolute;left:0;top:0;transform-origin:0 0}
+#map,#map>svg,#overlay{display:block;width:100%;height:100%}
+#map>svg{box-shadow:var(--shadow);border-radius:2px}
+#overlay{position:absolute;inset:0;overflow:visible;pointer-events:none}
+#overlay [data-handle]{pointer-events:all}
+.bar{position:fixed;z-index:10;display:flex;align-items:center;gap:2px;padding:4px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);box-shadow:var(--shadow)}
+#bar{bottom:calc(12px + env(safe-area-inset-bottom));left:0;right:0;margin:auto;width:max-content;max-width:calc(100% - 24px);overflow-x:auto;scrollbar-width:none}
+#bar::-webkit-scrollbar{display:none}
+#zoom{left:12px;top:12px}
+.sep{flex:none;width:1px;height:24px;margin:0 4px;background:var(--border)}
+button{font:inherit;color:inherit}
+.bar button,#props header button{position:relative;flex:none;display:inline-flex;align-items:center;justify-content:center;gap:6px;min-width:var(--t);height:var(--t);padding:0 8px;border:0;border-radius:6px;background:none;cursor:pointer;transition:background .12s,color .12s}
+.bar button:hover{background:var(--hover)}
+.bar button:disabled{opacity:.35;cursor:default;background:none}
+.bar [aria-pressed=true]{background:var(--accent-soft);color:var(--accent)}
+.bar .primary{background:var(--accent);color:var(--on-accent);font-weight:600;padding:0 12px}
+.bar .primary:hover{background:var(--accent);filter:brightness(1.08)}
+.bar .primary:disabled{opacity:1;background:var(--hover);color:var(--muted);filter:none}
+:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.badge{position:absolute;top:2px;right:2px;min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:var(--danger);color:var(--on-danger);font-size:10px;font-weight:700;line-height:16px}
+.primary .badge{position:static;background:var(--on-accent);color:var(--accent)}
+#zoom-level{min-width:48px;text-align:center;font-variant-numeric:tabular-nums;font-size:12px;color:var(--muted)}
+#bar .ex{display:none}
+#bar.collapsed{padding:0}
+#bar.collapsed>:not([data-action=collapse]){display:none}
+#bar.collapsed [data-action=collapse]{border-radius:7px}
+#bar.collapsed .co{display:none}
+#bar.collapsed .ex{display:block}
+#props{position:fixed;z-index:20;top:12px;right:12px;width:300px;max-height:calc(100% - var(--bar-h,50px) - 48px);display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);box-shadow:var(--shadow)}
+#props header{display:flex;align-items:center;gap:8px;padding:4px 4px 4px 16px;border-bottom:1px solid var(--border)}
+#props h2{flex:1;margin:0;font-size:14px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#props header button:hover{background:var(--hover)}
+#props-body{padding:12px 16px 16px;overflow:auto;overscroll-behavior:contain}
+#toast{position:fixed;z-index:30;left:50%;bottom:calc(var(--bar-h,50px) + 24px + env(safe-area-inset-bottom));transform:translate(-50%,8px);max-width:calc(100% - 32px);padding:8px 14px;border-radius:var(--r);background:var(--fg);color:var(--surface);box-shadow:var(--shadow);opacity:0;pointer-events:none;transition:opacity .2s,transform .2s}
+#toast.show{opacity:1;transform:translate(-50%,0)}
+#tip{position:fixed;z-index:40;padding:3px 8px;border-radius:4px;background:var(--fg);color:var(--surface);font-size:12px;white-space:nowrap;pointer-events:none}
+#toast[data-kind=error]{background:var(--danger);color:var(--on-danger)}
+@media(max-width:699px){
+#bar{bottom:calc(8px + env(safe-area-inset-bottom));max-width:min(calc(100% - 16px),290px);flex-wrap:wrap;justify-content:center;gap:0;overflow:visible}
+#bar>[data-action]:not([data-action=delete]){order:1}
+.sep,.lbl,#zoom [data-action^=zoom-]{display:none}
+.bar .primary{padding:0}
+.primary .badge{position:absolute;background:var(--danger);color:var(--on-danger)}
+#props{top:auto;left:8px;right:8px;bottom:calc(var(--bar-h,90px) + 16px + env(safe-area-inset-bottom));width:auto;max-height:45vh;border-radius:14px}
+#toast{bottom:auto;top:64px}
 }
-
-/* ── Layout ─────────────────────────────────────────────────────────── */
-#map-container{width:100%;height:100%;display:flex;flex-direction:column}
-
-/* ── Global Bar ─────────────────────────────────────────────────────── */
-#global-bar{
-  display:flex;align-items:center;gap:8px;padding:6px 12px;
-  background:var(--panel-bg);border-bottom:1px solid var(--panel-border);
-  flex-shrink:0;font-size:13px;color:var(--panel-text);z-index:10
-}
-#global-bar button{
-  padding:4px 10px;border:1px solid var(--panel-border);border-radius:4px;
-  background:var(--panel-bg);color:var(--panel-text);cursor:pointer;
-  font-size:12px;font-family:inherit;line-height:1.4;white-space:nowrap;
-  transition:background .15s,border-color .15s
-}
-#global-bar button:hover{
-  border-color:var(--accent);
-  background:color-mix(in srgb,var(--accent) 10%,var(--panel-bg))
-}
-#global-bar button.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
-#global-bar button.primary:hover{background:var(--accent-hover)}
-#global-bar button:disabled{opacity:.4;cursor:default;border-color:var(--panel-border);background:var(--panel-bg)}
-#global-bar .separator{width:1px;height:20px;background:var(--panel-border);flex-shrink:0}
-#global-bar .counter{font-variant-numeric:tabular-nums;opacity:.8}
-#global-bar .spacer{flex:1}
-
-/* ── Context Zone ───────────────────────────────────────────────────── */
-#context-zone{
-  display:none;align-items:center;gap:8px;padding:4px 12px;
-  background:color-mix(in srgb,var(--accent) 8%,var(--panel-bg));
-  border-bottom:1px solid var(--panel-border);
-  flex-shrink:0;font-size:12px;color:var(--panel-text);z-index:9;min-height:32px
-}
-#context-zone.visible{display:flex}
-#context-zone .ctx-label{
-  font-weight:600;color:var(--accent);margin-right:4px;
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px
-}
-#context-zone .ctx-group{display:flex;align-items:center;gap:6px}
-#context-zone button{
-  padding:3px 8px;border:1px solid var(--panel-border);border-radius:3px;
-  background:var(--panel-bg);color:var(--panel-text);cursor:pointer;
-  font-size:11px;font-family:inherit;line-height:1.4;white-space:nowrap;
-  transition:background .15s,border-color .15s
-}
-#context-zone button:hover{
-  border-color:var(--accent);
-  background:color-mix(in srgb,var(--accent) 10%,var(--panel-bg))
-}
-#context-zone button.danger{color:#ef4444;border-color:#ef4444}
-#context-zone button.danger:hover{background:color-mix(in srgb,#ef4444 10%,var(--panel-bg))}
-#context-zone input[type="text"]{
-  padding:3px 6px;border:1px solid var(--panel-border);border-radius:3px;
-  background:var(--panel-bg);color:var(--panel-text);font-size:11px;font-family:inherit;width:140px
-}
-#context-zone select{
-  padding:3px 6px;border:1px solid var(--panel-border);border-radius:3px;
-  background:var(--panel-bg);color:var(--panel-text);font-size:11px;font-family:inherit
-}
-#context-zone .ctx-sep{width:1px;height:18px;background:var(--panel-border);flex-shrink:0}
-#context-zone .ctx-hint{opacity:.6;font-style:italic}
-.ctx-panel{display:none}
-.ctx-panel.active{display:contents}
-
-/* ── SVG Wrapper ────────────────────────────────────────────────────── */
-#svg-wrapper{flex:1;overflow:auto;position:relative}
-#svg-wrapper svg{width:100%;height:auto;display:block}
-
-/* ── Selection & Interactive Styles ─────────────────────────────────── */
-.wm-selected{filter:drop-shadow(0 0 3px var(--accent,#3b82f6)) drop-shadow(0 0 6px var(--accent,#3b82f6))}
-.wm-selected>circle,.wm-selected>ellipse{stroke:var(--accent,#3b82f6)!important;stroke-width:2.5!important}
-.wm-selected>rect{stroke:var(--accent,#3b82f6)!important;stroke-width:2!important}
-.wm-selected>line,.wm-selected>path:not(.hit-area){stroke:var(--accent,#3b82f6)!important;stroke-width:2.5!important}
-[data-pipeline-id].wm-selected>rect:first-of-type{fill:color-mix(in srgb,var(--accent,#3b82f6) 8%,transparent)!important;stroke:var(--accent,#3b82f6)!important;stroke-width:2!important}
-[data-label-for].wm-selected,[data-label-for].wm-selected *{fill:var(--accent,#3b82f6)!important}
-[data-step-id].wm-selected>circle{stroke:var(--accent,#3b82f6)!important;stroke-width:2.5!important;fill:color-mix(in srgb,var(--accent,#3b82f6) 15%,transparent)!important}
-[data-step-id].wm-selected>text{fill:var(--accent,#3b82f6)!important}
-[data-evolves-from].wm-selected>line,[data-evolves-from].wm-selected>path{stroke:var(--accent,#3b82f6)!important;stroke-width:2.5!important}
-[data-component-id],[data-pipeline-id],[data-step-id]{cursor:grab}
-[data-label-for]{cursor:grab}
-[data-edge-id] .hit-area,[data-evolves-from] .hit-area{cursor:pointer}
-[data-handle]{display:none;pointer-events:none}
-.wm-selected>[data-handle]{display:block;pointer-events:auto}
-
-/* ── Inline Rename ──────────────────────────────────────────────────── */
-.wm-inline-rename{
-  background:var(--panel-bg,#fff);color:var(--panel-text,#222);
-  border:1.5px solid var(--accent,#3b82f6);border-radius:3px;
-  padding:2px 4px;font-family:var(--map-font,Inter,system-ui,sans-serif);
-  font-size:12px;outline:none;width:100%;box-sizing:border-box
-}
-
-/* ── Placement Feedback ─────────────────────────────────────────────── */
-.wm-placement-ghost{
-  opacity:0.5;pointer-events:none;
-  stroke:var(--accent,#3b82f6);stroke-dasharray:4 3
-}
-.wm-placement-target{
-  stroke:var(--accent,#3b82f6)!important;stroke-width:2.5!important;
-  filter:drop-shadow(0 0 4px var(--accent,#3b82f6))
-}
-.wm-placement-source{
-  filter:drop-shadow(0 0 6px var(--accent,#3b82f6)) drop-shadow(0 0 12px var(--accent,#3b82f6))
-}
-.wm-placement-source>circle,.wm-placement-source>ellipse{
-  stroke:var(--accent,#3b82f6)!important;stroke-width:2.5!important;
-  fill:rgba(59,130,246,0.15)!important
-}
-.wm-placement-source>rect{
-  stroke:var(--accent,#3b82f6)!important;stroke-width:2.5!important
-}
-.wm-rubber-band{
-  stroke:var(--accent,#3b82f6);opacity:0.7;
-  transition:opacity 0.1s ease
-}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
 </head>
 <body>
-<div id="map-container">
-  <!-- ── Global Bar ─────────────────────────────────────────────────── -->
-  <div id="global-bar">
-    <button id="btn-add-component" title="Add component">+ Component</button>
-    <button id="btn-add-edge" title="Add edge">+ Edge</button>
-    <button id="btn-add-evolves" title="Add evolvesTo link">+ EvolvesTo</button>
-    <div class="separator"></div>
-    <span class="counter" id="counter-display"></span>
-    <div class="separator"></div>
-    <button id="btn-undo" title="Undo last operation (Ctrl+Z)" disabled>Undo</button>
-    <button id="btn-reset" title="Reset all changes">Reset</button>
-    <div class="spacer"></div>
-    <button id="btn-copy" title="Copy diff to clipboard" disabled>Copy</button>
-    <button id="btn-apply" class="primary" title="Send diff to Claude" disabled>Update Claude</button>
-  </div>
+<main id="viewport" data-tool="select" aria-label="Wardley map canvas">
+<div id="stage"><div id="map">{{SVG}}</div><svg id="overlay" aria-hidden="true"></svg></div>
+</main>
 
-  <!-- ── Context Zone ───────────────────────────────────────────────── -->
-  <div id="context-zone">
-    <!-- Component context panel -->
-    <div id="ctx-component" class="ctx-panel">
-      <span class="ctx-label" id="ctx-comp-name"></span>
-      <div class="ctx-sep"></div>
-      <div class="ctx-group">
-        <input type="text" id="ctx-comp-rename" placeholder="Rename..." title="Rename component">
-        <button id="ctx-comp-rename-btn">Rename</button>
-      </div>
-      <div class="ctx-sep"></div>
-      <div class="ctx-group">
-        <select id="ctx-comp-type" title="Component type">
-          <option value="component">component</option>
-          <option value="build">build</option>
-          <option value="buy">buy</option>
-          <option value="outsource">outsource</option>
-          <option value="dataProduct">dataProduct</option>
-          <option value="market">market</option>
-        </select>
-      </div>
-      <div class="ctx-sep"></div>
-      <button id="ctx-comp-delete" class="danger" title="Delete component">Delete</button>
-    </div>
+<nav id="bar" class="bar" role="toolbar" aria-label="Editor tools">
+<button data-tool="select" aria-label="Select (V)"><svg class="i" viewBox="0 0 24 24"><path d="M5 3l14 8-6.5 1.5L9 19z"/></svg></button>
+<button data-tool="component" aria-label="Add component (C)"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="6.5"/></svg></button>
+<button data-tool="link" aria-label="Link components (L)"><svg class="i" viewBox="0 0 24 24"><path d="M8.5 15.5l7-7M4 18a2.5 2.5 0 1 0 5 0a2.5 2.5 0 1 0-5 0M15 6a2.5 2.5 0 1 0 5 0a2.5 2.5 0 1 0-5 0"/></svg></button>
+<button data-tool="evolve" aria-label="Evolve (E)"><svg class="i" viewBox="0 0 24 24"><path d="M3 12h2m3 0h2m3 0h6M15 7l5 5-5 5"/></svg></button>
+<button data-tool="pipeline" aria-label="Pipeline (P)"><svg class="i" viewBox="0 0 24 24"><path d="M3 8h18v8H3zM8 12h.01M16 12h.01"/></svg></button>
+<button data-tool="pan" aria-label="Pan (H or hold Space)"><svg class="i" viewBox="0 0 24 24"><path d="M12 3v18M3 12h18M9 6l3-3 3 3M9 18l3 3 3-3M6 9l-3 3 3 3M18 9l3 3-3 3"/></svg></button>
+<span class="sep"></span>
+<button data-action="undo" aria-label="Undo (Ctrl+Z)"><svg class="i" viewBox="0 0 24 24"><path d="M9 14L4 9l5-5M4 9h11a5 5 0 0 1 0 10h-3"/></svg></button>
+<button data-action="redo" aria-label="Redo (Ctrl+Shift+Z)"><svg class="i" viewBox="0 0 24 24"><path d="M15 14l5-5-5-5M20 9H9a5 5 0 0 0 0 10h3"/></svg></button>
+<button data-action="delete" aria-label="Delete selection (Del)"><svg class="i" viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></button>
+<span class="sep"></span>
+<button data-action="reset" aria-label="Reset all changes"><svg class="i" viewBox="0 0 24 24"><path d="M3.5 9a9 9 0 1 1-.5 3M3 4v5h5"/></svg></button>
+<button data-action="download-json" aria-label="Download map JSON"><svg class="i" viewBox="0 0 24 24"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg></button>
+<button data-action="copy-diff" aria-label="Copy diff JSON"><svg class="i" viewBox="0 0 24 24"><path d="M9 9h11v11H9zM5 15H4V4h11v1"/></svg></button>
+<button data-action="send" class="primary" aria-label="Send edits to Claude"><svg class="i" viewBox="0 0 24 24"><path d="M21 3L10 14M21 3l-6.5 18-4.5-7-7-4.5z"/></svg><span class="lbl">Send</span><span class="badge" data-diff-count hidden>0</span></button>
+<span class="sep"></span>
+<button data-action="collapse" aria-label="Hide toolbar" aria-expanded="true"><svg class="i co" viewBox="0 0 24 24"><path d="M6 10l6 6 6-6"/></svg><svg class="i ex" viewBox="0 0 24 24"><path d="M18 14l-6-6-6 6"/></svg></button>
+</nav>
 
-    <!-- Edge context panel -->
-    <div id="ctx-edge" class="ctx-panel">
-      <span class="ctx-label" id="ctx-edge-label"></span>
-      <div class="ctx-sep"></div>
-      <div class="ctx-group">
-        <select id="ctx-edge-type" title="Edge type">
-          <option value="dependency">dependency</option>
-          <option value="flow">flow</option>
-          <option value="constraint">constraint</option>
-        </select>
-      </div>
-      <div class="ctx-sep"></div>
-      <button id="ctx-edge-delete" class="danger" title="Delete edge">Delete</button>
-    </div>
-
-    <!-- Pipeline context panel -->
-    <div id="ctx-pipeline" class="ctx-panel">
-      <span class="ctx-label" id="ctx-pipe-name"></span>
-      <div class="ctx-sep"></div>
-      <span class="ctx-hint" id="ctx-pipe-range"></span>
-      <div class="ctx-sep"></div>
-      <button id="ctx-pipe-delete" class="danger" title="Delete pipeline">Delete</button>
-    </div>
-
-    <!-- Add-component context panel -->
-    <div id="ctx-add-component" class="ctx-panel">
-      <span class="ctx-hint">Add component &mdash; pick type &amp; label, then click on the map</span>
-      <div class="ctx-sep"></div>
-      <div class="ctx-group">
-        <select id="ctx-add-type" title="Component type">
-          <option value="component">component</option>
-          <option value="user-need">user-need</option>
-          <option value="pipeline">pipeline</option>
-          <option value="note">note</option>
-          <option value="anchor">anchor</option>
-          <option value="market">market</option>
-          <option value="ecosystem">ecosystem</option>
-        </select>
-      </div>
-      <div class="ctx-group">
-        <input type="text" id="ctx-add-label" placeholder="Label..." title="Component label" value="New Component">
-      </div>
-      <div class="ctx-sep"></div>
-      <button id="ctx-add-cancel">Cancel</button>
-    </div>
-
-    <!-- Placement context panel (edge/evolvesTo target picking) -->
-    <div id="ctx-placement" class="ctx-panel">
-      <span class="ctx-hint" id="ctx-placement-hint"></span>
-      <div class="ctx-sep"></div>
-      <button id="ctx-placement-cancel">Cancel</button>
-    </div>
-  </div>
-
-  <!-- ── SVG Container ──────────────────────────────────────────────── -->
-  <div id="svg-wrapper">
-    {{SVG_CONTENT}}
-  </div>
+<div id="zoom" class="bar" role="group" aria-label="Zoom">
+<button data-action="zoom-out" aria-label="Zoom out (Ctrl+-)"><svg class="i" viewBox="0 0 24 24"><path d="M6 12h12"/></svg></button>
+<output id="zoom-level">100%</output>
+<button data-action="zoom-in" aria-label="Zoom in (Ctrl+=)"><svg class="i" viewBox="0 0 24 24"><path d="M6 12h12M12 6v12"/></svg></button>
+<button data-action="fit" aria-label="Fit to screen (Shift+1)"><svg class="i" viewBox="0 0 24 24"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/></svg></button>
 </div>
 
-<!-- ── JSON Injection Points ────────────────────────────────────────── -->
-<script id="wardley-data" type="application/json">
-{{MAP_JSON}}
-</script>
-<script id="render-constants" type="application/json">
-{{CONSTANTS_JSON}}
-</script>
-<script id="render-config" type="application/json">
-{{RENDER_CONFIG_JSON}}
-</script>
+<aside id="props" role="dialog" aria-labelledby="props-title" hidden>
+<header><h2 id="props-title">Properties</h2><button data-close aria-label="Close properties (Esc)"><svg class="i" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></header>
+<div id="props-body"></div>
+</aside>
 
-<!-- ── Bundled Interactive Script (injected at build time) ───────────── -->
-{{BUNDLE_SCRIPT}}
+<div id="toast" role="status" aria-live="polite"></div>
+<div id="tip" aria-hidden="true" hidden></div>
+{{DATA}}
+{{BUNDLE}}
 </body>
 </html>
