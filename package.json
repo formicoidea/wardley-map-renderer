@@ -1,6 +1,6 @@
 {
   "name": "@formicoidea/wardley-map-renderer",
-  "version": "1.0.0-beta.3",
+  "version": "1.0.0-beta.4",
   "description": "Pure-function Wardley Map renderer — SVG/PNG/HTML generation from JSON",
   "type": "module",
   "main": "dist/index.js",
