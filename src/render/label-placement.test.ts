@@ -101,3 +101,34 @@ describe("avoidLabelCollisions — pinned label support", () => {
     expect(result[0].anchor).toBe("start");
   });
 });
+
+describe("avoidLabelCollisions — multi-line labels", () => {
+  const charWidth = 7;
+  const lineHeight = 16;
+
+  it("box width uses the longest line, height the line count", () => {
+    // "Short" (5 chars) overlaps the second line of the two-line label only if
+    // the box is two lines tall (y + lineHeight).
+    const labels: LabelPlacement[] = [
+      { x: 100, y: 200, text: "A very long first line\nb", anchor: "start", pinned: true },
+      { x: 100, y: 200 + lineHeight, text: "Short", anchor: "start", pinned: false },
+    ];
+
+    const result = avoidLabelCollisions(labels, [], charWidth, lineHeight);
+
+    // Second label pushed away → the two-line box was measured as two lines
+    expect(result[1].y).not.toBe(200 + lineHeight);
+  });
+
+  it("clamp leaves room for the lines below the first baseline", () => {
+    const plotBounds = { top: 24, bottom: 852 };
+    const labels: LabelPlacement[] = [
+      { x: 100, y: 900, text: "one\ntwo\nthree", anchor: "start", pinned: false },
+    ];
+
+    const result = avoidLabelCollisions(labels, [], charWidth, lineHeight, plotBounds);
+
+    // Last baseline (y + 2 × lineHeight) must land on the bottom bound
+    expect(result[0].y).toBe(852 - 2 * lineHeight);
+  });
+});

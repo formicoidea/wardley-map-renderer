@@ -224,6 +224,71 @@ describe("interactive controller", () => {
     });
   });
 
+  it("the toolbar is permanent (no collapse button)", () => {
+    expect(document.querySelector("[data-action=collapse]")).toBeNull();
+    expect($("#bar").className).toBe("bar");
+  });
+
+  it("clicking the map background clears the selection instead of hitting it", () => {
+    click(node("a"));
+    expect($<HTMLButtonElement>("[data-action=delete]").disabled).toBe(false);
+    const bg = $("#map [data-kind=background]");
+    document.elementFromPoint = () => bg;
+    click(bg);
+    expect($<HTMLButtonElement>("[data-action=delete]").disabled).toBe(true);
+  });
+
+  it("dragging a label keeps its anchor", async () => {
+    const text = label("a");
+    const x = +text.getAttribute("x")!, y = +text.getAttribute("y")!;
+    const anchor = text.getAttribute("text-anchor");
+    document.elementFromPoint = () => text;
+    ptr(text, "pointerdown", x, y);
+    ptr($("#viewport"), "pointermove", x + 24, y + 10);
+    await frame();
+    ptr($("#viewport"), "pointerup", x + 24, y + 10);
+    expect(api().getDiff().at(-1)).toMatchObject({ op: "move_label", payload: { id: "a", anchor } });
+    expect(api().getMap().components[0].label.position!.anchor).toBe(anchor);
+  });
+
+  it("dragging the legend emits move_legend from its box corner", async () => {
+    const legend = $("#map [data-kind=legend]");
+    const from = legend.getBBox();
+    document.elementFromPoint = () => legend;
+    ptr(legend, "pointerdown", 400, 400);
+    ptr($("#viewport"), "pointermove", 460, 430);
+    await frame();
+    ptr($("#viewport"), "pointerup", 460, 430);
+    expect(api().getDiff().at(-1)).toEqual({ op: "move_legend", payload: { x: from.x + 60, y: from.y + 30 } });
+  });
+
+  it("the background tool resizes the canvas through its handles", async () => {
+    key(document.body, "b");
+    const h = $("#overlay [data-handle=se][data-kind=background]");
+    const at = (n: string) => +h.getAttribute(n)!;
+    const hx = at("x") + at("width") / 2, hy = at("y") + at("height") / 2;
+    document.elementFromPoint = () => h;
+    ptr(h, "pointerdown", hx, hy);
+    ptr($("#viewport"), "pointermove", hx - 200, hy - 100);
+    await frame();
+    ptr($("#viewport"), "pointerup", hx - 200, hy - 100);
+    expect(api().getDiff().at(-1)).toEqual({ op: "resize_canvas", payload: { width: 1400, height: 700 } });
+    expect($("#map svg").getAttribute("viewBox")).toBe("0 0 1400 700");
+    act("undo");
+    expect($("#map svg").getAttribute("viewBox")).toBe("0 0 1600 800");
+    key(document.body, "v");
+  });
+
+  it("the rename box grows with its content", () => {
+    dblclick(label("m"));
+    const ta = $<HTMLTextAreaElement>(".wm-rename");
+    Object.defineProperty(ta, "scrollHeight", { value: 48, configurable: true });
+    ta.value = "Member\nof the pipeline";
+    ta.dispatchEvent(new Event("input", { bubbles: true }));
+    expect(ta.style.height).toBe("48px");
+    key(ta, "Escape");
+  });
+
   it("send: clipboard keeps the diff; endpoint delivery checkpoints it", async () => {
     const n = api().getDiff().length;
     expect(n).toBeGreaterThan(0);

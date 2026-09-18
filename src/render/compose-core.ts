@@ -15,7 +15,7 @@ import { getOrderedLayers } from "./registry.js";
  * Escape text for XML/SVG attribute/content safety.
  * Imported from svg-primitives.ts — the single source of truth.
  */
-import { esc } from "./svg-primitives.js";
+import { esc, hitAttrs } from "./svg-primitives.js";
 export { esc };
 
 /**
@@ -36,7 +36,9 @@ export function scaledFontSize(ctx: RenderContext, base: number, elementScale?: 
  */
 function renderBackground(ctx: RenderContext): string {
   const bgColor = ctx.resolvedConfig.background.color;
-  return `<rect width="${ctx.canvasWidth}" height="${ctx.canvasHeight}" fill="${esc(bgColor)}" />`;
+  // Interactive mode only: the canvas itself is a hit target (resize / deselect).
+  const hit = ctx.options?.interactive === true ? hitAttrs("background", "background") : "";
+  return `<rect width="${ctx.canvasWidth}" height="${ctx.canvasHeight}" fill="${esc(bgColor)}"${hit} />`;
 }
 
 // ── SVG document structure ───────────────────────────────────────────

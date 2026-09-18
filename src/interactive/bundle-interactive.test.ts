@@ -27,9 +27,10 @@ describe("bundle-interactive", () => {
     expect(code).toContain("data-kind"); // hit-testing contract (no legacy data-* ids)
   });
 
-  // 27 KB: editor + renderer (~11 KB incl. flow labels), plus headroom for the v2 fix pass
-  // (send checkpoint, props focus/validation, tooltip, mobile sheet).
-  it("stays within the size budget (27 KB gzip)", () => {
-    expect(gzipSync(code).length).toBeLessThan(27 * 1024);
+  // 32 KB: editor + renderer (~11 KB incl. flow labels and multi-line labels),
+  // plus the v2 pass (send checkpoint, props focus/validation, tooltip, mobile
+  // sheet, per-property locks, background resize and legend move).
+  it("stays within the size budget (32 KB gzip)", () => {
+    expect(gzipSync(code).length).toBeLessThan(32 * 1024);
   });
 });

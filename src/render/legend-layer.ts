@@ -15,6 +15,7 @@
 
 import type { RenderContext, LayerRenderer } from "./types.js";
 import { esc, scaledFontSize } from "./compose-core.js";
+import { hitAttrs } from "./svg-primitives.js";
 import { resolveTypeStyle } from "../schema-helpers.js";
 import { componentRenderableType } from "../renderable-type.js";
 import { SIN60, COS60 } from "./nodes-layer.js";
@@ -588,6 +589,11 @@ export const renderLegendLayer: LayerRenderer = (
       `font-family="Inter, sans-serif" font-size="${fontSize}" ` +
       `fill="${FONT_COLOR}">${esc(item.label)}</text>`
     );
+  }
+
+  // Interactive mode only: one draggable hit target for the whole legend.
+  if (ctx.options?.interactive === true) {
+    return [`<g${hitAttrs("legend", "legend")}>\n${parts.join("\n")}\n</g>`];
   }
 
   return parts;

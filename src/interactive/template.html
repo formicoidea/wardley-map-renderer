@@ -38,12 +38,6 @@ svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stro
 .badge{position:absolute;top:2px;right:2px;min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:var(--danger);color:var(--on-danger);font-size:10px;font-weight:700;line-height:16px}
 .primary .badge{position:static;background:var(--on-accent);color:var(--accent)}
 #zoom-level{min-width:48px;text-align:center;font-variant-numeric:tabular-nums;font-size:12px;color:var(--muted)}
-#bar .ex{display:none}
-#bar.collapsed{padding:0}
-#bar.collapsed>:not([data-action=collapse]){display:none}
-#bar.collapsed [data-action=collapse]{border-radius:7px}
-#bar.collapsed .co{display:none}
-#bar.collapsed .ex{display:block}
 #props{position:fixed;z-index:20;top:12px;right:12px;width:300px;max-height:calc(100% - var(--bar-h,50px) - 48px);display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);box-shadow:var(--shadow)}
 #props header{display:flex;align-items:center;gap:8px;padding:4px 4px 4px 16px;border-bottom:1px solid var(--border)}
 #props h2{flex:1;margin:0;font-size:14px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -76,6 +70,7 @@ svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stro
 <button data-tool="link" aria-label="Link components (L)"><svg class="i" viewBox="0 0 24 24"><path d="M8.5 15.5l7-7M4 18a2.5 2.5 0 1 0 5 0a2.5 2.5 0 1 0-5 0M15 6a2.5 2.5 0 1 0 5 0a2.5 2.5 0 1 0-5 0"/></svg></button>
 <button data-tool="evolve" aria-label="Evolve (E)"><svg class="i" viewBox="0 0 24 24"><path d="M3 12h2m3 0h2m3 0h6M15 7l5 5-5 5"/></svg></button>
 <button data-tool="pipeline" aria-label="Pipeline (P)"><svg class="i" viewBox="0 0 24 24"><path d="M3 8h18v8H3zM8 12h.01M16 12h.01"/></svg></button>
+<button data-tool="background" aria-label="Resize map background (B)"><svg class="i" viewBox="0 0 24 24"><path d="M4 4h16v16H4zM12 4v3M12 17v3M4 12h3M17 12h3"/></svg></button>
 <button data-tool="pan" aria-label="Pan (H or hold Space)"><svg class="i" viewBox="0 0 24 24"><path d="M12 3v18M3 12h18M9 6l3-3 3 3M9 18l3 3 3-3M6 9l-3 3 3 3M18 9l3 3-3 3"/></svg></button>
 <span class="sep"></span>
 <button data-action="undo" aria-label="Undo (Ctrl+Z)"><svg class="i" viewBox="0 0 24 24"><path d="M9 14L4 9l5-5M4 9h11a5 5 0 0 1 0 10h-3"/></svg></button>
@@ -86,8 +81,6 @@ svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stro
 <button data-action="download-json" aria-label="Download map JSON"><svg class="i" viewBox="0 0 24 24"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg></button>
 <button data-action="copy-diff" aria-label="Copy diff JSON"><svg class="i" viewBox="0 0 24 24"><path d="M9 9h11v11H9zM5 15H4V4h11v1"/></svg></button>
 <button data-action="send" class="primary" aria-label="Send edits to Claude"><svg class="i" viewBox="0 0 24 24"><path d="M21 3L10 14M21 3l-6.5 18-4.5-7-7-4.5z"/></svg><span class="lbl">Send</span><span class="badge" data-diff-count hidden>0</span></button>
-<span class="sep"></span>
-<button data-action="collapse" aria-label="Hide toolbar" aria-expanded="true"><svg class="i co" viewBox="0 0 24 24"><path d="M6 10l6 6 6-6"/></svg><svg class="i ex" viewBox="0 0 24 24"><path d="M18 14l-6-6-6 6"/></svg></button>
 </nav>
 
 <div id="zoom" class="bar" role="group" aria-label="Zoom">

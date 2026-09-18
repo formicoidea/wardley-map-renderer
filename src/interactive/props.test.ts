@@ -45,9 +45,9 @@ function sample(): WardleyMap {
 }
 const fields = (map: WardleyMap, id: string) => propsFields(map, id)!.fields;
 const byKey = (fs: FieldDesc[], k: string) => fs.find((f) => f.key === k);
-const applies = (map: WardleyMap, op: DiffOp | null) => {
+const applies = (map: WardleyMap, op: DiffOp | DiffOp[] | null) => {
   expect(op).not.toBeNull();
-  const next = applyDiffOp(map, op!);
+  const next = (Array.isArray(op) ? op : [op!]).reduce(applyDiffOp, map);
   expect(WardleyMapSchema.safeParse(next).success).toBe(true);
   return next;
 };
@@ -121,6 +121,26 @@ describe("propsFields", () => {
     expect(byKey(f, "recommendation")!.toOp("Transitional")).toBeNull();
     expect(byKey(f, "stepColor")!.toOp("#00ff00")).toBeNull();
     expect(byKey(f, "evolveType")).toBeUndefined();
+  });
+
+  it("locks: checkboxes mirror comp.locked, a placed label counts as locked", () => {
+    let map = sample();
+    expect(byKey(fields(map, "kettle"), "lockPosition")!.value).toBe(false);
+    expect(byKey(fields(map, "kettle"), "lockGeometry")).toBeUndefined();
+    expect(byKey(fields(map, "pipe"), "lockGeometry")!.value).toBe(false);
+
+    map = applies(map, byKey(fields(map, "kettle"), "lockPosition")!.toOp(true));
+    expect(map.components[2].locked).toEqual({ position: true });
+    expect(byKey(fields(map, "kettle"), "lockPosition")!.value).toBe(true);
+    map = applies(map, byKey(fields(map, "kettle"), "lockPosition")!.toOp(false));
+    expect(map.components[2].locked).toBeUndefined();
+
+    // A move_label placed the label: shown as locked, and unlocking clears the placement.
+    map = applies(map, { op: "move_label", payload: { id: "kettle", dx: 12, dy: -4, anchor: "end" } });
+    expect(byKey(fields(map, "kettle"), "lockLabel")!.value).toBe(true);
+    map = applies(map, byKey(fields(map, "kettle"), "lockLabel")!.toOp(false));
+    expect(map.components[2].label.position).toBeUndefined();
+    expect(byKey(fields(map, "kettle"), "lockLabel")!.value).toBe(false);
   });
 
   it("dependent fields edit existing decorators", () => {
@@ -276,6 +296,12 @@ describe("buildProps", () => {
     ck.checked = true;
     ck.onchange();
     expect(dispatch).toHaveBeenLastCalledWith({ op: "set_field", payload: { target: "power", path: "inertia", value: true } }, "inertia");
+
+    const lock = named("lockPosition");
+    lock.checked = true;
+    lock.onchange();
+    expect(dispatch).toHaveBeenLastCalledWith({ op: "set_lock", payload: { id: "power", position: true } }, "lockPosition");
+    expect(root.all((e) => e.tagName === "h3").map((e) => e.textContent)).toEqual(["Locks"]);
 
     expect(named("method").attrs.list).toBe("pf-method-list");
     expect(named("recommendation").disabled).toBe(true);

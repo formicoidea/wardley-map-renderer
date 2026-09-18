@@ -435,7 +435,15 @@ describe("renderLabel", () => {
       fontFamily: "Inter", fontSize: 12,
     });
     expect(svg).toContain("<tspan");
-    expect(svg).toContain('dy="14"');
+    expect(svg).toContain('dy="14"'); // 12 × 1.2, rounded
+  });
+
+  it("line gap scales with the font size", () => {
+    const svg = renderLabel({
+      x: 100, y: 200, text: "Line 1\nLine 2", anchor: "middle",
+      fontFamily: "Inter", fontSize: 24,
+    });
+    expect(svg).toContain('dy="29"'); // 24 × 1.2, rounded — no overlap
   });
 
   it("escapes special characters", () => {

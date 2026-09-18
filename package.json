@@ -28,6 +28,7 @@
     "build": "tsc",
     "typecheck": "tsc --noEmit",
     "gen:schema": "tsx scripts/generate-json-schema.ts",
+    "editor": "tsx scripts/editor-server.ts",
     "test": "vitest run",
     "prepublishOnly": "pnpm run gen:schema && pnpm run build"
   },

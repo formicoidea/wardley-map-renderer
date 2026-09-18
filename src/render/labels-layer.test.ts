@@ -99,3 +99,68 @@ describe("LabelsLayer", () => {
     expect(svg).toContain("Visible Anchor");
   });
 });
+
+describe("LabelsLayer — remembered anchor and locks", () => {
+  function makeMap(component: Record<string, unknown>): WardleyMap {
+    return sanitizeMap(WardleyMapSchema.parse({
+      title: "Anchor Test",
+      components: [component],
+      relations: [],
+    }));
+  }
+
+  it("a stored anchor wins over the sign of dx", () => {
+    // dx > 0 would derive "start"; the stored anchor must win (no flip on drag)
+    const map = makeMap({
+      id: "c1", label: { name: "Pinned", position: { dx: 20, dy: 4, anchor: "end" } },
+      type: "component", position: { evolution: { scalar: 0.5 }, visibility: { scalar: 0.5 } },
+    });
+    const svg = renderLabelsLayer(buildRenderContext(map)).join("\n");
+    expect(svg).toContain('text-anchor="end"');
+  });
+
+  it("without a stored anchor the sign of dx still decides", () => {
+    const map = makeMap({
+      id: "c1", label: { name: "Derived", position: { dx: -20, dy: 4 } },
+      type: "component", position: { evolution: { scalar: 0.5 }, visibility: { scalar: 0.5 } },
+    });
+    const svg = renderLabelsLayer(buildRenderContext(map)).join("\n");
+    expect(svg).toContain('text-anchor="end"');
+  });
+
+  it("locked.label pins the label even without label.position", () => {
+    // Two labels on the same spot: the locked one must keep its baseline.
+    const map = sanitizeMap(WardleyMapSchema.parse({
+      title: "Lock Test",
+      components: [
+        {
+          id: "locked", label: { name: "Locked" }, type: "component",
+          position: { evolution: { scalar: 0.5 }, visibility: { scalar: 0.5 } },
+          locked: { label: true },
+        },
+        {
+          id: "free", label: { name: "Free" }, type: "component",
+          position: { evolution: { scalar: 0.5 }, visibility: { scalar: 0.5 } },
+        },
+      ],
+      relations: [],
+    }));
+    const ctx = buildRenderContext(map);
+    const svg = renderLabelsLayer(ctx).join("\n");
+
+    // The locked label sits at the node baseline (cy + 4), untouched by phase 2
+    const node = ctx.nodes.find((n) => n.component.id === "locked")!;
+    expect(svg).toContain(`y="${node.cy + 4}" text-anchor="start"`);
+  });
+
+  it("multi-line label names are emitted as tspans, not escaped newlines", () => {
+    const map = makeMap({
+      id: "c1", label: { name: "First line\nSecond line" }, type: "component",
+      position: { evolution: { scalar: 0.5 }, visibility: { scalar: 0.5 } },
+    });
+    const svg = renderLabelsLayer(buildRenderContext(map)).join("\n");
+    expect(svg).toContain("<tspan");
+    expect(svg).toContain("Second line");
+    expect(svg).not.toContain("\\n");
+  });
+});

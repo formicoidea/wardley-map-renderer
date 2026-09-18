@@ -4,8 +4,8 @@ import { mapToPx } from "../render/browser-render.js";
 import { prepareRender } from "../render/prepare-render.js";
 import { sanitizeMap, type WardleyMap } from "../schema.js";
 import {
-  addComponentOp, componentOf, connectOp, deleteOps, dragOps, dragStart, nearestComponent, nodeCentre, rectToPipeline,
-  resolveHit, selectId, selectionExists, type ElLike, type Pt,
+  addComponentOp, canvasSize, componentOf, connectOp, deleteOps, dragOps, dragStart, MIN_CANVAS, nearestComponent, nodeCentre,
+  rectToPipeline, resolveHit, selectId, selectionExists, type ElLike, type Pt,
 } from "./gestures.js";
 import { createStore } from "./store.js";
 
@@ -41,6 +41,13 @@ describe("resolveHit", () => {
 
   it("overlay handles (data-for)", () => {
     expect(resolveHit(el({ "data-handle": "se", "data-for": "pipe" }))).toEqual({ id: "pipe", kind: "pipeline", handle: "se" });
+    // Background handles carry their own kind; the legend and the background are not components.
+    expect(resolveHit(el({ "data-handle": "e", "data-for": "background", "data-kind": "background" })))
+      .toEqual({ id: "background", kind: "background", handle: "e" });
+    expect(componentOf({ id: "legend", kind: "legend" })).toBeNull();
+    expect(selectId({ id: "legend", kind: "legend" })).toBe("legend");
+    expect(selectId({ id: "background", kind: "background" })).toBeNull();
+    expect(selectionExists(MAP, "legend")).toBe(true);
     expect(resolveHit(el({ "data-handle": "bogus", "data-for": "pipe" }))).toBeNull();
     // Renderer's pipeline handle square: data-part="handle" on the pipeline hit group.
     expect(resolveHit(el({ "data-part": "handle", "data-id": "pipe", "data-kind": "pipeline" }))).toEqual({ id: "pipe", kind: "pipeline", handle: "h" });
@@ -91,6 +98,34 @@ describe("dragOps", () => {
     const d = dragStart(MAP, prepared, { id: "a", kind: "label" }, p(0.4, 0.4, c.x + 9, c.y + 4), [], { x: c.x + 9, y: c.y + 4 });
     expect(d.label).toEqual({ dx: 9, dy: 4 });
     expect(dragOps(MAP, d, p(0, 0, c.x + 29, c.y - 6))).toEqual([{ op: "move_label", payload: { id: "a", dx: 29, dy: -6 } }]);
+  });
+
+  it("label drags carry the <text> anchor so the label does not jump", () => {
+    const c = nodeCentre(MAP, prepared, "a")!;
+    const at = { x: c.x - 9, y: c.y + 4, anchor: "end" };
+    const d = dragStart(MAP, prepared, { id: "a", kind: "label" }, p(0.4, 0.4, at.x, at.y), [], at);
+    expect(d.label).toEqual({ dx: -9, dy: 4, anchor: "end" });
+    expect(dragOps(MAP, d, p(0, 0, at.x + 5, at.y))).toEqual([
+      { op: "move_label", payload: { id: "a", dx: -4, dy: 4, anchor: "end" } },
+    ]);
+    // No usable anchor on the <text>: the renderer keeps deriving it from dx.
+    const plain = dragStart(MAP, prepared, { id: "a", kind: "label" }, p(0.4, 0.4, at.x, at.y), [], { x: at.x, y: at.y, anchor: null });
+    expect(dragOps(MAP, plain, p(0, 0, at.x + 5, at.y))).toEqual([{ op: "move_label", payload: { id: "a", dx: -4, dy: 4 } }]);
+  });
+
+  it("legend → move_legend from the box top-left; background handles → resize_canvas", () => {
+    const legend = dragStart(MAP, prepared, { id: "legend", kind: "legend" }, p(0, 0, 1400, 700), [], { x: 1380, y: 690 });
+    expect(dragOps(MAP, legend, p(0, 0, 1300, 660))).toEqual([{ op: "move_legend", payload: { x: 1280, y: 650 } }]);
+    expect(dragOps(MAP, legend, p(0, 0, 1400, 700))).toEqual([]);
+
+    const { w, h } = canvasSize(prepared);
+    const se = dragStart(MAP, prepared, { id: "background", kind: "background", handle: "se" }, p(0, 0, w, h), []);
+    expect(dragOps(MAP, se, p(0, 0, w + 120, h + 60))).toEqual([{ op: "resize_canvas", payload: { width: w + 120, height: h + 60 } }]);
+    // A west handle mirrors the movement (the canvas origin stays at 0,0), and never goes below the floor.
+    const west = dragStart(MAP, prepared, { id: "background", kind: "background", handle: "w" }, p(0, 0, 0, 0), []);
+    expect(dragOps(MAP, west, p(0, 0, 40, 0))).toEqual([{ op: "resize_canvas", payload: { width: w - 40 } }]);
+    expect(dragOps(MAP, west, p(0, 0, 9000, 0))).toEqual([{ op: "resize_canvas", payload: { width: MIN_CANVAS.w } }]);
+    expect(applyDiffOps(MAP, dragOps(MAP, se, p(0, 0, w + 120, h))).renderConfig).toBeDefined();
   });
 
   it("pipeline label anchor is the top-border handle", () => {

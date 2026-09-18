@@ -76,6 +76,37 @@ Every edit is a `DiffOp` (see `applyDiffOp`). The op log always equals the net d
 - **Copy diff** copies the raw JSON array of ops. **Download** saves the full edited map.
 - **Scripting**: `window.__wardley` exposes `getMap()`, `getDiff()`, `clearDiff()`, `apply(op)`, `undo()` and `redo()`. `getDiff()` does not clear the ops.
 
+## Éditeur interactif — boucle de retour vers Claude
+
+`Send` sait poster les ops sur `editsEndpoint`, mais encore faut-il que quelqu'un les ramasse. Le dépôt fournit les deux moitiés : un serveur de dev qui sert l'éditeur et encaisse les POST, et un hook `Stop` qui relance la conversation Claude Code avec les éditions reçues.
+
+```bash
+pnpm run editor data/ma-carte.json            # http://127.0.0.1:4173
+pnpm run editor data/ma-carte.json --port 8080 --inbox .claude/wardley-inbox
+```
+
+| Route | Effet |
+|---|---|
+| `GET /` | l'éditeur, carte relue du disque à chaque requête (recharger la page = dernier état du fichier) |
+| `POST /edits` | `{ title, ops }` → un fichier `<horodatage>.json` dans la boîte de réception, `204` |
+| `GET /health` | `200` |
+
+Le serveur écoute sur `127.0.0.1` uniquement, plafonne les corps à 1 Mo, et logue une ligne par lot reçu. Aucune dépendance : `node:http` et le renderer.
+
+Le hook `.claude/hooks/wardley-inbox.mjs`, enregistré dans `.claude/settings.json`, se déclenche quand Claude s'arrête de travailler : si la boîte contient des éditions, il les lit, les supprime, et répond `{"decision":"block","reason":"<prompt>"}` — Claude repart aussitôt sur « Applique ces N édition(s)… ». Boîte vide, absente ou erreur quelconque : sortie silencieuse, la session n'est jamais bloquée. `stop_hook_active` coupe la boucle (un tour relancé ne se relance pas lui-même). La boîte se règle via `$WARDLEY_INBOX`, sinon `<projet>/.claude/wardley-inbox`.
+
+Boucle complète : `pnpm run editor carte.json` → on édite dans le navigateur → `Send` → Claude reprend la main tout seul dès qu'il a fini ce qu'il faisait.
+
+### Les trois voies, honnêtement
+
+| Voie | Latence | Ce qu'elle coûte |
+|---|---|---|
+| **Serveur local + hook `Stop`** | immédiate si Claude travaille encore, sinon à la fin du prochain tour | ne réveille pas une session au repos : il faut un tour en cours (ou taper n'importe quoi pour en provoquer un). Hook propre à ce dépôt, donc à recopier ailleurs. |
+| **Sondage `/loop`** | l'intervalle choisi | `/loop 2m` sur un prompt qui vide la boîte : réveille vraiment une session inactive, mais consomme des tours dans le vide et la fenêtre de contexte avec. |
+| **Hôte MCP Apps** | immédiate, sans serveur ni hook | la voie propre (`ui/message`, spec 2026-01-26), mais elle suppose un hôte qui embarque la page et implémente l'extension ; Claude Code en terminal n'en est pas un aujourd'hui. |
+
+Les trois cohabitent sans conflit : `Send` essaie l'hôte, puis l'endpoint, puis le presse-papier, et s'arrête au premier qui répond.
+
 ## Text size
 
 Every text size is `base × style.global.textScale × element label.scale` (all default to `1`).
