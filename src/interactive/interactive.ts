@@ -14,12 +14,12 @@
  * @module interactive/interactive
  */
 
-import type { DiffOp } from "../diff-ops-apply.js";
+import { readConfigOverrides, type DiffOp } from "../diff-ops-apply.js";
 import { mapToPx, pxToMap, renderSVGFromPrepared, type PreparedRender } from "../render/browser-render.js";
 import type { WardleyMap } from "../schema.js";
 import {
-  addComponentOp, canEvolve, clamp01, componentOf, connectOp, deleteOps, dragOps, dragStart, nearestComponent, nodeCentre, rectToPipeline,
-  resolveHit, selectId, selectionExists, targetOf, type DragStart, type Hit, type Pt,
+  addComponentOp, canEvolve, canvasSize, clamp01, componentOf, connectOp, deleteOps, dragOps, dragStart, LEGEND_ID, nearestComponent,
+  nodeCentre, rectToPipeline, resolveHit, selectId, selectionExists, targetOf, type DragAnchor, type DragStart, type Hit, type Pt,
 } from "./gestures.js";
 import { buildProps, PROPS_CSS } from "./props.js";
 import { initShell } from "./shell.js";
@@ -53,8 +53,8 @@ interface Gesture {
   timer: number;
   shift: boolean;
   done?: boolean;
-  /** Dragged label <text> x/y at pointerdown. */
-  labelXY?: { x: number; y: number };
+  /** Dragged label <text> (x/y + anchor) or legend box top-left, at pointerdown. */
+  at?: DragAnchor;
 }
 
 export function initEditor(doc: Document): void {
@@ -88,10 +88,14 @@ export function initEditor(doc: Document): void {
   let focusKey = "";
 
   const tool = () => shell.getTool();
+  // The background rect spans the whole canvas: everywhere but its overlay
+  // handles it is empty space (pan, rubber band, click to deselect).
+  const onBackground = (el: Element | null) => !!el?.closest?.("[data-kind=background]") && !el.closest("[data-handle]");
   // Drags on map elements (and pipeline rectangles) belong to the editor, not to panning.
   const canPan = view.shouldPan;
   view.shouldPan = (ev) =>
-    tool() !== "pipeline" && canPan(ev) && !hitFor(ev.target as Element, ev.clientX, ev.clientY, ev.pointerType !== "mouse");
+    tool() !== "pipeline" && (canPan(ev) || onBackground(ev.target as Element)) &&
+    !hitFor(ev.target as Element, ev.clientX, ev.clientY, ev.pointerType !== "mouse");
   const title = () => store.map.title?.trim() || "Wardley map";
   const esc = (s: string) => CSS.escape(s);
   const byId = (id: string, kinds: string) =>
@@ -107,15 +111,35 @@ export function initEditor(doc: Document): void {
    * pipeline body a nearby member component wins over the pipeline.
    */
   const hitFor = (target: Element | null, x: number, y: number, touch = false) => {
-    const h = resolveHit(target);
+    const r = resolveHit(target);
+    const h = r?.kind === "background" && !r.handle ? null : r;
     if (h && (h.kind !== "pipeline" || h.handle)) return h;
     return nearestComponent(store.map, prepared, pt(x, y), (touch ? 16 : 6) / view.k) ?? h;
   };
   const hitAt = (x: number, y: number) => hitFor(doc.elementFromPoint(x, y), x, y);
 
   // ── Rendering ───────────────────────────────────────────────────
+  /**
+   * The prepared config is frozen server-side, so canvas size and legend
+   * position are re-read from the edited map before every render. The map stays
+   * the only source of truth — undo/redo and op replays need no extra state.
+   */
+  const config = prepared.config;
+  const base = { width: config.width, height: config.height, legend: config.legend.position };
+  let canvasKey = "";
+  const syncConfig = (map: WardleyMap) => {
+    const o = readConfigOverrides(map);
+    config.width = o.width ?? base.width;
+    config.height = o.height ?? base.height;
+    config.legend.position = o.legendPosition ?? base.legend;
+    const hint = config.coordinateSpace.outputHint;
+    if (hint?.targetWidth !== undefined) hint.targetWidth = config.width;
+    if (hint?.targetHeight !== undefined) hint.targetHeight = config.height;
+    canvasKey = `${config.width}x${config.height}`;
+  };
   const render = (map: WardleyMap = store.map) => {
     pending = null;
+    syncConfig(map);
     mapEl.innerHTML = renderSVGFromPrepared(map, prepared);
     drawOverlay();
     editing?.place();
@@ -138,13 +162,37 @@ export function initEditor(doc: Document): void {
     const sw = 1.5 / k;
     const accent = "stroke:var(--accent)";
     let s = `<defs><marker id="wm-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--accent)"/></marker></defs>`;
-    const box = (b: DOMRect, pad: number, extra = "") =>
+    const box = (b: { x: number; y: number; width: number; height: number }, pad: number, extra = "") =>
       `<rect x="${b.x - pad}" y="${b.y - pad}" width="${b.width + 2 * pad}" height="${b.height + 2 * pad}" rx="${3 / k}" fill="none" style="${accent}" stroke-width="${sw}"${extra}/>`;
     const line = (a: { x: number; y: number }, b: { x: number; y: number }, extra = "") =>
       `<line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" style="${accent}" stroke-width="${sw}"${extra}/>`;
+    const att = (s: string) => s.replace(/[&"<]/g, (c) => `&#${c.charCodeAt(0)};`);
+    /** Resize handles on the corners and edge midpoints of `b`; `skipX` drops the top-centre one. */
+    const handles = (b: { x: number; y: number; width: number; height: number }, id: string, kind = "", skipX = NaN) => {
+      const r = 6 / k;
+      const xs = { w: b.x, e: b.x + b.width, "": b.x + b.width / 2 };
+      const ys = { n: b.y, s: b.y + b.height, "": b.y + b.height / 2 };
+      let out = "";
+      for (const [v, y] of Object.entries(ys)) {
+        for (const [h, x] of Object.entries(xs)) {
+          const name = v + h;
+          if (!name || (name === "n" && Math.abs(x - skipX) < 3 * r)) continue;
+          const cursor = name.length === 2 ? (name === "nw" || name === "se" ? "nwse" : "nesw") : v ? "ns" : "ew";
+          out += `<rect data-handle="${name}" data-for="${att(id)}"${kind ? ` data-kind="${kind}"` : ""} x="${x - r}" y="${y - r}" width="${2 * r}" height="${2 * r}" rx="${r / 3}" style="fill:var(--surface);${accent};cursor:${cursor}-resize;touch-action:none" stroke-width="${sw}"/>`;
+        }
+      }
+      return out;
+    };
+
+    // Background tool: the canvas outline and its resize handles.
+    if (tool() === "background") {
+      const { w, h } = canvasSize(prepared);
+      const b = { x: 0, y: 0, width: w, height: h };
+      s += box(b, 0, ` stroke-dasharray="${6 / k}"`) + handles(b, "background", "background");
+    }
 
     for (const sel of selection) {
-      const el = byId(targetOf(sel), sel.startsWith("evolve:") ? "evolve" : "component,pipeline,relation");
+      const el = byId(targetOf(sel), sel.startsWith("evolve:") ? "evolve" : "component,pipeline,relation,legend");
       if (!el) continue;
       const kind = el.dataset.kind;
       if (kind === "relation" || kind === "evolve") {
@@ -154,20 +202,9 @@ export function initEditor(doc: Document): void {
       const body = (kind === "pipeline" ? el.firstElementChild : el) as SVGGraphicsElement;
       const b = body.getBBox();
       s += box(b, kind === "pipeline" ? 0 : 4 / k, kind === "pipeline" ? "" : ` stroke-dasharray="${4 / k}"`);
+      // The renderer's handle square (drags handleEvolution) wins over a top-centre resize handle.
       if (kind === "pipeline" && selection.length === 1) {
-        const r = 6 / k;
-        const xs = { w: b.x, e: b.x + b.width, "": b.x + b.width / 2 };
-        // The renderer's handle square (drags handleEvolution) wins over a top-centre resize handle.
-        const hx = nodeCentre(store.map, prepared, targetOf(sel))?.x ?? NaN;
-        const ys = { n: b.y, s: b.y + b.height, "": b.y + b.height / 2 };
-        for (const [v, y] of Object.entries(ys)) {
-          for (const [h, x] of Object.entries(xs)) {
-            const name = v + h;
-            if (!name || (name === "n" && Math.abs(x - hx) < 3 * r)) continue;
-            const cursor = name.length === 2 ? (name === "nw" || name === "se" ? "nwse" : "nesw") : v ? "ns" : "ew";
-            s += `<rect data-handle="${name}" data-for="${targetOf(sel).replace(/[&"<]/g, (c) => `&#${c.charCodeAt(0)};`)}" x="${x - r}" y="${y - r}" width="${2 * r}" height="${2 * r}" rx="${r / 3}" style="fill:var(--surface);${accent};cursor:${cursor}-resize;touch-action:none" stroke-width="${sw}"/>`;
-          }
-        }
+        s += handles(b, targetOf(sel), "", nodeCentre(store.map, prepared, targetOf(sel))?.x ?? NaN);
       }
     }
 
@@ -214,9 +251,11 @@ export function initEditor(doc: Document): void {
     syncUi();
   };
   const changed = () => {
+    const size = canvasKey;
     doc.title = title();
     selection = selection.filter((s) => selectionExists(store.map, s));
     render();
+    if (canvasKey !== size) view.fit(); // a resized background needs a new framing
     syncUi();
     refreshPanel();
   };
@@ -241,7 +280,7 @@ export function initEditor(doc: Document): void {
   const openProps = (id: string, reveal = true) => {
     const p = buildProps(doc, store.map, id, (op, key) => {
       focusKey = key;
-      commit([op]);
+      commit(Array.isArray(op) ? op : [op]);
     }, (msg) => shell.toast(msg, "error"));
     if (!p) return;
     const opening = reveal && panelFor !== id;
@@ -292,6 +331,12 @@ export function initEditor(doc: Document): void {
     ta.rows = old.split("\n").length;
     ta.setAttribute("aria-label", isTitle ? "Map title" : "Component name");
     let done = false;
+    // The box hides its overflow, so it must follow the text: re-measured on
+    // every input and whenever place() changes the font size or the width.
+    const grow = () => {
+      ta.style.height = "auto";
+      if (ta.scrollHeight) ta.style.height = `${ta.scrollHeight}px`;
+    };
     const place = () => {
       const cur = find();
       if (!cur) return;
@@ -303,6 +348,7 @@ export function initEditor(doc: Document): void {
         top: `${r.top - 3}px`,
         width: `${Math.max(r.width + 40, 140)}px`,
       });
+      grow();
     };
     const finish = (ok: boolean) => {
       if (done) return;
@@ -322,6 +368,7 @@ export function initEditor(doc: Document): void {
         finish(true);
       }
     });
+    ta.addEventListener("input", grow);
     ta.addEventListener("blur", () => finish(true));
     doc.body.append(ta);
     editing = { finish, place };
@@ -355,8 +402,11 @@ export function initEditor(doc: Document): void {
     lastClick = dbl ? null : { t: now, x: c.cx, y: c.cy };
     const t = tool();
     const hit = c.hit;
+    // The background tool only drags its handles; a click just clears the selection.
+    if (t === "background") return select([]);
     if (t === "select" && dbl) {
       if (!hit) return add(addComponentOp(store.map, c.start));
+      if (hit.kind === "legend") return select([LEGEND_ID]); // the legend is neither renamed nor edited
       if (hit.kind === "relation" || hit.kind === "evolve") return openProps(hit.id);
       return rename(hit.id, hit.kind === "title");
     }
@@ -415,18 +465,23 @@ export function initEditor(doc: Document): void {
     const hit = hitFor(ev.target as Element, ev.clientX, ev.clientY, ev.pointerType !== "mouse");
     const start = pt(ev.clientX, ev.clientY);
     const comp = componentOf(hit);
+    // Label drags need the <text> anchor; legend drags its box top-left (canvas px).
     const text = hit?.kind === "label" ? (ev.target as Element).closest("text") : null;
+    const legendBox = hit?.kind === "legend" ? byId(LEGEND_ID, "legend")?.getBBox() : null;
     let mode: Gesture["mode"] = "none";
     // Evolve arrows drag their head (only when unambiguous: a single arrow).
     const oneArrow = hit?.kind === "evolve" && store.map.components.find((x) => x.id === hit.id)?.evolvesTo?.length === 1;
-    if (t === "select" && hit && hit.kind !== "relation" && hit.kind !== "title" && (hit.kind !== "evolve" || oneArrow)) mode = "move";
+    if (t === "background") mode = hit?.kind === "background" && hit.handle ? "move" : "none";
+    else if (t === "select" && hit && hit.kind !== "relation" && hit.kind !== "title" && (hit.kind !== "evolve" || oneArrow)) mode = "move";
     else if (t === "link" && comp && !linkFrom) mode = t;
     else if (t === "evolve" && canEvolve(store.map, comp) && !linkFrom) mode = t;
     else if (t === "pipeline" && !hit) mode = "rect";
     const c: Gesture = {
       mode, pid: ev.pointerId, cx: ev.clientX, cy: ev.clientY, moved: false, hit, start, cur: start,
       from: mode === "link" || mode === "evolve" ? comp! : undefined, ops: [], timer: 0, shift: ev.shiftKey,
-      labelXY: text ? { x: +text.getAttribute("x")!, y: +text.getAttribute("y")! } : undefined,
+      at: text
+        ? { x: +text.getAttribute("x")!, y: +text.getAttribute("y")!, anchor: text.getAttribute("text-anchor") }
+        : legendBox ? { x: legendBox.x, y: legendBox.y } : undefined,
     };
     if (ev.pointerType === "touch" && hit) {
       c.timer = window.setTimeout(() => {
@@ -462,9 +517,9 @@ export function initEditor(doc: Document): void {
       try { vp.setPointerCapture(c.pid); } catch { /* pointer gone */ }
       if (c.mode === "move") {
         const hit = c.hit!;
-        const id = selectId(hit)!;
-        if (!selection.includes(id)) select(c.shift ? [...selection, id] : [id]);
-        c.drag = dragStart(store.map, prepared, hit, c.start, selection, c.labelXY);
+        const id = selectId(hit);
+        if (id && !selection.includes(id)) select(c.shift ? [...selection, id] : [id]);
+        c.drag = dragStart(store.map, prepared, hit, c.start, selection, c.at);
       }
     }
     if (c.mode === "move" && c.drag) {
@@ -584,6 +639,7 @@ export function initEditor(doc: Document): void {
     redo,
   };
 
+  syncConfig(store.map); // the server SVG already has them; this records the canvas size
   syncUi();
   drawOverlay();
 }

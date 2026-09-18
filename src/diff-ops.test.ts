@@ -19,6 +19,9 @@ import {
   RenameMapPayload,
   MoveLabelPayload,
   MoveStepPayload,
+  SetLockPayload,
+  ResizeCanvasPayload,
+  MoveLegendPayload,
   DiffOp,
 } from "./diff-ops.js";
 import { DiffOpSchema } from "./index.js";
@@ -88,8 +91,18 @@ describe("payload schemas", () => {
       [{ id: "p", evoStart: 1.5 }, { id: "p", evoEnd: -0.1 }, { evoStart: 0.2 }, { id: "", evoStart: 0.2 }]],
     ["RenameMapPayload", RenameMapPayload, [{ title: "T" }], [{ title: "" }, {}]],
     ["MoveLabelPayload", MoveLabelPayload,
-      [{ id: "c", dx: 0.05, dy: -0.03 }, { id: "c", dx: 0, dy: 0 }],
-      [{ dx: 0, dy: 0 }, { id: "", dx: 0, dy: 0 }, { id: "c", dy: 0 }, { id: "c", dx: 0 }, { id: "c", dx: "a", dy: 0 }, { id: 1, dx: 0, dy: 0 }]],
+      [{ id: "c", dx: 0.05, dy: -0.03 }, { id: "c", dx: 0, dy: 0 }, { id: "c", dx: 1, dy: 2, anchor: "middle" }],
+      [{ dx: 0, dy: 0 }, { id: "", dx: 0, dy: 0 }, { id: "c", dy: 0 }, { id: "c", dx: 0 }, { id: "c", dx: "a", dy: 0 }, { id: 1, dx: 0, dy: 0 },
+        { id: "c", dx: 0, dy: 0, anchor: "left" }]],
+    ["SetLockPayload", SetLockPayload,
+      [{ id: "c", label: true }, { id: "c", position: null, geometry: false }],
+      [{ id: "c" }, { label: true }, { id: "c", label: "yes" }]],
+    ["ResizeCanvasPayload", ResizeCanvasPayload,
+      [{ width: 1200 }, { height: 800 }, { width: 200, height: 10000 }],
+      [{}, { width: 199 }, { height: 10001 }, { width: "800" }]],
+    ["MoveLegendPayload", MoveLegendPayload,
+      [{ x: 40, y: 700 }, { position: "top-left" }, { position: "auto" }],
+      [{ x: 40 }, { position: "middle" }, {}]],
     ["MoveStepPayload", MoveStepPayload,
       [{ id: "s", evolution: 0.5, visibility: 0.3 }, { id: "s", evolution: 0, visibility: 1 }],
       [{ evolution: 0.5, visibility: 0.3 }, { id: 1, evolution: 0.5, visibility: 0.3 }, { id: "s", evolution: 1.5, visibility: 0.3 },
@@ -126,7 +139,12 @@ describe("DiffOp schema", () => {
     { op: "resize_pipeline", payload: { id: "p", handleEvolution: 0.4 } },
     { op: "rename_map", payload: { title: "T" } },
     { op: "move_label", payload: { id: "a", dx: 1, dy: 2 } },
+    { op: "move_label", payload: { id: "a", dx: 1, dy: 2, anchor: "end" } },
     { op: "move_step", payload: { id: "a", evolution: 0.1, visibility: 0.2 } },
+    { op: "set_lock", payload: { id: "a", label: true, position: null } },
+    { op: "resize_canvas", payload: { width: 1200, height: 800 } },
+    { op: "move_legend", payload: { x: 40, y: 700 } },
+    { op: "move_legend", payload: { position: "bottom-left" } },
   ];
 
   it("accepts every op and is exported from the package as DiffOpSchema", () => {

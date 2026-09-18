@@ -148,6 +148,13 @@ const PIPELINE_SUBTYPES = ["functional", "userNeed", "solution"] as const;
 export const LabelPositionSchema = z.object({
   dx: z.number(),
   dy: z.number(),
+  /**
+   * Text anchor of the label, in SVG terms ("start" = dx is the left edge,
+   * "end" = dx is the right edge). When absent the renderer derives it from the
+   * sign of `dx`; when present it wins, so a label placed by the collision
+   * avoider (or dragged in the editor) keeps its side instead of flipping.
+   */
+  anchor: z.enum(["start", "middle", "end"]).optional(),
 });
 
 export const LabelSchema = z.object({
@@ -215,6 +222,28 @@ export const StepDecoratorSchema = z.object({
   color: z.string().optional(),
 });
 
+// ── Per-property locks ("hardness") ────────────────────────────────────────
+/**
+ * Marks the properties of a component that were placed EXPLICITLY — by a human
+ * in the editor or by an instruction — and are therefore authoritative: they are
+ * exempted from every automatic replacement the renderer would otherwise apply.
+ *
+ * - `label`    — the label is never moved by `avoidLabelCollisions` (no phase 1,
+ *                no phase 2, no clamp). Equivalent to the historic `pinned` flag,
+ *                which stays `label.position != null || locked.label === true`.
+ * - `position` — the component's evolution/visibility are authoritative (no
+ *                automatic repositioning; marker consumed by downstream tooling).
+ * - `geometry` — pipeline geometry is authoritative.
+ *
+ * Ops that place a property set the matching lock; `set_lock` removes it.
+ * Round-trips through the editor therefore freeze a map progressively.
+ */
+export const ComponentLocksSchema = z.object({
+  position: z.boolean().optional(),
+  label: z.boolean().optional(),
+  geometry: z.boolean().optional(),
+});
+
 // ── Component (node) ───────────────────────────────────────────────────────
 // Single object + superRefine (rather than a discriminated union) so the inferred
 // type stays a flat object for the many consumers that read fields generically.
@@ -241,6 +270,8 @@ export const ComponentSchema = z
     accelerator: z.boolean().optional(),
     deaccelerator: z.boolean().optional(),
     step: StepDecoratorSchema.optional(),
+    // Properties placed explicitly — authoritative, see ComponentLocksSchema.
+    locked: ComponentLocksSchema.optional(),
   })
   .superRefine((c, ctx) => {
     if (c.type === "anchor") {
@@ -1385,6 +1416,10 @@ export type ComponentType = z.infer<typeof ComponentTypeEnum>;
 export type Method = z.infer<typeof MethodSchema>;
 export type Label = z.infer<typeof LabelSchema>;
 export type LabelPosition = z.infer<typeof LabelPositionSchema>;
+/** Text anchor stored on a label position (see LabelPositionSchema.anchor). */
+export type LabelAnchor = NonNullable<LabelPosition["anchor"]>;
+/** Per-property "hardness" flags of a component (see ComponentLocksSchema). */
+export type ComponentLocks = z.infer<typeof ComponentLocksSchema>;
 export type EvolutionField = z.infer<typeof EvolutionFieldSchema>;
 export type VisibilityField = z.infer<typeof VisibilityFieldSchema>;
 export type Position = z.infer<typeof PositionSchema>;

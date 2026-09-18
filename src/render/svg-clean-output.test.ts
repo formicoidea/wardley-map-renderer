@@ -101,6 +101,12 @@ describe("SVG format is clean (no interactive elements)", () => {
     expect(svg).not.toContain("ew-resize"); // no server-drawn pipeline handles
   });
 
+  it("interactive=true exposes the background and legend hit targets (D6)", () => {
+    const svg = renderToSVG(FULL_MAP, { interactive: true });
+    expect(svg).toContain('data-id="background" data-kind="background"');
+    expect(svg).toContain('data-id="legend" data-kind="legend"');
+  });
+
   it("clean SVG still contains actual visual elements (not stripped)", () => {
     const svg = renderToSVG(FULL_MAP);
     // Must contain the actual component labels, lines, rects — just not interactive wrappers

@@ -56,12 +56,17 @@ interface LabelBox {
   right: number;
   top: number;
   bottom: number;
+  /** Number of rendered lines (manual "\n" in label.name) */
+  lines: number;
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
 function labelToBox(l: LabelPlacement, charWidth: number, lineHeight: number): LabelBox {
-  const textW = l.text.length * charWidth;
+  // Multi-line labels: widest line drives the width, line count the height.
+  // l.y is the baseline of the FIRST line, so extra lines extend downward.
+  const lines = l.text.split("\n");
+  const textW = Math.max(...lines.map((s) => s.length)) * charWidth;
   let left: number, right: number;
   if (l.anchor === "start") {
     left = l.x;
@@ -78,7 +83,8 @@ function labelToBox(l: LabelPlacement, charWidth: number, lineHeight: number): L
     left,
     right,
     top: l.y - lineHeight * 0.7,
-    bottom: l.y + lineHeight * 0.3,
+    bottom: l.y + lineHeight * 0.3 + lineHeight * (lines.length - 1),
+    lines: lines.length,
   };
 }
 
@@ -161,11 +167,15 @@ export function avoidLabelCollisions(
     let bestPenalty = currentPenalty;
     let bestCandidate: LabelPlacement | null = null;
 
+    // Extra lines hang below the first baseline: the "above" candidate has to
+    // start that much higher to really sit above the node.
+    const extra = lineHeight * (boxes[i].lines - 1);
+
     for (const cand of LABEL_CANDIDATES) {
       const trial: LabelPlacement = {
         ...lbl,
         x: lbl.nodeCx + cand.dx,
-        y: lbl.nodeCy + cand.dy,
+        y: lbl.nodeCy + cand.dy - (cand.dy < 0 ? extra : 0),
         anchor: cand.anchor,
       };
       const trialBox = labelToBox(trial, charWidth, lineHeight);
@@ -216,11 +226,13 @@ export function avoidLabelCollisions(
     }
   }
 
-  // Clamp labels inside plot area (skip pinned labels)
+  // Clamp labels inside plot area (skip pinned labels).
+  // The bottom bound leaves room for the extra lines hanging below the baseline.
   for (const b of boxes) {
     if (b.label.pinned) continue;
+    const bottomBound = clampBottom - lineHeight * (b.lines - 1);
     if (b.label.y < clampTop + lineHeight) b.label.y = clampTop + lineHeight;
-    if (b.label.y > clampBottom) b.label.y = clampBottom;
+    if (b.label.y > bottomBound) b.label.y = bottomBound;
   }
 
   return boxes.map((b) => b.label);

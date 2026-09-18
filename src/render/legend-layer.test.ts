@@ -635,3 +635,20 @@ describe("LegendLayer — accelerator subtype isolation", () => {
     expect(svg).not.toContain(">Accelerator<");
   });
 });
+
+// ── D6: editor hit targets (interactive mode only) ───────────────────
+
+describe("LegendLayer — interactive hit target", () => {
+  it("interactive mode wraps the legend in a data-id/data-kind group", () => {
+    const ctx = buildRenderContext(makeMap(), { interactive: true });
+    const svg = renderLegendLayer(ctx).join("\n");
+    expect(svg).toContain('<g data-id="legend" data-kind="legend">');
+    expect(svg.trim().endsWith("</g>")).toBe(true);
+  });
+
+  it("non-interactive output carries no hit attributes", () => {
+    const svg = renderLegendLayer(buildRenderContext(makeMap())).join("\n");
+    expect(svg).not.toContain("data-id=");
+    expect(svg).not.toContain("data-kind=");
+  });
+});

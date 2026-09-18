@@ -33,8 +33,14 @@ Desktop.ini
 ehthumbs.db
 
 # ── Claude Code ───────────────────────────────
-.claude/
+# Everything is local, except the editor→Claude bridge (hook + its registration).
+.claude/*
+!.claude/settings.json
+!.claude/hooks/
 .omc/
+
+# ── Editor inbox (edits waiting for the Stop hook) ──
+wardley-inbox/
 
 # ── Logs & debug ──────────────────────────────
 logs/
@@ -69,6 +75,8 @@ CLAUDE.md
 /scripts/**
 !/scripts/bundle-interactive.ts
 !/scripts/generate-json-schema.ts
+!/scripts/editor-server.ts
+!/scripts/editor-server.test.ts
 
 # ── data/ : ignore all except fixtures used by visual-regression.test.ts ──
 /data/**
@@ -76,3 +84,5 @@ CLAUDE.md
 !/data/mapkeep/mapkeep-extracted-maps.json
 !/data/verified-exemples/
 !/data/verified-exemples/**
+!/data/demo-editor-map.json
+

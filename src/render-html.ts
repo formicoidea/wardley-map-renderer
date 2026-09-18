@@ -31,6 +31,16 @@ export interface HTMLRenderOptions extends RenderOptions {
 const asset = (path: string) => new URL(path, import.meta.url);
 let bundle: Promise<string> | undefined;
 
+/**
+ * Drop the cached editor bundle so the next interactive render rebuilds it.
+ * For dev servers only: without it a long-running process keeps serving the
+ * bundle built on its first request, while the template is re-read every time —
+ * new buttons appear but their code does not.
+ */
+export function invalidateInteractiveBundle(): void {
+  bundle = undefined;
+}
+
 function loadBundle(): Promise<string> {
   return (bundle ??= readFile(asset("./interactive-bundle.js"), "utf-8").catch(async () => {
     // Not built (running from src/): bundle on the fly. Non-literal specifier keeps tsc's rootDir happy.

@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, it, expect } from "vitest";
-import { applyDiffOp, applyDiffOps, uniqueId, pipelineMembers, type DiffOp } from "./diff-ops-apply.js";
+import { applyDiffOp, applyDiffOps, readConfigOverrides, uniqueId, pipelineMembers, type DiffOp } from "./diff-ops-apply.js";
 import { DiffOp as DiffOpSchema, SetFieldPayload, ResizePipelinePayload } from "./diff-ops.js";
 import { sanitizeMap, type WardleyMap } from "./schema.js";
 
@@ -320,6 +320,15 @@ describe("move_label / legacy ops", () => {
     expect(find(next, "out").label.position).toEqual({ dx: 12, dy: -6 });
   });
 
+  it("move_label keeps an explicit anchor and rejects an unknown one", () => {
+    const next = applyDiffOp(makeMap(), { op: "move_label", payload: { id: "out", dx: 12, dy: -6, anchor: "end" } });
+    expect(find(next, "out").label.position).toEqual({ dx: 12, dy: -6, anchor: "end" });
+    expect(() => applyDiffOp(makeMap(), {
+      op: "move_label",
+      payload: { id: "out", dx: 0, dy: 0, anchor: "left" as never },
+    })).toThrow(/anchor must be one of/);
+  });
+
   it("rename_component, rename_map, change_component_type, change_edge_type, set_flow still work", () => {
     const next = applyDiffOps(makeMap(), [
       { op: "rename_component", payload: { id: "out", name: "N" } },
@@ -344,5 +353,115 @@ describe("move_label / legacy ops", () => {
       { op: "resize_pipeline", payload: { id: "p", visStart: 0.1 } },
     ];
     for (const s of samples) expect(DiffOpSchema.safeParse(s).success, s.op).toBe(true);
+  });
+});
+
+describe("locks", () => {
+  it("placing a property locks it (position / label / geometry)", () => {
+    const m = applyDiffOps(makeMap(), [
+      { op: "move_component", payload: { id: "out", evolution: 0.2, visibility: 0.2 } },
+      { op: "move_label", payload: { id: "out", dx: 4, dy: 4 } },
+      { op: "move_pipeline", payload: { id: "pipe", dEvo: 0.05, dVis: 0 } },
+      { op: "resize_pipeline", payload: { id: "pipe", visEnd: 0.5 } },
+    ]);
+    expect(find(m, "out").locked).toEqual({ position: true, label: true });
+    expect(find(m, "pipe").locked).toEqual({ geometry: true });
+    expect(find(m, "in-b").locked).toBeUndefined();
+  });
+
+  it("move_step locks the position too", () => {
+    const seed = makeMap();
+    find(seed, "out").step = { number: 1 };
+    const m = applyDiffOp(seed, { op: "move_step", payload: { id: "out", evolution: 0.3, visibility: 0.3 } });
+    expect(find(m, "out").locked).toEqual({ position: true });
+  });
+
+  it("set_lock round-trips: null removes a flag and drops an empty locked object", () => {
+    let m = applyDiffOp(makeMap(), { op: "set_lock", payload: { id: "out", label: true, position: false } });
+    expect(find(m, "out").locked).toEqual({ label: true, position: false });
+    m = applyDiffOp(m, { op: "set_lock", payload: { id: "out", position: null } });
+    expect(find(m, "out").locked).toEqual({ label: true });
+    m = applyDiffOp(m, { op: "set_lock", payload: { id: "out", label: null } });
+    expect(find(m, "out").locked).toBeUndefined();
+  });
+
+  it("set_lock validates its payload", () => {
+    const m = makeMap();
+    expect(() => applyDiffOp(m, { op: "set_lock", payload: { id: "out" } })).toThrow(/at least one of/);
+    expect(() => applyDiffOp(m, { op: "set_lock", payload: { id: "nope", label: true } })).toThrow(/unknown component id/);
+    expect(() => applyDiffOp(m, { op: "set_lock", payload: { id: "out", label: "yes" as never } })).toThrow(/boolean or null/);
+  });
+});
+
+describe("resize_canvas / move_legend / readConfigOverrides", () => {
+  /** v3 shape (what a human- or Claude-authored map carries). */
+  const v3Map = (): WardleyMap => ({
+    ...makeMap(),
+    renderConfig: {
+      style: {
+        background: { canvas: { default: { width: 1200, height: 800 } } },
+        view: { default: { width: 600, height: 400 } },
+      },
+    },
+  } as unknown as WardleyMap);
+
+  /** Legacy shape (what WardleyMapSchema / sanitizeMap hands the editor). */
+  const legacyMap = (): WardleyMap => ({
+    ...makeMap(),
+    renderConfig: {
+      spatial: {
+        width: 1200,
+        height: 800,
+        coordinateSpace: { width: 1200, height: 800, outputHint: { targetWidth: 600, targetHeight: 400 } },
+      },
+      legend: { position: "bottom-right" },
+    },
+  } as unknown as WardleyMap);
+
+  const rc = (m: WardleyMap) => (m as unknown as { renderConfig: any }).renderConfig;
+
+  it("resizes a v3 map in the v3 paths, output hint included", () => {
+    const m = applyDiffOp(v3Map(), { op: "resize_canvas", payload: { width: 1000, height: 500 } });
+    expect(rc(m).style.background.canvas.default).toEqual({ width: 1000, height: 500 });
+    expect(rc(m).style.view.default).toEqual({ width: 1000, height: 500 });
+    expect(rc(m).spatial).toBeUndefined();
+    expect(readConfigOverrides(m)).toMatchObject({ width: 1000, height: 500 });
+  });
+
+  it("resizes a legacy map in the legacy paths, coordinateSpace and output hint included", () => {
+    const m = applyDiffOp(legacyMap(), { op: "resize_canvas", payload: { width: 1000 } });
+    expect(rc(m).spatial).toMatchObject({ width: 1000, height: 800 });
+    expect(rc(m).spatial.coordinateSpace).toMatchObject({ width: 1000, height: 800 });
+    expect(rc(m).spatial.coordinateSpace.outputHint).toEqual({ targetWidth: 1000, targetHeight: 400 });
+    expect(rc(m).style).toBeUndefined();
+    expect(readConfigOverrides(m)).toMatchObject({ width: 1000, height: 400 });
+  });
+
+  it("creates a v3 config on a map that has none", () => {
+    const m = applyDiffOp(makeMap(), { op: "resize_canvas", payload: { height: 900 } });
+    expect(rc(m)).toEqual({ style: { background: { canvas: { default: { height: 900 } } } } });
+    expect(readConfigOverrides(makeMap())).toEqual({});
+    expect(readConfigOverrides(m)).toEqual({ height: 900 });
+  });
+
+  it("rejects out-of-range or empty resize_canvas payloads", () => {
+    const m = makeMap();
+    expect(() => applyDiffOp(m, { op: "resize_canvas", payload: {} })).toThrow(/width and\/or height/);
+    expect(() => applyDiffOp(m, { op: "resize_canvas", payload: { width: 100 } })).toThrow(/\[200, 10000\]/);
+    expect(() => applyDiffOp(m, { op: "resize_canvas", payload: { height: 20000 } })).toThrow(/\[200, 10000\]/);
+  });
+
+  it("move_legend writes x/y or a named anchor in both shapes", () => {
+    const v3 = applyDiffOp(v3Map(), { op: "move_legend", payload: { x: 40, y: 700 } });
+    expect(rc(v3).style.legend.default.box.position).toEqual({ x: 40, y: 700 });
+    expect(readConfigOverrides(v3).legendPosition).toEqual({ x: 40, y: 700 });
+
+    const legacy = applyDiffOp(legacyMap(), { op: "move_legend", payload: { position: "top-left" } });
+    expect(rc(legacy).legend.position).toBe("top-left");
+    expect(rc(legacy).style).toBeUndefined();
+    expect(readConfigOverrides(legacy).legendPosition).toBe("top-left");
+
+    expect(() => applyDiffOp(makeMap(), { op: "move_legend", payload: { position: "middle" as never } }))
+      .toThrow(/position must be one of/);
   });
 });

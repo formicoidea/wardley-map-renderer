@@ -69,7 +69,8 @@ export const renderLabelsLayer: LayerRenderer = (
     fontSizeById.set(comp.id, Math.round(scaledFontSize(ctx, COMPONENT_LABEL_BASE_FONT_SIZE, labelScale * nodeScale)));
 
     // Label offset: to the right of node (pipelines: above handle center)
-    const hasCustomPos = comp.label.position != null;
+    // Pinned = placed explicitly, so collision avoidance must leave it alone.
+    const pinned = comp.label.position != null || comp.locked?.label === true;
     let dx: number;
     let dy: number;
     let anchor: "start" | "middle" | "end" = "middle";
@@ -85,6 +86,10 @@ export const renderLabelsLayer: LayerRenderer = (
       anchor = dx > 0 ? "start" : anchor;
     }
 
+    // A stored anchor wins over the sign of dx: a label the collision avoider
+    // (or the editor) placed keeps its side instead of flipping when dragged.
+    anchor = comp.label.position?.anchor ?? anchor;
+
     labelPlacements.push({
       x: cx + dx,
       y: cy + dy,
@@ -92,7 +97,7 @@ export const renderLabelsLayer: LayerRenderer = (
       anchor,
       nodeCx: cx,
       nodeCy: cy,
-      pinned: hasCustomPos,
+      pinned,
       componentId: comp.id,
     });
   }

@@ -2,9 +2,10 @@
  * Properties panel for the interactive editor.
  *
  * `propsFields()` is pure (descriptor list, unit-tested in node); `buildProps()`
- * turns it into a native `<form>`. Every control commits on `change` and maps
- * to exactly ONE DiffOp; the caller re-builds the panel after each dispatch
- * (options depend on the edited map). Browser code: no runtime imports.
+ * turns it into a native `<form>`. Every control commits on `change` and maps to
+ * ONE edit — a single DiffOp, or a group the caller applies as one undo step;
+ * the caller re-builds the panel after each dispatch (options depend on the
+ * edited map). Browser code: no runtime imports.
  *
  * @module interactive/props
  */
@@ -13,7 +14,7 @@ import type { DiffOp } from "../diff-ops-apply.js";
 import type { Component, Relation, WardleyMap } from "../schema.js";
 
 /** `key`: the field that committed (`<key>.clear` for its Clear button). */
-export type Dispatch = (op: DiffOp, key: string) => void;
+export type Dispatch = (op: DiffOp | DiffOp[], key: string) => void;
 
 // ── Zod-free enum mirrors (props.test.ts asserts they equal src/schema.ts) ──
 export const COMPONENT_TYPES = ["anchor", "component", "pipeline"] as const;
@@ -58,8 +59,10 @@ export interface FieldDesc {
   danger?: boolean;
   /** Fields sharing a `row` are laid out side by side. */
   row?: string;
-  /** The op for a committed value, or null when the value is invalid / a no-op. */
-  toOp(v: FieldValue): DiffOp | null;
+  /** [heading, help text] rendered above this field. */
+  section?: [string, string];
+  /** The op(s) for a committed value, or null when the value is invalid / a no-op. */
+  toOp(v: FieldValue): DiffOp | DiffOp[] | null;
 }
 
 const opts = (xs: readonly string[], none?: string): [string, string][] =>
@@ -146,6 +149,24 @@ function componentFields(map: WardleyMap, c: Component): FieldDesc[] {
   add({ key: "rangeMin", label: "Evolution from", value: r ? String(r[0]) : "", ...numRange, toOp: range(0) });
   add({ key: "rangeMax", label: "Evolution to", value: r ? String(r[1]) : "", ...numRange, clear: !!r && "Clear range", toOp: range(1) });
 
+  // Locks: a checked box means the value was placed on purpose and no automatic
+  // replacement may touch it. A placed label.position pins the label just as the
+  // lock does, so unlocking the label clears it in the same edit.
+  const lock = (key: "position" | "label" | "geometry", v: FieldValue): DiffOp =>
+    ({ op: "set_lock", payload: { id, [key]: v === true ? true : null } });
+  add({
+    key: "lockPosition", label: "Position", kind: "checkbox", value: !!c.locked?.position,
+    section: ["Locks", "Locked values are authoritative: nothing moves them automatically."],
+    toOp: (v) => lock("position", v),
+  });
+  add({
+    key: "lockLabel", label: "Label", kind: "checkbox", value: !!c.locked?.label || c.label.position != null,
+    toOp: (v) => (v !== true && c.label.position ? [lock("label", v), set(id, "label.position", null)] : lock("label", v)),
+  });
+  if (c.type === "pipeline") {
+    add({ key: "lockGeometry", label: "Geometry", kind: "checkbox", value: !!c.locked?.geometry, toOp: (v) => lock("geometry", v) });
+  }
+
   add({
     key: "delete", label: c.type === "pipeline" ? "Delete pipeline" : "Delete component", kind: "button", value: "", danger: true,
     toOp: () => ({ op: c.type === "pipeline" ? "delete_pipeline" : "delete_component", payload: { id } }),
@@ -197,6 +218,8 @@ export const PROPS_CSS =
   ".pf button{font:inherit;height:34px;padding:0 12px;border:1px solid var(--border);border-radius:6px;background:none;color:var(--fg);cursor:pointer}" +
   ".pf button:hover{background:var(--hover)}" +
   ".pf button:disabled{opacity:.4;cursor:default}" +
+  ".pf h3{margin:4px 0 -4px;font-size:13px;font-weight:600}" +
+  ".pf .h{margin:0;font-size:12px;color:var(--muted)}" +
   ".pf .d{color:var(--danger)}";
 
 /**
@@ -231,6 +254,10 @@ export function buildProps(
   let row: HTMLElement | null = null;
 
   for (const f of spec.fields) {
+    if (f.section) {
+      form.append(el("h3", { textContent: f.section[0] }), el("p", { className: "h", textContent: f.section[1] }));
+      row = null;
+    }
     if (f.kind === "button") {
       actions.append(button(f.key, f.label, () => fire(f, null), { disabled: !!f.disabled, className: f.danger ? "d" : "" }));
       continue;

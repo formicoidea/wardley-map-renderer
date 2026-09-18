@@ -6,6 +6,9 @@
  *
  * Coordinates are normalized [0, 1]; `move_label` / `label.position` dx,dy are
  * SVG user units (px) relative to the node centre (see render/labels-layer.ts).
+ * `resize_canvas` and `move_legend` are in canvas px and target `map.renderConfig`
+ * (whichever shape it uses) instead of a component; `set_lock` edits the
+ * per-property locks that exempt a property from automatic replacement.
  *
  * @module diff-ops
  */
@@ -16,6 +19,7 @@ import {
   EvolutionRangeSchema,
   EvolvesToSchema,
   LabelPositionSchema,
+  LegendPositionEnum,
   MethodSchema,
   NatureEnum,
   RelationTypeEnum,
@@ -152,8 +156,39 @@ export const MoveLabelPayload = z.object({
   dx: z.number(),
   /** Vertical offset from the node centre, SVG user units (px) */
   dy: z.number(),
+  /** Explicit text anchor; omitted, the renderer derives it from the sign of dx. */
+  anchor: LabelPositionSchema.shape.anchor,
 });
 export type MoveLabelPayload = z.infer<typeof MoveLabelPayload>;
+
+/** Per-property locks: `true`/`false` sets the flag, `null` removes it, omitted leaves it. */
+export const SetLockPayload = z
+  .object({
+    id: Id,
+    position: z.boolean().nullable().optional(),
+    label: z.boolean().nullable().optional(),
+    geometry: z.boolean().nullable().optional(),
+  })
+  .refine((p) => [p.position, p.label, p.geometry].some((v) => v !== undefined), {
+    message: "set_lock needs at least one of position, label, geometry",
+  });
+export type SetLockPayload = z.infer<typeof SetLockPayload>;
+
+/** Map background (canvas) size in px — at least one dimension. */
+const CanvasDimension = z.number().min(200).max(10000);
+export const ResizeCanvasPayload = z
+  .object({ width: CanvasDimension.optional(), height: CanvasDimension.optional() })
+  .refine((p) => p.width !== undefined || p.height !== undefined, {
+    message: "resize_canvas needs width and/or height",
+  });
+export type ResizeCanvasPayload = z.infer<typeof ResizeCanvasPayload>;
+
+/** Legend box top-left corner in canvas px, or a named anchor. */
+export const MoveLegendPayload = z.union([
+  z.object({ x: z.number(), y: z.number() }),
+  z.object({ position: LegendPositionEnum }),
+]);
+export type MoveLegendPayload = z.infer<typeof MoveLegendPayload>;
 
 export const MoveStepPayload = z.object({
   /** Id of the component carrying the step decorator */
@@ -212,6 +247,9 @@ export const MoveLabelOp = op("move_label", MoveLabelPayload);
 export const MoveStepOp = op("move_step", MoveStepPayload);
 export const RenameMapOp = op("rename_map", RenameMapPayload);
 export const SetFieldOp = op("set_field", SetFieldPayload);
+export const SetLockOp = op("set_lock", SetLockPayload);
+export const ResizeCanvasOp = op("resize_canvas", ResizeCanvasPayload);
+export const MoveLegendOp = op("move_legend", MoveLegendPayload);
 
 export const DiffOp = z.discriminatedUnion("op", [
   MoveComponentOp,
@@ -232,6 +270,9 @@ export const DiffOp = z.discriminatedUnion("op", [
   MoveStepOp,
   RenameMapOp,
   SetFieldOp,
+  SetLockOp,
+  ResizeCanvasOp,
+  MoveLegendOp,
 ]);
 
 /** The engine's op type (source of truth, zod-free). */

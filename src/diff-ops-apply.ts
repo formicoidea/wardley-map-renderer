@@ -10,15 +10,20 @@
  * - All positions are normalized [0, 1] (evolution = x, visibility = y), except
  *   `move_label` / `label.position` whose dx/dy are SVG user units (px) relative
  *   to the node centre, exactly as `src/render/labels-layer.ts` consumes them.
+ * - Ops that place a property explicitly set the matching lock on the component
+ *   (`comp.locked.{position,label,geometry}`); `set_lock` clears it.
  *
  * @module diff-ops-apply
  */
 
 import type {
   Component,
+  ComponentLocks,
   EvolvesTo,
   Flow,
+  LabelAnchor,
   LabelPosition,
+  LegendPosition,
   Method,
   Nature,
   PipelineGeometry,
@@ -83,9 +88,32 @@ export interface ResizePipelinePayload {
   handleEvolution?: number;
 }
 export interface MovePipelinePayload { id: string; dEvo: number; dVis: number }
-export interface MoveLabelPayload { id: string; dx: number; dy: number }
+export interface MoveLabelPayload {
+  id: string;
+  dx: number;
+  dy: number;
+  /** Explicit text anchor; omit to let the renderer derive it from `dx`. */
+  anchor?: LabelAnchor;
+}
 export interface MoveStepPayload { id: string; evolution: number; visibility: number }
 export interface RenameMapPayload { title: string }
+/** Set (`true`/`false`) or remove (`null`) per-property locks; omitted keys are left alone. */
+export interface SetLockPayload {
+  id: string;
+  position?: boolean | null;
+  label?: boolean | null;
+  geometry?: boolean | null;
+}
+/** Canvas (map background) size in px; at least one of the two, each in [200, 10000]. */
+export interface ResizeCanvasPayload { width?: number; height?: number }
+/** Named legend anchor ("bottom-right", "auto", …). */
+export type LegendPositionName = LegendPosition;
+/** What a legend position can be: a named anchor or a canvas-px top-left corner. */
+export type LegendPositionValue = LegendPositionName | { x: number; y: number };
+/** Legend top-left corner in canvas px, or a named anchor. */
+export type MoveLegendPayload =
+  | { x: number; y: number; position?: never }
+  | { position: LegendPositionName; x?: never; y?: never };
 
 /** Value type per allowed `set_field` path (null deletes the field). */
 export interface SetFieldValues {
@@ -130,13 +158,22 @@ export type DiffOp =
   | { op: "move_label"; payload: MoveLabelPayload }
   | { op: "move_step"; payload: MoveStepPayload }
   | { op: "rename_map"; payload: RenameMapPayload }
-  | { op: "set_field"; payload: SetFieldPayload };
+  | { op: "set_field"; payload: SetFieldPayload }
+  | { op: "set_lock"; payload: SetLockPayload }
+  | { op: "resize_canvas"; payload: ResizeCanvasPayload }
+  | { op: "move_legend"; payload: MoveLegendPayload };
 
 export type DiffOpName = DiffOp["op"];
 
 // ── Small helpers ────────────────────────────────────────────────────
 
 const COMPONENT_TYPES: readonly string[] = ["anchor", "component", "pipeline"];
+const LABEL_ANCHORS: readonly string[] = ["start", "middle", "end"];
+const LOCK_KEYS = ["position", "label", "geometry"] as const;
+const LEGEND_POSITIONS: readonly string[] = ["top-left", "top-right", "bottom-left", "bottom-right", "auto"];
+/** Canvas size bounds (px), matching the v3 render-config schema's upper bound. */
+const CANVAS_MIN = 200;
+const CANVAS_MAX = 10000;
 const RELATION_TYPES: readonly string[] = ["DependsOn", "Flow", "Constraint"];
 const FLOW_STYLES: readonly string[] = ["solid", "dashed", "bold"];
 const EVOLVE_TYPES: readonly string[] = ["natural", "ecosystem", "forced", "late"];
@@ -174,6 +211,12 @@ function unit(v: unknown, name: string): number {
   if (n < 0 || n > 1) fail(`${name} must be within [0, 1]`);
   return n;
 }
+/** Canvas dimension in px: bounded and rounded (drag handles produce fractions). */
+function canvasDim(v: unknown, name: string): number {
+  const n = num(v, name);
+  if (n < CANVAS_MIN || n > CANVAS_MAX) fail(`${name} must be within [${CANVAS_MIN}, ${CANVAS_MAX}]`);
+  return Math.round(n);
+}
 /** Hex (#rgb … #rrggbbaa) or a Tailwind-style name ("red-600"): safe to put in markup. */
 function color(v: unknown, name: string): string {
   if (typeof v !== "string" || !/^(#[0-9a-f]{3,8}|[a-z]+-\d{2,3})$/i.test(v)) {
@@ -205,6 +248,14 @@ function getPipeline(map: WardleyMap, id: unknown): Component & { pipelineGeomet
 }
 function idTaken(map: WardleyMap, id: string): boolean {
   return map.components.some((c) => c.id === id) || map.relations.some((r) => r.id === id);
+}
+
+/**
+ * Record that a property was placed explicitly, so downstream automatic
+ * replacement leaves it alone (see ComponentLocksSchema in schema.ts).
+ */
+function setLock(comp: Component, key: keyof ComponentLocks): void {
+  (comp.locked ??= {})[key] = true;
 }
 
 /**
@@ -351,8 +402,11 @@ function setComponentField(map: WardleyMap, comp: Component, path: string, value
       return;
     case "label.position":
       if (value !== null && !isObj(value)) fail("label.position must be { dx, dy } or null");
-      if (value === null) delete comp.label.position;
-      else comp.label.position = { dx: num(value.dx, "label.position.dx"), dy: num(value.dy, "label.position.dy") };
+      if (value === null) { delete comp.label.position; return; }
+      comp.label.position = { dx: num(value.dx, "label.position.dx"), dy: num(value.dy, "label.position.dy") };
+      if (value.anchor !== undefined) {
+        comp.label.position.anchor = oneOf<LabelAnchor>(value.anchor, LABEL_ANCHORS, "label.position.anchor");
+      }
       return;
     case "description":
       if (value !== null && typeof value !== "string") fail(`${path} must be a string or null`);
@@ -426,6 +480,120 @@ function setRelationField(map: WardleyMap, rel: Relation, path: string, value: u
   }
 }
 
+// ── Render config (canvas size + legend position) ────────────────────
+//
+// `map.renderConfig` comes in two shapes: the v3 input shape authors write
+// (`display`/`rendering`/`style`/`configIntent`) and the legacy nested shape
+// WardleyMapSchema transforms it into at parse time (`spatial`/`legend`/…).
+// The two must NEVER be mixed in one object: RenderConfigV3Schema is `.strict()`
+// and a hybrid object fails to parse. So we detect the shape, then write the
+// matching paths:
+//
+//   v3     style.background.canvas.default.{width,height} · style.view.default.{width,height}
+//          style.legend.default.box.position
+//   legacy spatial.{width,height} (+ spatial.coordinateSpace.{width,height} and
+//          .outputHint.{targetWidth,targetHeight} when present) · legend.position
+//
+// `computeCanvasFrame` prefers the output hint over the canvas size, hence the
+// hint is kept in sync — otherwise resizing the background changes nothing.
+
+type AnyRecord = Record<string, any>;
+
+/** v3 when there is no config yet (we create v3), or when a v3 top-level key is present. */
+function isV3Config(rc: unknown): boolean {
+  return !isObj(rc) || ["display", "rendering", "style", "configIntent"].some((k) => k in rc);
+}
+
+/** Walk (creating as needed) a chain of plain-object keys. */
+function nest(obj: AnyRecord, ...keys: string[]): AnyRecord {
+  let cur = obj;
+  for (const k of keys) cur = (cur[k] ??= {});
+  return cur;
+}
+
+/** Read one facet of a v3 element style `{ default?, override? }` (override wins). */
+function v3El(el: unknown, key: string): unknown {
+  if (!isObj(el)) return undefined;
+  const over = isObj(el.override) ? el.override[key] : undefined;
+  if (over !== undefined) return over;
+  return isObj(el.default) ? el.default[key] : undefined;
+}
+
+/** `map.renderConfig` (created when missing) + the shape to write into. */
+function configTarget(map: WardleyMap): { rc: AnyRecord; v3: boolean } {
+  const m = map as AnyRecord;
+  const v3 = isV3Config(m.renderConfig); // decided BEFORE creating an empty one
+  return { rc: (m.renderConfig ??= {}), v3 };
+}
+
+function writeCanvasSize(map: WardleyMap, width?: number, height?: number): void {
+  const { rc, v3 } = configTarget(map);
+  if (v3) {
+    const canvas = nest(rc, "style", "background", "canvas", "default");
+    const view = (rc.style as AnyRecord).view as AnyRecord | undefined;
+    // Output hint: update it where it is declared, never create one.
+    const syncHint = (key: "width" | "height", v: number) => {
+      for (const level of [view?.override, view?.default]) {
+        if (isObj(level) && level[key] !== undefined) { level[key] = v; return; }
+      }
+    };
+    if (width !== undefined) { canvas.width = width; syncHint("width", width); }
+    if (height !== undefined) { canvas.height = height; syncHint("height", height); }
+    return;
+  }
+  const spatial = nest(rc, "spatial");
+  const cs = isObj(spatial.coordinateSpace) ? (spatial.coordinateSpace as AnyRecord) : undefined;
+  const hint = cs && isObj(cs.outputHint) ? (cs.outputHint as AnyRecord) : undefined;
+  if (width !== undefined) {
+    spatial.width = width;
+    if (cs?.width !== undefined) cs.width = width;
+    if (hint?.targetWidth !== undefined) hint.targetWidth = width;
+  }
+  if (height !== undefined) {
+    spatial.height = height;
+    if (cs?.height !== undefined) cs.height = height;
+    if (hint?.targetHeight !== undefined) hint.targetHeight = height;
+  }
+}
+
+function writeLegendPosition(map: WardleyMap, position: LegendPositionValue): void {
+  const { rc, v3 } = configTarget(map);
+  if (v3) nest(rc, "style", "legend", "default", "box").position = position;
+  else nest(rc, "legend").position = position;
+}
+
+/** Canvas size / legend position overrides carried by a map's renderConfig (both shapes). */
+export function readConfigOverrides(map: WardleyMap): {
+  width?: number;
+  height?: number;
+  legendPosition?: LegendPositionValue;
+} {
+  const rc = (map as AnyRecord).renderConfig as unknown;
+  if (!isObj(rc)) return {};
+  let width: unknown, height: unknown, position: unknown;
+  if (isV3Config(rc)) {
+    const style = isObj(rc.style) ? rc.style : {};
+    const canvas = isObj(style.background) ? (style.background as AnyRecord).canvas : undefined;
+    // The output hint (style.view) wins, exactly as computeCanvasFrame does.
+    width = v3El(style.view, "width") ?? v3El(canvas, "width");
+    height = v3El(style.view, "height") ?? v3El(canvas, "height");
+    const box = v3El(style.legend, "box");
+    position = isObj(box) ? box.position : undefined;
+  } else {
+    const spatial = isObj(rc.spatial) ? (rc.spatial as AnyRecord) : {};
+    const cs = isObj(spatial.coordinateSpace) ? (spatial.coordinateSpace as AnyRecord) : undefined;
+    const hint = cs && isObj(cs.outputHint) ? (cs.outputHint as AnyRecord) : undefined;
+    width = hint?.targetWidth ?? cs?.width ?? spatial.width;
+    height = hint?.targetHeight ?? cs?.height ?? spatial.height;
+    position = isObj(rc.legend) ? (rc.legend as AnyRecord).position : undefined;
+  }
+  const out: { width?: number; height?: number; legendPosition?: LegendPositionValue } = {};
+  if (typeof width === "number") out.width = width;
+  if (typeof height === "number") out.height = height;
+  if (typeof position === "string" || isObj(position)) out.legendPosition = position as LegendPositionValue;
+  return out;
+}
+
 // ── Op handlers (mutate the working copy; validate BEFORE mutating) ──
 
 function mutate(map: WardleyMap, diffOp: DiffOp): void {
@@ -442,6 +610,7 @@ function mutate(map: WardleyMap, diffOp: DiffOp): void {
       const v = unit(p.visibility, "visibility");
       comp.position.evolution.scalar = round3(e);
       comp.position.visibility.scalar = round3(v);
+      setLock(comp, "position");
       return;
     }
 
@@ -602,6 +771,7 @@ function mutate(map: WardleyMap, diffOp: DiffOp): void {
         pipe.position.visibility.scalar = round3((geo.visStart + geo.visEnd) / 2);
       }
       pipe.pipelineGeometry = geo;
+      setLock(pipe, "geometry");
       for (const c of members) {
         const ev = c.position.evolution;
         const vi = c.position.visibility;
@@ -634,12 +804,52 @@ function mutate(map: WardleyMap, diffOp: DiffOp): void {
         visEnd: round3(geo.visEnd + dVis),
         ...(geo.handleEvolution != null ? { handleEvolution: round3(geo.handleEvolution + dEvo) } : {}),
       };
+      setLock(pipe, "geometry");
       return;
     }
 
     case "move_label": {
       const comp = getComponent(map, p.id);
-      comp.label.position = { dx: num(p.dx, "dx"), dy: num(p.dy, "dy") };
+      const position: LabelPosition = { dx: num(p.dx, "dx"), dy: num(p.dy, "dy") };
+      if (p.anchor !== undefined) position.anchor = oneOf<LabelAnchor>(p.anchor, LABEL_ANCHORS, "anchor");
+      comp.label.position = position;
+      setLock(comp, "label");
+      return;
+    }
+
+    case "set_lock": {
+      const comp = getComponent(map, p.id);
+      if (!LOCK_KEYS.some((k) => p[k] !== undefined)) {
+        fail(`set_lock needs at least one of ${LOCK_KEYS.join(", ")}`);
+      }
+      const locked: ComponentLocks = { ...comp.locked };
+      for (const k of LOCK_KEYS) {
+        const v = p[k];
+        if (v === undefined) continue;
+        if (v === null) delete locked[k];
+        else if (typeof v !== "boolean") fail(`${k} must be a boolean or null`);
+        else locked[k] = v;
+      }
+      if (Object.keys(locked).length) comp.locked = locked;
+      else delete comp.locked;
+      return;
+    }
+
+    case "resize_canvas": {
+      const width = p.width === undefined ? undefined : canvasDim(p.width, "width");
+      const height = p.height === undefined ? undefined : canvasDim(p.height, "height");
+      if (width === undefined && height === undefined) fail("resize_canvas needs width and/or height");
+      writeCanvasSize(map, width, height);
+      return;
+    }
+
+    case "move_legend": {
+      if (p.position !== undefined && (p.x !== undefined || p.y !== undefined)) {
+        fail("move_legend takes x/y or position, not both");
+      }
+      writeLegendPosition(map, p.position !== undefined
+        ? oneOf<LegendPositionName>(p.position, LEGEND_POSITIONS, "position")
+        : { x: num(p.x, "x"), y: num(p.y, "y") });
       return;
     }
 

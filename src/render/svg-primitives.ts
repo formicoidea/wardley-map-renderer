@@ -31,7 +31,9 @@ export function esc(s: string): string {
 }
 
 /** Kind of element a hit-test group represents (interactive mode only). */
-export type HitKind = "component" | "pipeline" | "relation" | "label" | "evolve" | "step" | "title";
+export type HitKind =
+  | "component" | "pipeline" | "relation" | "label" | "evolve" | "step" | "title"
+  | "legend" | "background";
 
 /** ` data-id="…" data-kind="…"` — the editor hit-testing contract (interactive mode only). */
 export function hitAttrs(id: string, kind: HitKind): string {
@@ -690,6 +692,14 @@ export interface LabelRenderInput {
 }
 
 /**
+ * Baseline-to-baseline gap of a multi-line label, in px.
+ * Proportional to the font size so large labels don't overlap (12px → 14).
+ */
+export function labelLineGap(fontSize: number): number {
+  return Math.round(fontSize * 1.2);
+}
+
+/**
  * Render a component label as an SVG text element.
  * Supports multi-line text (split on newlines → tspan elements).
  */
@@ -703,9 +713,10 @@ export function renderLabel(input: LabelRenderInput): string {
   if (text.includes("\n")) {
     const lines = text.split("\n");
     const firstLine = esc(lines[0]);
+    const dy = labelLineGap(fontSize);
     const restLines = lines
       .slice(1)
-      .map((line) => `<tspan x="${x}" dy="14">${esc(line)}</tspan>`)
+      .map((line) => `<tspan x="${x}" dy="${dy}">${esc(line)}</tspan>`)
       .join("");
     return (
       `<text x="${x}" y="${y}" text-anchor="${anchor}" ` +

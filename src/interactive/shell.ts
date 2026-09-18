@@ -8,7 +8,7 @@
  * @module interactive/shell
  */
 
-export type Tool = "select" | "component" | "link" | "evolve" | "pipeline" | "pan";
+export type Tool = "select" | "component" | "link" | "evolve" | "pipeline" | "background" | "pan";
 
 export interface View {
   x: number;
@@ -26,7 +26,7 @@ export interface View {
 }
 
 /**
- * Events: `tool` (tool), `action` (name, event) — zoom-in/zoom-out/fit/collapse are
+ * Events: `tool` (tool), `action` (name, event) — zoom-in/zoom-out/fit are
  * handled by the shell and still emitted — `view` (view), `escape`, `panel-close`,
  * `gesture` (a pinch started: cancel any in-progress drag).
  */
@@ -43,8 +43,7 @@ export interface Shell {
   on(event: string, cb: (...args: any[]) => void): void;
 }
 
-const KEYS: Record<string, Tool> = { v: "select", c: "component", l: "link", e: "evolve", p: "pipeline", h: "pan" };
-const STORE = "wardley.toolbar.collapsed";
+const KEYS: Record<string, Tool> = { v: "select", c: "component", l: "link", e: "evolve", p: "pipeline", b: "background", h: "pan" };
 const clamp = (k: number) => Math.min(8, Math.max(0.1, k));
 
 export function initShell(doc: Document): Shell {
@@ -125,17 +124,9 @@ export function initShell(doc: Document): Shell {
     doc.querySelectorAll<HTMLElement>("[data-tool]").forEach((b) => b !== vp && b.setAttribute("aria-pressed", String(b.dataset.tool === t)));
     emit("tool", t);
   };
-  const setCollapsed = (c: boolean) => {
-    bar.classList.toggle("collapsed", c);
-    const b = bar.querySelector("[data-action=collapse]")!, label = c ? "Show toolbar" : "Hide toolbar";
-    b.setAttribute("aria-expanded", String(!c));
-    b.setAttribute("aria-label", label);
-    try { localStorage.setItem(STORE, c ? "1" : ""); } catch { /* storage unavailable */ }
-  };
   const act = (name: string, ev: Event) => {
     if (name === "zoom-in" || name === "zoom-out") view.zoomAt(name === "zoom-in" ? 1.25 : 0.8, ...center());
     else if (name === "fit") view.fit();
-    else if (name === "collapse") setCollapsed(!bar.classList.contains("collapsed"));
     emit("action", name, ev);
   };
   const closePanel = () => {
@@ -294,9 +285,6 @@ export function initShell(doc: Document): Shell {
   };
 
   // ── Init ────────────────────────────────────────────────────────
-  let collapsed = false;
-  try { collapsed = !!localStorage.getItem(STORE); } catch { /* storage unavailable */ }
-  setCollapsed(collapsed);
   doc.querySelectorAll<HTMLElement>("button[data-tool]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.tool === tool)));
   setDiffCount(0);
   sync();

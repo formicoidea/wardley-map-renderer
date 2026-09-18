@@ -9,13 +9,18 @@
  * the handle square (`data-part="handle"`, drawn by the renderer) drags the
  * pipeline's handleEvolution. Evolve arrows never start or end on a pipeline.
  *
+ * Chrome: the legend (`data-kind="legend"`) only moves (`move_legend`), and the
+ * map background (`data-kind="background"`) only resizes, through overlay
+ * handles, in the background tool (`resize_canvas`).
+ *
  * @module interactive/gestures
  */
 
 import { uniqueId, type DiffOp } from "../diff-ops-apply.js";
 import { mapToPx, type PreparedRender } from "../render/browser-render.js";
+import { computeCanvasFrame } from "../render/context-core.js";
 import type { HitKind } from "../render/svg-primitives.js";
-import type { WardleyMap } from "../schema.js";
+import type { LabelAnchor, WardleyMap } from "../schema.js";
 
 /** Pointer position: SVG user units (x, y) + normalized map coords (evo, vis, clamped). */
 export interface Pt { x: number; y: number; evo: number; vis: number }
@@ -23,6 +28,13 @@ export interface Pt { x: number; y: number; evo: number; vis: number }
 /** Overlay resize handles, or "h": the renderer's pipeline handle square (drags handleEvolution). */
 export type Handle = "n" | "s" | "e" | "w" | "ne" | "nw" | "se" | "sw" | "h";
 export interface Hit { id: string; kind: HitKind; handle?: Handle }
+
+/** The legend's `data-id` (it is chrome, not a map object). */
+export const LEGEND_ID = "legend";
+/** Canvas size floor for the background resize tool (px). */
+export const MIN_CANVAS = { w: 400, h: 300 };
+/** Canvas size ceiling accepted by `resize_canvas`. */
+const MAX_CANVAS = 10000;
 
 /** Minimal Element surface used by resolveHit (keeps it testable without a DOM). */
 export interface ElLike {
@@ -37,8 +49,9 @@ const HANDLES = new Set(["n", "s", "e", "w", "ne", "nw", "se", "sw"]);
 /**
  * Map an event target to the editor element under it. Relies only on the
  * renderer's `data-id`/`data-kind` groups and the overlay's own handles
- * (`data-handle` + `data-for`), which win over their pipeline. The renderer's
- * pipeline handle square is a pipeline group with `data-part="handle"` (handle "h").
+ * (`data-handle` + `data-for`, kind from `data-kind`, pipeline by default),
+ * which win over their pipeline. The renderer's pipeline handle square is a
+ * pipeline group with `data-part="handle"` (handle "h").
  */
 export function resolveHit(el: ElLike | null | undefined): Hit | null {
   if (!el || typeof el.closest !== "function") return null;
@@ -47,7 +60,7 @@ export function resolveHit(el: ElLike | null | undefined): Hit | null {
   if (h) {
     const handle = h.getAttribute("data-handle") as Handle;
     const id = h.getAttribute("data-for");
-    if (HANDLES.has(handle) && id) return { id, kind: "pipeline", handle };
+    if (HANDLES.has(handle) && id) return { id, kind: (h.getAttribute("data-kind") as HitKind) ?? "pipeline", handle };
   }
   const id = group?.getAttribute("data-id");
   if (!id) return null;
@@ -56,14 +69,17 @@ export function resolveHit(el: ElLike | null | undefined): Hit | null {
   return hit;
 }
 
-/** Component id a hit refers to (null for relations and the title). */
+/** Kinds that are not a component: they never link, evolve or rename. */
+const NOT_A_COMPONENT = new Set<HitKind>(["relation", "title", "legend", "background"]);
+
+/** Component id a hit refers to (null for relations, the title and chrome). */
 export function componentOf(hit: Hit | null): string | null {
-  return hit && hit.kind !== "relation" && hit.kind !== "title" ? hit.id : null;
+  return hit && !NOT_A_COMPONENT.has(hit.kind) ? hit.id : null;
 }
 
 /** Selection id for a hit (null: not selectable). */
 export function selectId(hit: Hit | null): string | null {
-  if (!hit || hit.kind === "title") return null;
+  if (!hit || hit.kind === "title" || hit.kind === "background") return null;
   return hit.kind === "evolve" ? `evolve:${hit.id}` : hit.id;
 }
 
@@ -74,7 +90,8 @@ export function selectionExists(map: WardleyMap, sel: string): boolean {
   const id = targetOf(sel);
   const comp = map.components.find((c) => c.id === id);
   if (sel !== id) return !!comp?.evolvesTo?.length;
-  return !!comp || map.relations.some((r) => r.id === id);
+  // The legend is chrome, not a map object, but stays selected across edits.
+  return !!comp || id === LEGEND_ID || map.relations.some((r) => r.id === id);
 }
 
 /** Ops deleting the selection: relations first (component deletes cascade to them). */
@@ -135,24 +152,42 @@ export function nearestComponent(map: WardleyMap, prepared: PreparedRender, p: P
   return best;
 }
 
-/** What a select-tool drag operates on, captured at drag start. */
+/** Canvas (map background) size in px for the prepared config, overrides included. */
+export function canvasSize(prepared: PreparedRender): { w: number; h: number } {
+  const f = computeCanvasFrame(prepared.options, prepared.config);
+  return { w: f.canvasWidth, h: f.canvasHeight };
+}
+
+/** Where the dragged element sits at drag start (SVG user units). */
+export interface DragAnchor {
+  x: number;
+  y: number;
+  /** Label drags: the <text>'s `text-anchor`, kept so the label does not jump. */
+  anchor?: string | null;
+}
+
+/** What a drag operates on, captured at drag start. */
 export interface DragStart {
   hit: Hit;
   start: Pt;
   /** Components moved together (component drags). */
   ids: string[];
-  /** Label offset from its node centre at drag start (label drags). */
-  label?: { dx: number; dy: number };
+  /** Label offset from its node centre, with its anchor (label drags). */
+  label?: { dx: number; dy: number; anchor?: LabelAnchor };
+  /** Legend box top-left in canvas px (legend drags). */
+  legend?: { x: number; y: number };
+  /** Canvas size (background resize drags). */
+  canvas?: { w: number; h: number };
 }
 
-/** Start a select-tool drag; `labelXY` is the dragged <text>'s x/y attributes. */
+/** Start a drag; `at` is the dragged <text>'s x/y (labels) or the legend box top-left. */
 export function dragStart(
   map: WardleyMap,
   prepared: PreparedRender,
   hit: Hit,
   start: Pt,
   selection: readonly string[],
-  labelXY?: { x: number; y: number },
+  at?: DragAnchor,
 ): DragStart {
   let ids = [hit.id];
   if (hit.kind === "component" && selection.includes(hit.id)) {
@@ -160,11 +195,34 @@ export function dragStart(
     ids = selection.filter((s) => movable.has(s));
   }
   const d: DragStart = { hit, start, ids };
-  if (hit.kind === "label" && labelXY) {
+  if (hit.kind === "label" && at) {
     const c = nodeCentre(map, prepared, hit.id);
-    if (c) d.label = { dx: labelXY.x - c.x, dy: labelXY.y - c.y };
-  }
+    if (c) {
+      d.label = { dx: at.x - c.x, dy: at.y - c.y };
+      if (at.anchor === "start" || at.anchor === "middle" || at.anchor === "end") d.label.anchor = at.anchor;
+    }
+  } else if (hit.kind === "legend" && at) d.legend = { x: at.x, y: at.y };
+  else if (hit.kind === "background") d.canvas = canvasSize(prepared);
   return d;
+}
+
+/**
+ * Ops for a background-handle drag: the canvas grows with the dragged edge
+ * (its origin stays at 0,0, so a west/north handle mirrors the movement).
+ */
+function resizeCanvasOps(d: DragStart, cur: Pt): DiffOp[] {
+  const s = d.canvas;
+  const h = d.hit.handle;
+  if (!s || !h) return [];
+  const dim = (v: number, min: number) => Math.round(Math.max(min, Math.min(MAX_CANVAS, v)));
+  const p: { width?: number; height?: number } = {};
+  if (h.includes("e")) p.width = dim(s.w + cur.x - d.start.x, MIN_CANVAS.w);
+  else if (h.includes("w")) p.width = dim(s.w - cur.x + d.start.x, MIN_CANVAS.w);
+  if (h.includes("s")) p.height = dim(s.h + cur.y - d.start.y, MIN_CANVAS.h);
+  else if (h.includes("n")) p.height = dim(s.h - cur.y + d.start.y, MIN_CANVAS.h);
+  if (p.width === s.w) delete p.width;
+  if (p.height === s.h) delete p.height;
+  return p.width === undefined && p.height === undefined ? [] : [{ op: "resize_canvas", payload: p }];
 }
 
 /** Ops for a select-tool drag at pointer `cur` (empty when nothing changes). */
@@ -173,6 +231,7 @@ export function dragOps(map: WardleyMap, d: DragStart, cur: Pt): DiffOp[] {
   const dVis = round3(cur.vis - d.start.vis);
   const { hit } = d;
   if (hit.handle) {
+    if (hit.kind === "background") return resizeCanvasOps(d, cur);
     const e = round3(cur.evo), v = round3(cur.vis);
     if (hit.handle === "h") return [{ op: "resize_pipeline", payload: { id: hit.id, handleEvolution: e } }];
     const p: { id: string; evoStart?: number; evoEnd?: number; visStart?: number; visEnd?: number } = { id: hit.id };
@@ -186,7 +245,18 @@ export function dragOps(map: WardleyMap, d: DragStart, cur: Pt): DiffOp[] {
     case "label": {
       const dx = Math.round((d.label?.dx ?? 9) + cur.x - d.start.x);
       const dy = Math.round((d.label?.dy ?? 4) + cur.y - d.start.y);
-      return cur.x === d.start.x && cur.y === d.start.y ? [] : [{ op: "move_label", payload: { id: hit.id, dx, dy } }];
+      // The anchor captured at drag start keeps the text where the pointer took it
+      // (the renderer would otherwise re-derive it from the sign of dx).
+      const anchor = d.label?.anchor;
+      return cur.x === d.start.x && cur.y === d.start.y
+        ? []
+        : [{ op: "move_label", payload: anchor ? { id: hit.id, dx, dy, anchor } : { id: hit.id, dx, dy } }];
+    }
+    case "legend": {
+      if (!d.legend || (cur.x === d.start.x && cur.y === d.start.y)) return [];
+      const x = Math.round(Math.max(0, d.legend.x + cur.x - d.start.x));
+      const y = Math.round(Math.max(0, d.legend.y + cur.y - d.start.y));
+      return [{ op: "move_legend", payload: { x, y } }];
     }
     case "pipeline":
       return dEvo || dVis ? [{ op: "move_pipeline", payload: { id: hit.id, dEvo, dVis } }] : [];
