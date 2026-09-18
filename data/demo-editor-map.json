@@ -1,49 +1,318 @@
 {
   "title": "Boutique de thé — carte de recette",
   "components": [
-    { "id": "public", "label": { "name": "Public" }, "type": "anchor", "position": { "evolution": { "scalar": 0.62 }, "visibility": { "scalar": 0.05 } } },
-    { "id": "tasse-de-the", "label": { "name": "Tasse de thé" }, "type": "component", "subtype": "userNeed", "position": { "evolution": { "scalar": 0.62 }, "visibility": { "scalar": 0.18 } } },
-    { "id": "tasse", "label": { "name": "Tasse" }, "type": "component", "position": { "evolution": { "scalar": 0.78 }, "visibility": { "scalar": 0.32 } } },
-    { "id": "the", "label": { "name": "Thé" }, "type": "component", "position": { "evolution": { "scalar": 0.83 }, "visibility": { "scalar": 0.34 } } },
-    { "id": "eau-chaude", "label": { "name": "Eau chaude" }, "type": "component", "position": { "evolution": { "scalar": 0.7 }, "visibility": { "scalar": 0.45 } } },
-    { "id": "eau", "label": { "name": "Eau" }, "type": "component", "position": { "evolution": { "scalar": 0.88 }, "visibility": { "scalar": 0.62 } } },
+    {
+      "id": "public",
+      "label": {
+        "name": "Public"
+      },
+      "type": "anchor",
+      "position": {
+        "evolution": {
+          "scalar": 0.62
+        },
+        "visibility": {
+          "scalar": 0.05
+        }
+      }
+    },
+    {
+      "id": "tasse-de-the",
+      "label": {
+        "name": "Tasse de thé"
+      },
+      "type": "component",
+      "subtype": "userNeed",
+      "position": {
+        "evolution": {
+          "scalar": 0.62
+        },
+        "visibility": {
+          "scalar": 0.18
+        }
+      }
+    },
+    {
+      "id": "tasse",
+      "label": {
+        "name": "Tasse"
+      },
+      "type": "component",
+      "position": {
+        "evolution": {
+          "scalar": 0.725
+        },
+        "visibility": {
+          "scalar": 0.335
+        }
+      },
+      "locked": {
+        "position": true
+      }
+    },
+    {
+      "id": "the",
+      "label": {
+        "name": "Thé"
+      },
+      "type": "component",
+      "position": {
+        "evolution": {
+          "scalar": 0.83
+        },
+        "visibility": {
+          "scalar": 0.34
+        }
+      }
+    },
+    {
+      "id": "eau-chaude",
+      "label": {
+        "name": "Eau chaude"
+      },
+      "type": "component",
+      "position": {
+        "evolution": {
+          "scalar": 0.7
+        },
+        "visibility": {
+          "scalar": 0.45
+        }
+      }
+    },
+    {
+      "id": "eau",
+      "label": {
+        "name": "Eau\nfeu",
+        "position": {
+          "dx": 10,
+          "dy": -27,
+          "anchor": "start"
+        }
+      },
+      "type": "component",
+      "position": {
+        "evolution": {
+          "scalar": 0.88
+        },
+        "visibility": {
+          "scalar": 0.62
+        }
+      },
+      "locked": {
+        "label": true,
+        "position": true
+      }
+    },
     {
       "id": "bouilloire",
-      "label": { "name": "Bouilloire" },
+      "label": {
+        "name": "Bouilloire"
+      },
       "type": "component",
-      "position": { "evolution": { "scalar": 0.48 }, "visibility": { "scalar": 0.6 } },
-      "evolvesTo": [{ "position": { "evolution": { "scalar": 0.78 }, "visibility": { "scalar": 0.6 } }, "evolveType": "natural", "inertia": true }]
+      "position": {
+        "evolution": {
+          "scalar": 0.48
+        },
+        "visibility": {
+          "scalar": 0.6
+        }
+      },
+      "evolvesTo": [
+        {
+          "position": {
+            "evolution": {
+              "scalar": 0.78
+            },
+            "visibility": {
+              "scalar": 0.6
+            }
+          },
+          "evolveType": "natural",
+          "inertia": true
+        }
+      ]
     },
-    { "id": "alimentation", "label": { "name": "Alimentation électrique\ndu comptoir" }, "type": "component", "position": { "evolution": { "scalar": 0.92 }, "visibility": { "scalar": 0.82 } } },
+    {
+      "id": "alimentation",
+      "label": {
+        "name": "Alimentation électrique\ndu comptoir"
+      },
+      "type": "component",
+      "position": {
+        "evolution": {
+          "scalar": 0.92
+        },
+        "visibility": {
+          "scalar": 0.82
+        }
+      }
+    },
     {
       "id": "socle-logistique",
-      "label": { "name": "Socle logistique" },
+      "label": {
+        "name": "Socle logistique",
+        "position": {
+          "dx": -1,
+          "dy": -13,
+          "anchor": "middle"
+        }
+      },
       "type": "pipeline",
-      "position": { "evolution": { "scalar": 0.6 }, "visibility": { "scalar": 0.72 } },
-      "pipelineGeometry": { "evoStart": 0.3, "evoEnd": 0.9, "visStart": 0.68, "visEnd": 0.76, "handleEvolution": 0.6 }
+      "position": {
+        "evolution": {
+          "scalar": 0.601
+        },
+        "visibility": {
+          "scalar": 0.727
+        }
+      },
+      "pipelineGeometry": {
+        "evoStart": 0.301,
+        "evoEnd": 0.901,
+        "visStart": 0.687,
+        "visEnd": 0.767,
+        "handleEvolution": 0.601
+      },
+      "locked": {
+        "geometry": true,
+        "label": true
+      }
     },
-    { "id": "approvisionnement", "label": { "name": "Approvisionnement" }, "type": "component", "position": { "evolution": { "scalar": 0.42 }, "visibility": { "scalar": 0.72 } } },
-    { "id": "stock", "label": { "name": "Stock" }, "type": "component", "position": { "evolution": { "scalar": 0.74 }, "visibility": { "scalar": 0.72 } } },
-    { "id": "marche-du-the", "label": { "name": "Marché du thé" }, "type": "component", "subtype": "market", "position": { "evolution": { "scalar": 0.36 }, "visibility": { "scalar": 0.5 } } }
+    {
+      "id": "approvisionnement",
+      "label": {
+        "name": "Approvisionnement"
+      },
+      "type": "component",
+      "position": {
+        "evolution": {
+          "scalar": 0.421
+        },
+        "visibility": {
+          "scalar": 0.727
+        }
+      }
+    },
+    {
+      "id": "stock",
+      "label": {
+        "name": "Stock"
+      },
+      "type": "component",
+      "position": {
+        "evolution": {
+          "scalar": 0.741
+        },
+        "visibility": {
+          "scalar": 0.727
+        }
+      }
+    },
+    {
+      "id": "marche-du-the",
+      "label": {
+        "name": "Marché du thé",
+        "position": {
+          "dx": -22,
+          "dy": -30,
+          "anchor": "start"
+        }
+      },
+      "type": "component",
+      "subtype": "market",
+      "position": {
+        "evolution": {
+          "scalar": 0.36
+        },
+        "visibility": {
+          "scalar": 0.5
+        }
+      },
+      "locked": {
+        "label": true
+      }
+    }
   ],
   "relations": [
-    { "id": "r-public-tasse-de-the", "consumer": "public", "supplier": "tasse-de-the" },
-    { "id": "r-besoin-tasse", "consumer": "tasse-de-the", "supplier": "tasse" },
-    { "id": "r-besoin-the", "consumer": "tasse-de-the", "supplier": "the" },
-    { "id": "r-besoin-eau-chaude", "consumer": "tasse-de-the", "supplier": "eau-chaude" },
-    { "id": "r-eau-chaude-eau", "consumer": "eau-chaude", "supplier": "eau" },
-    { "id": "r-eau-chaude-bouilloire", "consumer": "eau-chaude", "supplier": "bouilloire" },
-    { "id": "r-bouilloire-alimentation", "consumer": "bouilloire", "supplier": "alimentation" },
-    { "id": "r-the-stock", "consumer": "the", "supplier": "stock" },
-    { "id": "r-stock-appro", "consumer": "stock", "supplier": "approvisionnement" },
-    { "id": "r-appro-marche", "consumer": "approvisionnement", "supplier": "marche-du-the" }
+    {
+      "id": "r-public-tasse-de-the",
+      "consumer": "public",
+      "supplier": "tasse-de-the"
+    },
+    {
+      "id": "r-besoin-tasse",
+      "consumer": "tasse-de-the",
+      "supplier": "tasse"
+    },
+    {
+      "id": "r-besoin-the",
+      "consumer": "tasse-de-the",
+      "supplier": "the"
+    },
+    {
+      "id": "r-besoin-eau-chaude",
+      "consumer": "tasse-de-the",
+      "supplier": "eau-chaude"
+    },
+    {
+      "id": "r-eau-chaude-eau",
+      "consumer": "eau-chaude",
+      "supplier": "eau"
+    },
+    {
+      "id": "r-eau-chaude-bouilloire",
+      "consumer": "eau-chaude",
+      "supplier": "bouilloire"
+    },
+    {
+      "id": "r-bouilloire-alimentation",
+      "consumer": "bouilloire",
+      "supplier": "alimentation"
+    },
+    {
+      "id": "r-the-stock",
+      "consumer": "the",
+      "supplier": "stock"
+    },
+    {
+      "id": "r-stock-appro",
+      "consumer": "stock",
+      "supplier": "approvisionnement"
+    },
+    {
+      "id": "r-appro-marche",
+      "consumer": "approvisionnement",
+      "supplier": "marche-du-the"
+    }
   ],
   "renderConfig": {
-    "display": { "legend": true },
-    "rendering": { "locale": "fr", "avoidCollisions": true },
+    "display": {
+      "legend": true
+    },
+    "rendering": {
+      "locale": "fr",
+      "avoidCollisions": true
+    },
     "style": {
-      "background": { "canvas": { "default": { "width": 1600, "height": 900 } } },
-      "legend": { "default": { "box": { "position": "bottom-right" } } }
+      "background": {
+        "canvas": {
+          "default": {
+            "width": 1600,
+            "height": 900
+          }
+        }
+      },
+      "legend": {
+        "default": {
+          "box": {
+            "position": {
+              "x": 199,
+              "y": 325
+            }
+          }
+        }
+      }
     }
   }
 }

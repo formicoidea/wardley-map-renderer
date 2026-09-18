@@ -1,6 +1,6 @@
 {
   "name": "@formicoidea/wardley-map-renderer",
-  "version": "1.0.0-beta.4",
+  "version": "1.0.0-beta.5",
   "description": "Pure-function Wardley Map renderer — SVG/PNG/HTML generation from JSON",
   "type": "module",
   "main": "dist/index.js",
@@ -21,7 +21,7 @@
     "README.md"
   ],
   "publishConfig": {
-    "registry": "https://npm.pkg.github.com"
+    "registry": "https://registry.npmjs.org"
   },
   "scripts": {
     "prebuild": "tsx scripts/bundle-interactive.ts",

@@ -1,7 +1,12 @@
-name: Release (GitHub Packages)
+name: Release (npm)
 
-# Publishes @formicoidea/wardley-map-renderer to GitHub Packages when a version
-# tag is pushed (e.g. `git tag v1.0.0-beta.0 && git push origin v1.0.0-beta.0`).
+# Publishes @formicoidea/wardley-map-renderer to the public npm registry when a
+# version tag is pushed (e.g. `git tag v1.0.0-beta.5 && git push origin v1.0.0-beta.5`).
+#
+# Auth is npm trusted publishing (OIDC): no token, no secret. It requires a
+# one-time setup on npmjs — package settings → Trusted publishers → this repo +
+# this workflow file. Until then, publish manually (see PUBLISHING.md); a tag
+# pushed too early only fails this job, it cannot publish anywhere else.
 on:
   push:
     tags:
@@ -12,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      packages: write # required to publish to GitHub Packages
+      id-token: write # required for trusted publishing (OIDC)
 
     steps:
       - name: Checkout
@@ -27,9 +32,13 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          registry-url: https://npm.pkg.github.com
+          registry-url: https://registry.npmjs.org
           scope: "@formicoidea"
           cache: pnpm
+
+      # Trusted publishing needs a recent npm CLI.
+      - name: Update npm
+        run: npm install -g npm@latest
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -37,7 +46,7 @@ jobs:
       - name: Build
         run: pnpm run build
 
-      # Prerelease versions (1.0.0-beta.0) must NOT claim the `latest` dist-tag.
+      # Prerelease versions (1.0.0-beta.5) must NOT claim the `latest` dist-tag.
       # Derive `beta` for any version containing a hyphen, else `latest`.
       - name: Determine npm dist-tag
         id: disttag
@@ -47,9 +56,7 @@ jobs:
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "Publishing $VERSION under dist-tag '$TAG'"
 
-      # --no-git-checks: dist/ is gitignored and rebuilt here, so the tree is
-      # intentionally "dirty"; this skips pnpm's clean-branch guard.
-      - name: Publish to GitHub Packages
-        run: pnpm publish --no-git-checks --tag ${{ steps.disttag.outputs.tag }}
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # npm (not pnpm): trusted publishing is an npm CLI feature.
+      # prepublishOnly rebuilds schema/ and dist/, so the tree is intentionally dirty.
+      - name: Publish to npm
+        run: npm publish --tag ${{ steps.disttag.outputs.tag }}
