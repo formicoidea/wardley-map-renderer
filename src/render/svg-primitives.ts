@@ -32,7 +32,7 @@ export function esc(s: string): string {
 
 /** Kind of element a hit-test group represents (interactive mode only). */
 export type HitKind =
-  | "component" | "pipeline" | "relation" | "label" | "evolve" | "inertia" | "step" | "title"
+  | "component" | "pipeline" | "relation" | "label" | "evolve" | "inertia" | "step" | "note" | "title"
   | "legend" | "background";
 
 /** ` data-id="…" data-kind="…"` — the editor hit-testing contract (interactive mode only). */

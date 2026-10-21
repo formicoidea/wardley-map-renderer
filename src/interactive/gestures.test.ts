@@ -4,7 +4,7 @@ import { mapToPx } from "../render/browser-render.js";
 import { prepareRender } from "../render/prepare-render.js";
 import { sanitizeMap, type WardleyMap } from "../schema.js";
 import {
-  addComponentOp, canvasSize, componentOf, connectOp, deleteOps, dragOps, dragStart, MIN_CANVAS, nearestComponent, nodeCentre,
+  addComponentOp, addNoteOp, canvasSize, componentOf, connectOp, deleteOps, dragOps, dragStart, MIN_CANVAS, nearestComponent, nodeCentre,
   rectToPipeline, resolveHit, selectId, selectionExists, type ElLike, type Pt,
 } from "./gestures.js";
 import { createStore } from "./store.js";
@@ -67,6 +67,19 @@ describe("resolveHit", () => {
 });
 
 describe("dragOps", () => {
+  it("adds, drags, selects and deletes a note", () => {
+    const add = addNoteOp(MAP, p(0.2, 0.8));
+    const map = applyDiffOps(MAP, [add]);
+    const id = add.payload.id!;
+    const hit = { id, kind: "note" as const };
+    expect(selectId(hit)).toBe(id);
+    expect(componentOf(hit)).toBeNull();
+    expect(selectionExists(map, id)).toBe(true);
+    expect(dragOps(map, dragStart(map, prepared, hit, p(0.2, 0.8), []), p(0.3, 0.7)))
+      .toEqual([{ op: "edit_note", payload: { id, evolution: 0.3, visibility: 0.7 } }]);
+    expect(deleteOps(map, [id])).toEqual([{ op: "delete_note", payload: { id } }]);
+  });
+
   it("slides the inertia barrier along the arrow (fraction of its span, kept off the ends)", () => {
     const d = dragStart(MAP, prepared, { id: "b", kind: "inertia" }, p(0.5, 0.1), []);
     const [op] = dragOps(MAP, d, p(0.3, 0.2));

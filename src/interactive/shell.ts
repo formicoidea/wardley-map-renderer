@@ -8,7 +8,7 @@
  * @module interactive/shell
  */
 
-export type Tool = "select" | "component" | "link" | "evolve" | "pipeline" | "background" | "pan";
+export type Tool = "select" | "component" | "link" | "evolve" | "pipeline" | "note" | "background" | "pan";
 
 export interface View {
   x: number;
@@ -43,7 +43,7 @@ export interface Shell {
   on(event: string, cb: (...args: any[]) => void): void;
 }
 
-const KEYS: Record<string, Tool> = { v: "select", c: "component", l: "link", e: "evolve", p: "pipeline", b: "background", h: "pan" };
+const KEYS: Record<string, Tool> = { v: "select", c: "component", l: "link", e: "evolve", p: "pipeline", t: "note", b: "background", h: "pan" };
 const clamp = (k: number) => Math.min(8, Math.max(0.1, k));
 
 export function initShell(doc: Document): Shell {
