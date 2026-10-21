@@ -70,7 +70,7 @@ export function resolveHit(el: ElLike | null | undefined): Hit | null {
 }
 
 /** Kinds that are not a component: they never link, evolve or rename. */
-const NOT_A_COMPONENT = new Set<HitKind>(["relation", "title", "legend", "background"]);
+const NOT_A_COMPONENT = new Set<HitKind>(["relation", "inertia", "title", "legend", "background"]);
 
 /** Component id a hit refers to (null for relations, the title and chrome). */
 export function componentOf(hit: Hit | null): string | null {
@@ -80,7 +80,7 @@ export function componentOf(hit: Hit | null): string | null {
 /** Selection id for a hit (null: not selectable). */
 export function selectId(hit: Hit | null): string | null {
   if (!hit || hit.kind === "title" || hit.kind === "background") return null;
-  return hit.kind === "evolve" ? `evolve:${hit.id}` : hit.id;
+  return hit.kind === "evolve" || hit.kind === "inertia" ? `evolve:${hit.id}` : hit.id;
 }
 
 /** Target id for the properties panel / existence checks (strips `evolve:`). */
@@ -278,6 +278,17 @@ export function dragOps(map: WardleyMap, d: DragStart, cur: Pt): DiffOp[] {
       if (!t || !dEvo) return [];
       const evolution = clamp01(round3(t.evolution.scalar + dEvo));
       return [{ op: "set_evolves_to", payload: { id: hit.id, position: { evolution, visibility: t.visibility.scalar } } }];
+    }
+    case "inertia": {
+      // Slides the (first) arrow's barrier along it: pointer projected on the arrow's evolution span.
+      const c = map.components.find((x) => x.id === hit.id);
+      const [first, ...rest] = c?.evolvesTo ?? [];
+      if (!c || !first || !dEvo) return [];
+      const from = c.position.evolution.scalar;
+      const span = first.position.evolution.scalar - from;
+      if (!span) return [];
+      const inertiaAt = round3(Math.max(0.05, Math.min(0.95, (cur.evo - from) / span)));
+      return [{ op: "set_field", payload: { target: c.id, path: "evolvesTo", value: [{ ...first, inertiaAt }, ...rest] } }];
     }
     default:
       return [];

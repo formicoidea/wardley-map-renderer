@@ -77,6 +77,8 @@ export interface InertiaGeometry {
   readonly y2: number;
   /** The associated component */
   readonly component: Component;
+  /** Index of the evolve arrow it sits on (only arrow 0 is draggable in the editor) */
+  readonly arrow: number;
 }
 
 /** Pixel geometry for a pipeline background rect */

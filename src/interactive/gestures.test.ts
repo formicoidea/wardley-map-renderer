@@ -67,6 +67,15 @@ describe("resolveHit", () => {
 });
 
 describe("dragOps", () => {
+  it("slides the inertia barrier along the arrow (fraction of its span, kept off the ends)", () => {
+    const d = dragStart(MAP, prepared, { id: "b", kind: "inertia" }, p(0.5, 0.1), []);
+    const [op] = dragOps(MAP, d, p(0.3, 0.2));
+    expect(op).toMatchObject({ op: "set_field", payload: { target: "b", path: "evolvesTo", value: [{ inertiaAt: 0.25 }] } });
+    expect(dragOps(MAP, d, p(1, 0.1))[0]).toMatchObject({ payload: { value: [{ inertiaAt: 0.95 }] } });
+    expect(applyDiffOps(MAP, [op]).components.find((c) => c.id === "b")!.evolvesTo![0].inertiaAt).toBe(0.25);
+    expect(selectId({ id: "b", kind: "inertia" })).toBe("evolve:b");
+  });
+
   it("moves the dragged component, or the whole selection, clamped", () => {
     const d = dragStart(MAP, prepared, { id: "a", kind: "component" }, p(0.4, 0.4), []);
     expect(dragOps(MAP, d, p(0.5, 0.3))).toEqual([{ op: "move_component", payload: { id: "a", evolution: 0.5, visibility: 0.3 } }]);

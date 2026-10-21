@@ -195,6 +195,8 @@ export const EvolvesToSchema = z.object({
   evolveType: EvolveTypeEnum.default("natural"),
   /** When true, indicates resistance to evolution (inertia barrier at phase boundary). */
   inertia: z.boolean().optional(),
+  /** Where the inertia barrier sits along the arrow (0 = source, 1 = head); default: crossed phase boundaries. */
+  inertiaAt: z.number().min(0).max(1).transform(round3).optional(),
 });
 
 // ── Pipeline geometry ───────────────────────────────────────

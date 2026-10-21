@@ -407,7 +407,7 @@ export function initEditor(doc: Document): void {
     if (t === "select" && dbl) {
       if (!hit) return add(addComponentOp(store.map, c.start));
       if (hit.kind === "legend") return select([LEGEND_ID]); // the legend is neither renamed nor edited
-      if (hit.kind === "relation" || hit.kind === "evolve") return openProps(hit.id);
+      if (hit.kind === "relation" || hit.kind === "evolve" || hit.kind === "inertia") return openProps(hit.id);
       return rename(hit.id, hit.kind === "title");
     }
     if ((t === "link" || t === "evolve")) {

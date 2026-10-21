@@ -26,6 +26,7 @@ import type { RenderContext, LayerRenderer } from "./types.js";
 import {
   renderEvolveArrow,
   renderInertiaBarrier,
+  hitAttrs,
   renderEvolutionRange,
   COMPONENT_INERTIA_GAP,
   COMPONENT_INERTIA_HALF_HEIGHT,
@@ -87,7 +88,12 @@ export const renderEvolvesToLayer: LayerRenderer = (
   const withBarrier = new Set<string>();
   for (const barrier of ctx.inertiaBarriers) {
     withBarrier.add(barrier.component.id);
-    parts.push(renderInertiaBarrier(barrier.x, barrier.y1, barrier.y2));
+    const svg = renderInertiaBarrier(barrier.x, barrier.y1, barrier.y2);
+    parts.push(interactive && barrier.arrow === 0
+      ? `<g${hitAttrs(barrier.component.id, "inertia")}>` +
+        `<line class="hit-area" x1="${barrier.x}" y1="${barrier.y1}" x2="${barrier.x}" y2="${barrier.y2}" ` +
+        `stroke="transparent" stroke-width="16" style="cursor:ew-resize" />${svg}</g>`
+      : svg);
   }
 
   // ── Component-level inertia bars (beside the node) ──

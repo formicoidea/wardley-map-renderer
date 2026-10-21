@@ -379,6 +379,7 @@ function checkEvolvesTo(v: unknown): EvolvesTo[] {
       if (typeof t.inertia !== "boolean") fail(`evolvesTo[${i}].inertia must be boolean`);
       out.inertia = t.inertia;
     }
+    if (t.inertiaAt !== undefined) out.inertiaAt = round3(unit(t.inertiaAt, `evolvesTo[${i}].inertiaAt`));
     return out;
   });
 }
@@ -742,6 +743,7 @@ function mutate(map: WardleyMap, diffOp: DiffOp): void {
         position: { evolution: { scalar: evolution }, visibility: { scalar: visibility } },
         evolveType: prev?.evolveType ?? "natural",
         ...(prev?.inertia !== undefined ? { inertia: prev.inertia } : {}),
+        ...(prev?.inertiaAt !== undefined ? { inertiaAt: prev.inertiaAt } : {}),
       }, ...rest];
       return;
     }

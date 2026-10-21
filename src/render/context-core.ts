@@ -266,32 +266,30 @@ export function buildRenderContextFromConfig(
   // Inertia barriers — thick vertical lines at phase boundaries crossed by evolve arrows
   const INERTIA_HALF_HEIGHT = 15; // pixels above and below the arrow's Y at the boundary
   const inertiaBarriers: InertiaGeometry[] = [];
-  for (const evolve of evolves) {
-    if (!evolve.inertia) continue;
-    // Determine the normalized evolution range of this arrow
-    const fromEvo = evo(evolve.component);
-    const toEvo = evoTarget(
-      evolve.component.evolvesTo!.find(
-        (e) => evoToX(evoTarget(e)) === evolve.toX && visToY(visTarget(e)) === evolve.toY
-      )!
-    );
-    const minEvo = Math.min(fromEvo, toEvo);
-    const maxEvo = Math.max(fromEvo, toEvo);
-
-    for (const boundary of EVOLUTION_BOUNDARIES) {
-      if (boundary > minEvo && boundary < maxEvo) {
-        const bx = evoToX(boundary);
-        // Interpolate Y at the boundary crossing point
-        const t = (boundary - fromEvo) / (toEvo - fromEvo);
-        const yAtBoundary = evolve.fromY + t * (evolve.toY - evolve.fromY);
+  for (const comp of adjustedMap.components) {
+    const fromEvo = evo(comp);
+    const fromVis = vis(comp);
+    comp.evolvesTo?.forEach((e, arrow) => {
+      if (!e.inertia) return;
+      const toEvo = evoTarget(e);
+      const toVis = visTarget(e);
+      // Explicit position along the arrow, else every crossed phase boundary
+      const ts = e.inertiaAt !== undefined
+        ? [e.inertiaAt]
+        : EVOLUTION_BOUNDARIES
+            .filter((bd) => bd > Math.min(fromEvo, toEvo) && bd < Math.max(fromEvo, toEvo))
+            .map((bd) => (bd - fromEvo) / (toEvo - fromEvo));
+      for (const t of ts) {
+        const y = visToY(fromVis + t * (toVis - fromVis));
         inertiaBarriers.push({
-          x: bx,
-          y1: yAtBoundary - INERTIA_HALF_HEIGHT,
-          y2: yAtBoundary + INERTIA_HALF_HEIGHT,
-          component: evolve.component,
+          x: evoToX(fromEvo + t * (toEvo - fromEvo)),
+          y1: y - INERTIA_HALF_HEIGHT,
+          y2: y + INERTIA_HALF_HEIGHT,
+          component: comp,
+          arrow,
         });
       }
-    }
+    });
   }
 
   // Axes zone geometry (evolution phase zones in pixel coords)
