@@ -26,6 +26,7 @@ import type {
   LegendPosition,
   Method,
   Nature,
+  Note,
   PipelineGeometry,
   Relation,
   StepDecorator,
@@ -97,6 +98,17 @@ export interface MoveLabelPayload {
 }
 export interface MoveStepPayload { id: string; evolution: number; visibility: number }
 export interface RenameMapPayload { title: string }
+/** New note (annotation card, top-left at evolution/visibility); `step` makes it that step's annotation. */
+export interface AddNotePayload { id?: string; title?: string; text: string; evolution: number; visibility: number; step?: number }
+/** Edit a note: omitted keys are left alone; `title: null` removes the title, `step: null` unlinks the step. */
+export interface EditNotePayload {
+  id: string;
+  title?: string | null;
+  text?: string;
+  evolution?: number;
+  visibility?: number;
+  step?: number | null;
+}
 /** Set (`true`/`false`) or remove (`null`) per-property locks; omitted keys are left alone. */
 export interface SetLockPayload {
   id: string;
@@ -161,7 +173,10 @@ export type DiffOp =
   | { op: "set_field"; payload: SetFieldPayload }
   | { op: "set_lock"; payload: SetLockPayload }
   | { op: "resize_canvas"; payload: ResizeCanvasPayload }
-  | { op: "move_legend"; payload: MoveLegendPayload };
+  | { op: "move_legend"; payload: MoveLegendPayload }
+  | { op: "add_note"; payload: AddNotePayload }
+  | { op: "edit_note"; payload: EditNotePayload }
+  | { op: "delete_note"; payload: IdPayload };
 
 export type DiffOpName = DiffOp["op"];
 
@@ -246,8 +261,18 @@ function getPipeline(map: WardleyMap, id: unknown): Component & { pipelineGeomet
   if (comp.type !== "pipeline" || !comp.pipelineGeometry) fail(`component "${String(id)}" is not a pipeline`);
   return comp as Component & { pipelineGeometry: PipelineGeometry };
 }
+function getNote(map: WardleyMap, id: unknown): Note {
+  const note = map.notes?.find((n) => n.id === id);
+  if (!note) fail(`unknown note id "${String(id)}"`);
+  return note;
+}
+function stepNumber(v: unknown): number {
+  if (!Number.isInteger(v) || (v as number) < 1) fail("step must be an integer ≥ 1");
+  return v as number;
+}
 function idTaken(map: WardleyMap, id: string): boolean {
-  return map.components.some((c) => c.id === id) || map.relations.some((r) => r.id === id);
+  return map.components.some((c) => c.id === id) || map.relations.some((r) => r.id === id) ||
+    !!map.notes?.some((n) => n.id === id);
 }
 
 /**
@@ -259,7 +284,7 @@ function setLock(comp: Component, key: keyof ComponentLocks): void {
 }
 
 /**
- * Generate an id unique among the map's component AND relation ids:
+ * Generate an id unique among the map's component, relation AND note ids:
  * slug of `name` ("Web App" → "web-app"), then "web-app-2", "web-app-3", ...
  */
 export function uniqueId(map: WardleyMap, name: string): string {
@@ -379,6 +404,7 @@ function checkEvolvesTo(v: unknown): EvolvesTo[] {
       if (typeof t.inertia !== "boolean") fail(`evolvesTo[${i}].inertia must be boolean`);
       out.inertia = t.inertia;
     }
+    if (t.inertiaAt !== undefined) out.inertiaAt = round3(unit(t.inertiaAt, `evolvesTo[${i}].inertiaAt`));
     return out;
   });
 }
@@ -742,6 +768,7 @@ function mutate(map: WardleyMap, diffOp: DiffOp): void {
         position: { evolution: { scalar: evolution }, visibility: { scalar: visibility } },
         evolveType: prev?.evolveType ?? "natural",
         ...(prev?.inertia !== undefined ? { inertia: prev.inertia } : {}),
+        ...(prev?.inertiaAt !== undefined ? { inertiaAt: prev.inertiaAt } : {}),
       }, ...rest];
       return;
     }
@@ -850,6 +877,49 @@ function mutate(map: WardleyMap, diffOp: DiffOp): void {
       writeLegendPosition(map, p.position !== undefined
         ? oneOf<LegendPositionName>(p.position, LEGEND_POSITIONS, "position")
         : { x: num(p.x, "x"), y: num(p.y, "y") });
+      return;
+    }
+
+    case "add_note": {
+      const text = str(p.text, "text");
+      const id = p.id === undefined ? uniqueId(map, "note") : str(p.id, "id");
+      if (idTaken(map, id)) fail(`id "${id}" already exists`);
+      const note: Note = {
+        id,
+        text,
+        position: {
+          evolution: { scalar: round3(unit(p.evolution, "evolution")) },
+          visibility: { scalar: round3(unit(p.visibility, "visibility")) },
+        },
+      };
+      if (p.title !== undefined) note.title = str(p.title, "title");
+      if (p.step !== undefined) note.step = stepNumber(p.step);
+      (map.notes ??= []).push(note);
+      return;
+    }
+
+    case "edit_note": {
+      const note = getNote(map, p.id);
+      // Validate everything before touching the note.
+      const text = p.text === undefined ? undefined : str(p.text, "text");
+      const title = p.title === undefined || p.title === null ? p.title : str(p.title, "title");
+      const e = p.evolution === undefined ? undefined : round3(unit(p.evolution, "evolution"));
+      const v = p.visibility === undefined ? undefined : round3(unit(p.visibility, "visibility"));
+      const step = p.step === undefined || p.step === null ? p.step : stepNumber(p.step);
+      if (text !== undefined) note.text = text;
+      if (title === null) delete note.title;
+      else if (title !== undefined) note.title = title;
+      if (e !== undefined) note.position.evolution.scalar = e;
+      if (v !== undefined) note.position.visibility.scalar = v;
+      if (step === null) delete note.step;
+      else if (step !== undefined) note.step = step;
+      return;
+    }
+
+    case "delete_note": {
+      const note = getNote(map, p.id);
+      map.notes = map.notes!.filter((n) => n !== note);
+      if (!map.notes.length) delete map.notes;
       return;
     }
 

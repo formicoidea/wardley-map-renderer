@@ -70,7 +70,7 @@ export function resolveHit(el: ElLike | null | undefined): Hit | null {
 }
 
 /** Kinds that are not a component: they never link, evolve or rename. */
-const NOT_A_COMPONENT = new Set<HitKind>(["relation", "title", "legend", "background"]);
+const NOT_A_COMPONENT = new Set<HitKind>(["relation", "inertia", "note", "title", "legend", "background"]);
 
 /** Component id a hit refers to (null for relations, the title and chrome). */
 export function componentOf(hit: Hit | null): string | null {
@@ -80,7 +80,7 @@ export function componentOf(hit: Hit | null): string | null {
 /** Selection id for a hit (null: not selectable). */
 export function selectId(hit: Hit | null): string | null {
   if (!hit || hit.kind === "title" || hit.kind === "background") return null;
-  return hit.kind === "evolve" ? `evolve:${hit.id}` : hit.id;
+  return hit.kind === "evolve" || hit.kind === "inertia" ? `evolve:${hit.id}` : hit.id;
 }
 
 /** Target id for the properties panel / existence checks (strips `evolve:`). */
@@ -91,7 +91,7 @@ export function selectionExists(map: WardleyMap, sel: string): boolean {
   const comp = map.components.find((c) => c.id === id);
   if (sel !== id) return !!comp?.evolvesTo?.length;
   // The legend is chrome, not a map object, but stays selected across edits.
-  return !!comp || id === LEGEND_ID || map.relations.some((r) => r.id === id);
+  return !!comp || id === LEGEND_ID || map.relations.some((r) => r.id === id) || !!map.notes?.some((n) => n.id === id);
 }
 
 /** Ops deleting the selection: relations first (component deletes cascade to them). */
@@ -106,6 +106,7 @@ export function deleteOps(map: WardleyMap, selection: readonly string[]): DiffOp
     }
   }
   for (const sel of selection) {
+    if (map.notes?.some((n) => n.id === sel)) ops.push({ op: "delete_note", payload: { id: sel } });
     const comp = map.components.find((c) => c.id === targetOf(sel));
     if (!comp) continue;
     if (sel !== comp.id) {
@@ -279,6 +280,24 @@ export function dragOps(map: WardleyMap, d: DragStart, cur: Pt): DiffOp[] {
       const evolution = clamp01(round3(t.evolution.scalar + dEvo));
       return [{ op: "set_evolves_to", payload: { id: hit.id, position: { evolution, visibility: t.visibility.scalar } } }];
     }
+    case "inertia": {
+      // Slides the (first) arrow's barrier along it: pointer projected on the arrow's evolution span.
+      const c = map.components.find((x) => x.id === hit.id);
+      const [first, ...rest] = c?.evolvesTo ?? [];
+      if (!c || !first || !dEvo) return [];
+      const from = c.position.evolution.scalar;
+      const span = first.position.evolution.scalar - from;
+      if (!span) return [];
+      const inertiaAt = round3(Math.max(0.05, Math.min(0.95, (cur.evo - from) / span)));
+      return [{ op: "set_field", payload: { target: c.id, path: "evolvesTo", value: [{ ...first, inertiaAt }, ...rest] } }];
+    }
+    case "note": {
+      const n = map.notes?.find((x) => x.id === hit.id);
+      if (!n || (!dEvo && !dVis)) return [];
+      const evolution = clamp01(round3(n.position.evolution.scalar + dEvo));
+      const visibility = clamp01(round3(n.position.visibility.scalar + dVis));
+      return [{ op: "edit_note", payload: { id: n.id, evolution, visibility } }];
+    }
     default:
       return [];
   }
@@ -291,6 +310,11 @@ export function addComponentOp(map: WardleyMap, p: Pt, type: "component" | "pipe
     op: "add_component",
     payload: { id: uniqueId(map, name), name, type, evolution: round3(p.evo), visibility: round3(p.vis) },
   };
+}
+
+/** add_note (card top-left at `p`; id generated so the caller can select it and edit its title). */
+export function addNoteOp(map: WardleyMap, p: Pt): DiffOp & { op: "add_note" } {
+  return { op: "add_note", payload: { id: uniqueId(map, "note"), title: "Title", text: "Description", evolution: round3(p.evo), visibility: round3(p.vis) } };
 }
 
 /** add_component (pipeline) for a dragged rectangle; null when it is too small. */

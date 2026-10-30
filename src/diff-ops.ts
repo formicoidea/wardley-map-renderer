@@ -201,6 +201,34 @@ export type MoveStepPayload = z.infer<typeof MoveStepPayload>;
 export const RenameMapPayload = z.object({ title: z.string().min(1) });
 export type RenameMapPayload = z.infer<typeof RenameMapPayload>;
 
+const StepNumber = z.number().int().min(1);
+
+/** Annotation card (top-left at the point); `step` makes it that step's annotation. */
+export const AddNotePayload = z.object({
+  /** Optional: generated with `uniqueId(map, "note")` when omitted. */
+  id: Id.optional(),
+  title: z.string().min(1).optional(),
+  text: z.string().min(1),
+  evolution: EvolutionValue,
+  visibility: VisibilityValue,
+  step: StepNumber.optional(),
+});
+export type AddNotePayload = z.infer<typeof AddNotePayload>;
+
+/** Omitted keys are left alone; `title: null` removes the title, `step: null` unlinks the step. */
+export const EditNotePayload = z.object({
+  id: Id,
+  title: z.string().min(1).nullable().optional(),
+  text: z.string().min(1).optional(),
+  evolution: EvolutionValue.optional(),
+  visibility: VisibilityValue.optional(),
+  step: StepNumber.nullable().optional(),
+});
+export type EditNotePayload = z.infer<typeof EditNotePayload>;
+
+export const DeleteNotePayload = IdPayload;
+export type DeleteNotePayload = z.infer<typeof DeleteNotePayload>;
+
 // set_field: one object per allowed path so each value is validated exactly.
 const field = <P extends string, V extends z.ZodTypeAny>(path: P, value: V) =>
   z.object({ target: Id, path: z.literal(path), value });
@@ -250,6 +278,9 @@ export const SetFieldOp = op("set_field", SetFieldPayload);
 export const SetLockOp = op("set_lock", SetLockPayload);
 export const ResizeCanvasOp = op("resize_canvas", ResizeCanvasPayload);
 export const MoveLegendOp = op("move_legend", MoveLegendPayload);
+export const AddNoteOp = op("add_note", AddNotePayload);
+export const EditNoteOp = op("edit_note", EditNotePayload);
+export const DeleteNoteOp = op("delete_note", DeleteNotePayload);
 
 export const DiffOp = z.discriminatedUnion("op", [
   MoveComponentOp,
@@ -273,6 +304,9 @@ export const DiffOp = z.discriminatedUnion("op", [
   SetLockOp,
   ResizeCanvasOp,
   MoveLegendOp,
+  AddNoteOp,
+  EditNoteOp,
+  DeleteNoteOp,
 ]);
 
 /** The engine's op type (source of truth, zod-free). */

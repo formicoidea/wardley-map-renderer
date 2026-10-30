@@ -246,6 +246,17 @@ describe("Inertia barrier rendering", () => {
     expect(ctx.inertiaBarriers).toHaveLength(3);
   });
 
+  it("inertiaAt places one barrier at that fraction of the arrow", () => {
+    const base = makeMapWithInertia();
+    const [e] = base.components[0].evolvesTo!;
+    const map = { ...base, components: [{ ...base.components[0], evolvesTo: [{ ...e, inertiaAt: 0.2 }] }] };
+    const ctx = buildRenderContext(map);
+    expect(ctx.inertiaBarriers).toHaveLength(1);
+    expect(ctx.inertiaBarriers[0].x).toBeCloseTo(ctx.evoToX(0.4));
+    const svg = renderEvolvesToLayer({ ...ctx, options: { ...ctx.options, interactive: true } }).join("");
+    expect(svg).toContain('data-id="a" data-kind="inertia"');
+  });
+
   it("inertia barriers are part of geometry.inertiaBarriers", () => {
     const map = makeMapWithInertia();
     const ctx = buildRenderContext(map);

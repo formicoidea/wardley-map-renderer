@@ -11,7 +11,7 @@
  */
 
 import type { DiffOp } from "../diff-ops-apply.js";
-import type { Component, Relation, WardleyMap } from "../schema.js";
+import type { Component, Note, Relation, WardleyMap } from "../schema.js";
 
 /** `key`: the field that committed (`<key>.clear` for its Clear button). */
 export type Dispatch = (op: DiffOp | DiffOp[], key: string) => void;
@@ -193,10 +193,30 @@ function relationFields(map: WardleyMap, r: Relation): FieldDesc[] {
   return f;
 }
 
-/** Pure descriptor list for a component or relation id; null for unknown ids. */
+function noteFields(n: Note): FieldDesc[] {
+  const id = n.id;
+  const edit = (patch: object) => ({ op: "edit_note", payload: { id, ...patch } }) as DiffOp;
+  return [
+    { key: "title", label: "Title", kind: "textarea", value: n.title ?? "", toOp: (v) => (v ? edit({ title: v }) : n.title ? edit({ title: null }) : null) },
+    { key: "text", label: "Text", kind: "textarea", value: n.text, toOp: (v) => (v ? edit({ text: v }) : null) },
+    {
+      key: "step", label: "Step number (empty: free text)", kind: "number", value: n.step === undefined ? "" : String(n.step),
+      min: 1, step: 1, clear: n.step !== undefined, invalid: "Step number must be a whole number ≥ 1",
+      toOp: (v) => {
+        const s = numOrNull(v);
+        return s === null ? (n.step === undefined ? null : edit({ step: null })) : Number.isInteger(s) && s >= 1 ? edit({ step: s }) : null;
+      },
+    },
+    { key: "delete", label: "Delete annotation", kind: "button", value: "", danger: true, toOp: () => ({ op: "delete_note", payload: { id } }) },
+  ];
+}
+
+/** Pure descriptor list for a component, note or relation id; null for unknown ids. */
 export function propsFields(map: WardleyMap, targetId: string): { title: string; fields: FieldDesc[] } | null {
   const c = map.components.find((x) => x.id === targetId);
   if (c) return { title: c.label.name || c.id, fields: componentFields(map, c) };
+  const n = map.notes?.find((x) => x.id === targetId);
+  if (n) return { title: n.step === undefined ? "Annotation" : `Step ${n.step} annotation`, fields: noteFields(n) };
   const r = map.relations.find((x) => x.id === targetId);
   if (!r) return null;
   const name = (cid: string) => map.components.find((x) => x.id === cid)?.label.name ?? cid;

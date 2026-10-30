@@ -18,7 +18,7 @@ import { readConfigOverrides, type DiffOp } from "../diff-ops-apply.js";
 import { mapToPx, pxToMap, renderSVGFromPrepared, type PreparedRender } from "../render/browser-render.js";
 import type { WardleyMap } from "../schema.js";
 import {
-  addComponentOp, canEvolve, canvasSize, clamp01, componentOf, connectOp, deleteOps, dragOps, dragStart, LEGEND_ID, nearestComponent,
+  addComponentOp, addNoteOp, canEvolve, canvasSize, clamp01, componentOf, connectOp, deleteOps, dragOps, dragStart, LEGEND_ID, nearestComponent,
   nodeCentre, rectToPipeline, resolveHit, selectId, selectionExists, targetOf, type DragAnchor, type DragStart, type Hit, type Pt,
 } from "./gestures.js";
 import { buildProps, PROPS_CSS } from "./props.js";
@@ -53,6 +53,8 @@ interface Gesture {
   timer: number;
   shift: boolean;
   done?: boolean;
+  /** Note part under the pointer at pointerdown (`data-field`: title / text). */
+  field?: string | null;
   /** Dragged label <text> (x/y + anchor) or legend box top-left, at pointerdown. */
   at?: DragAnchor;
 }
@@ -192,7 +194,7 @@ export function initEditor(doc: Document): void {
     }
 
     for (const sel of selection) {
-      const el = byId(targetOf(sel), sel.startsWith("evolve:") ? "evolve" : "component,pipeline,relation,legend");
+      const el = byId(targetOf(sel), sel.startsWith("evolve:") ? "evolve" : "component,pipeline,relation,legend,note");
       if (!el) continue;
       const kind = el.dataset.kind;
       if (kind === "relation" || kind === "evolve") {
@@ -318,18 +320,22 @@ export function initEditor(doc: Document): void {
   shell.on("panel-close", () => (panelFor = null));
 
   // ── Inline rename ───────────────────────────────────────────────
-  const rename = (id: string, isTitle = false) => {
+  /** `field`: which part of a note to edit (its title only when it has one). */
+  const rename = (id: string, isTitle = false, field?: string | null) => {
     editing?.finish(true);
-    const find = () => (isTitle ? mapEl.querySelector<SVGGraphicsElement>("[data-kind=title]") : byId(id, "label"));
+    const note = isTitle ? undefined : store.map.notes?.find((n) => n.id === id);
+    const part = field === "title" && note?.title ? "title" : "text";
+    const find = () => (isTitle ? mapEl.querySelector<SVGGraphicsElement>("[data-kind=title]")
+      : note ? byId(id, "note")?.querySelector<SVGGraphicsElement>(`[data-field=${part}]`) ?? null : byId(id, "label"));
     const el = find();
     const comp = store.map.components.find((c) => c.id === id);
-    if (!el || (!isTitle && !comp)) return comp && openProps(id);
-    const old = isTitle ? store.map.title : comp!.label.name;
+    if (!el || (!isTitle && !comp && !note)) return comp && openProps(id);
+    const old = isTitle ? store.map.title : note ? note[part]! : comp!.label.name;
     const ta = doc.createElement("textarea");
     ta.className = "wm-rename";
     ta.value = old;
     ta.rows = old.split("\n").length;
-    ta.setAttribute("aria-label", isTitle ? "Map title" : "Component name");
+    ta.setAttribute("aria-label", isTitle ? "Map title" : note ? (part === "title" ? "Note title" : "Note text") : "Component name");
     let done = false;
     // The box hides its overflow, so it must follow the text: re-measured on
     // every input and whenever place() changes the font size or the width.
@@ -357,7 +363,8 @@ export function initEditor(doc: Document): void {
       const name = ta.value.replace(/\s+$/, "");
       ta.remove();
       if (!ok || !name.trim() || name === old) return;
-      commit([isTitle ? { op: "rename_map", payload: { title: name } } : { op: "rename_component", payload: { id, name } }]);
+      commit([isTitle ? { op: "rename_map", payload: { title: name } }
+        : note ? { op: "edit_note", payload: { id, [part]: name } } : { op: "rename_component", payload: { id, name } }]);
     };
     ta.addEventListener("keydown", (ev) => {
       ev.stopPropagation();
@@ -389,11 +396,11 @@ export function initEditor(doc: Document): void {
     hoverOver = null;
     drawOverlay();
   };
-  const add = (op: ReturnType<typeof addComponentOp>) => {
+  const add = (op: ReturnType<typeof addComponentOp> | ReturnType<typeof addNoteOp>) => {
     if (!commit([op])) return;
     shell.setTool("select");
     select([op.payload.id!]);
-    rename(op.payload.id!);
+    rename(op.payload.id!, false, op.op === "add_note" ? "title" : undefined);
   };
 
   const onClick = (c: Gesture) => {
@@ -407,8 +414,8 @@ export function initEditor(doc: Document): void {
     if (t === "select" && dbl) {
       if (!hit) return add(addComponentOp(store.map, c.start));
       if (hit.kind === "legend") return select([LEGEND_ID]); // the legend is neither renamed nor edited
-      if (hit.kind === "relation" || hit.kind === "evolve") return openProps(hit.id);
-      return rename(hit.id, hit.kind === "title");
+      if (hit.kind === "relation" || hit.kind === "evolve" || hit.kind === "inertia") return openProps(hit.id);
+      return rename(hit.id, hit.kind === "title", c.field);
     }
     if ((t === "link" || t === "evolve")) {
       const comp = componentOf(hit);
@@ -431,6 +438,7 @@ export function initEditor(doc: Document): void {
     // A click inside a pipeline adds a member component.
     if (t === "component" && (!hit || hit.kind === "pipeline")) return add(addComponentOp(store.map, c.start));
     if (t === "pipeline" && !hit) return add(addComponentOp(store.map, c.start, "pipeline"));
+    if (t === "note" && hit?.kind !== "note") return add(addNoteOp(store.map, c.start));
     const id = selectId(hit);
     if (!id) return select([]);
     if (c.shift) select(selection.includes(id) ? selection.filter((s) => s !== id) : [...selection, id]);
@@ -479,6 +487,7 @@ export function initEditor(doc: Document): void {
     const c: Gesture = {
       mode, pid: ev.pointerId, cx: ev.clientX, cy: ev.clientY, moved: false, hit, start, cur: start,
       from: mode === "link" || mode === "evolve" ? comp! : undefined, ops: [], timer: 0, shift: ev.shiftKey,
+      field: (ev.target as Element).closest?.("[data-field]")?.getAttribute("data-field"),
       at: text
         ? { x: +text.getAttribute("x")!, y: +text.getAttribute("y")!, anchor: text.getAttribute("text-anchor") }
         : legendBox ? { x: legendBox.x, y: legendBox.y } : undefined,

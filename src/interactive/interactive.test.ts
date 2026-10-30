@@ -289,6 +289,30 @@ describe("interactive controller", () => {
     key(ta, "Escape");
   });
 
+  it("the text tool adds an annotation: title edited in place, text on dblclick, deleted", () => {
+    const tool = $<HTMLButtonElement>("[data-tool=note]");
+    ptr(tool, "pointerdown", 0, 0);
+    tool.click();
+    click($("#map [data-kind=background]"), 200);
+    const ta = $<HTMLTextAreaElement>(".wm-rename");
+    expect(ta.getAttribute("aria-label")).toBe("Note title");
+    ta.value = "Fascination";
+    key(ta, "Enter");
+    const [note] = api().getMap().notes!;
+    expect(note).toMatchObject({ title: "Fascination", text: "Description" });
+    expect(api().getDiff().slice(-2).map((o) => o.op)).toEqual(["add_note", "edit_note"]);
+    const g = $(`#map [data-id="${note.id}"][data-kind=note]`);
+    expect(g.textContent).toContain("Fascination");
+    dblclick(g.querySelector("[data-field=text]")!);
+    const again = $<HTMLTextAreaElement>(".wm-rename");
+    expect(again.getAttribute("aria-label")).toBe("Note text");
+    again.value = "On s'émerveille\nla valeur reste floue";
+    key(again, "Enter");
+    expect(api().getMap().notes![0].text).toBe("On s'émerveille\nla valeur reste floue");
+    act("delete");
+    expect(api().getMap().notes).toBeUndefined();
+  });
+
   it("send: clipboard keeps the diff; endpoint delivery checkpoints it", async () => {
     const n = api().getDiff().length;
     expect(n).toBeGreaterThan(0);

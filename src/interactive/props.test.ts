@@ -78,6 +78,22 @@ describe("enum mirrors", () => {
   });
 });
 
+describe("note fields", () => {
+  it("edit the text, link/unlink a step, delete", () => {
+    const map = { ...sample(), notes: [{ id: "n", text: "Hi", position: pos(0.2, 0.2) }] };
+    expect(propsFields(map, "n")!.title).toBe("Annotation");
+    expect(applies(map, byKey(fields(map, "n"), "title")!.toOp("T")).notes![0].title).toBe("T");
+    const f = fields(map, "n");
+    const linked = applies(map, byKey(f, "step")!.toOp("2"));
+    expect(linked.notes![0].step).toBe(2);
+    expect(propsFields(linked, "n")!.title).toBe("Step 2 annotation");
+    expect(byKey(f, "step")!.toOp("1.5")).toBeNull();
+    expect(applies(linked, byKey(fields(linked, "n"), "step")!.toOp(null)).notes![0].step).toBeUndefined();
+    expect(applies(map, byKey(f, "text")!.toOp("Bye")).notes![0].text).toBe("Bye");
+    expect(applies(map, byKey(f, "delete")!.toOp(true)).notes).toBeUndefined();
+  });
+});
+
 describe("propsFields", () => {
   it("returns null for unknown ids", () => {
     expect(propsFields(sample(), "nope")).toBeNull();

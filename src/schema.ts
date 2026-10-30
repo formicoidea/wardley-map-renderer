@@ -195,6 +195,8 @@ export const EvolvesToSchema = z.object({
   evolveType: EvolveTypeEnum.default("natural"),
   /** When true, indicates resistance to evolution (inertia barrier at phase boundary). */
   inertia: z.boolean().optional(),
+  /** Where the inertia barrier sits along the arrow (0 = source, 1 = head); default: crossed phase boundaries. */
+  inertiaAt: z.number().min(0).max(1).transform(round3).optional(),
 });
 
 // ── Pipeline geometry ───────────────────────────────────────
@@ -1391,11 +1393,27 @@ export interface RenderConfigInput {
 // DECORATORS (see ComponentSchema). The former top-level AcceleratorSchema,
 // StepSchema and WardleyMapSchema.accelerators/steps have been removed.
 
+// ── Note (free text placed on the map) ─────────────────────
+/**
+ * Annotation card on the map: optional bold `title` above the `text`, on its own
+ * background (it sits above the map). `position` is the card's top-left corner.
+ * With `step`, it is that step's annotation: a sticker matching the step's
+ * number/colour, title in that colour. `position.evolution.range` is ignored.
+ */
+export const NoteSchema = z.object({
+  id: z.string().min(1),
+  title: z.string().min(1).optional(),
+  text: z.string().min(1),
+  position: PositionSchema,
+  step: z.number().int().min(1).optional(),
+});
+
 // ── Wardley Map ────────────────────────────────────────────
 export const WardleyMapSchema = z.object({
   title: z.string(),
   components: z.array(ComponentSchema),
   relations: z.array(RelationSchema),
+  notes: z.array(NoteSchema).optional(),
   context: z.string().optional(),
   // Optional render config. The PUBLIC input shape is the v3 schema
   // (display/rendering/style). It is validated by RenderConfigV3Schema and then
@@ -1427,6 +1445,8 @@ export type EvolutionRange = z.infer<typeof EvolutionRangeSchema>;
 export type EvolvesTo = z.infer<typeof EvolvesToSchema>;
 export type PipelineGeometry = z.infer<typeof PipelineGeometrySchema>;
 export type Relation = z.infer<typeof RelationSchema>;
+/** Free text placed on the map (optionally a step's text). */
+export type Note = z.infer<typeof NoteSchema>;
 export type Flow = z.infer<typeof FlowSchema>;
 export type RelationType = z.infer<typeof RelationTypeEnum>;
 export type AxisLabels = z.infer<typeof AxisLabelsSchema>;
@@ -1731,6 +1751,11 @@ export function sanitizeMap(raw: WardleyMap): WardleyMap {
     seen.add(key);
     return true;
   });
+
+  for (const n of map.notes ?? []) {
+    n.position.evolution.scalar = clamp01(n.position.evolution.scalar);
+    n.position.visibility.scalar = clamp01(n.position.visibility.scalar);
+  }
 
   return map;
 }

@@ -14,7 +14,7 @@ body{font:14px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;backgrou
 #viewport{position:fixed;inset:0;overflow:hidden;touch-action:none;cursor:default}
 #viewport[data-tool=pan],#viewport.grab{cursor:grab}
 #viewport.panning{cursor:grabbing}
-#viewport[data-tool=component]{cursor:crosshair}
+#viewport:is([data-tool=component],[data-tool=note]){cursor:crosshair}
 #stage{position:absolute;left:0;top:0;transform-origin:0 0}
 #map,#map>svg,#overlay{display:block;width:100%;height:100%}
 #map>svg{box-shadow:var(--shadow);border-radius:2px}
@@ -70,6 +70,7 @@ svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stro
 <button data-tool="link" aria-label="Link components (L)"><svg class="i" viewBox="0 0 24 24"><path d="M8.5 15.5l7-7M4 18a2.5 2.5 0 1 0 5 0a2.5 2.5 0 1 0-5 0M15 6a2.5 2.5 0 1 0 5 0a2.5 2.5 0 1 0-5 0"/></svg></button>
 <button data-tool="evolve" aria-label="Evolve (E)"><svg class="i" viewBox="0 0 24 24"><path d="M3 12h2m3 0h2m3 0h6M15 7l5 5-5 5"/></svg></button>
 <button data-tool="pipeline" aria-label="Pipeline (P)"><svg class="i" viewBox="0 0 24 24"><path d="M3 8h18v8H3zM8 12h.01M16 12h.01"/></svg></button>
+<button data-tool="note" aria-label="Add text (T)"><svg class="i" viewBox="0 0 24 24"><path d="M5 6V4h14v2M12 4v16M9 20h6"/></svg></button>
 <button data-tool="background" aria-label="Resize map background (B)"><svg class="i" viewBox="0 0 24 24"><path d="M4 4h16v16H4zM12 4v3M12 17v3M4 12h3M17 12h3"/></svg></button>
 <button data-tool="pan" aria-label="Pan (H or hold Space)"><svg class="i" viewBox="0 0 24 24"><path d="M12 3v18M3 12h18M9 6l3-3 3 3M9 18l3 3 3-3M6 9l-3 3 3 3M18 9l3 3-3 3"/></svg></button>
 <span class="sep"></span>

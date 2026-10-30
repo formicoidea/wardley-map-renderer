@@ -465,3 +465,26 @@ describe("resize_canvas / move_legend / readConfigOverrides", () => {
       .toThrow(/position must be one of/);
   });
 });
+
+describe("notes", () => {
+  it("add_note / edit_note / delete_note, ids unique across the map, zod accepts them", () => {
+    const ops: DiffOp[] = [
+      { op: "add_note", payload: { text: "Hello", evolution: 0.2, visibility: 0.3 } },
+      { op: "add_note", payload: { id: "s1", text: "Step one", evolution: 0.5, visibility: 0.5, step: 1 } },
+      { op: "edit_note", payload: { id: "note", text: "Hi\nthere", evolution: 0.25, step: 2 } },
+      { op: "edit_note", payload: { id: "s1", step: null } },
+    ];
+    for (const op of ops) expect(DiffOpSchema.safeParse(op).success).toBe(true);
+    const map = applyDiffOps(makeMap(), ops);
+    expect(map.notes).toEqual([
+      { id: "note", text: "Hi\nthere", position: { evolution: { scalar: 0.25 }, visibility: { scalar: 0.3 } }, step: 2 },
+      { id: "s1", text: "Step one", position: { evolution: { scalar: 0.5 }, visibility: { scalar: 0.5 } } },
+    ]);
+    expect(uniqueId(map, "note")).toBe("note-2");
+    expect(() => applyDiffOp(map, { op: "add_note", payload: { id: "out", text: "x", evolution: 0, visibility: 0 } })).toThrow(/already exists/);
+    expect(() => applyDiffOp(map, { op: "edit_note", payload: { id: "s1", step: 0 } })).toThrow(/step must be/);
+    expect(() => applyDiffOp(map, { op: "edit_note", payload: { id: "s1", text: "" } })).toThrow(/non-empty/);
+    const gone = applyDiffOps(map, [{ op: "delete_note", payload: { id: "note" } }, { op: "delete_note", payload: { id: "s1" } }]);
+    expect(gone.notes).toBeUndefined();
+  });
+});
